@@ -226,6 +226,12 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
+  // some arguments missing? show usage
+  if (!pid) {
+    print_usage();
+    return 0;
+  }
+
   if (!addr && !size && !write_filename) {
     if (!pid) {
       printf("memory search mode requires a process id or name\n");
@@ -234,12 +240,6 @@ int main(int argc, char* argv[]) {
     if (getuid())
       printf("warning: memwatch likely will not work if not run as root\n");
     return memory_search(pid, pause_during);
-  }
-
-  // some arguments missing? show usage
-  if ((!size && !write_filename) || !addr || (!pid && !processname[0])) {
-    print_usage();
-    return 0;
   }
 
   if (getuid())
