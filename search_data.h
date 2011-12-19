@@ -47,6 +47,7 @@ typedef struct _MemorySearchData {
   int type;
   char name[0x80];
   VMRegionDataMap* memory;
+  unsigned long long prev_size;
   unsigned long long numResults;
   unsigned long long results[0];
 } MemorySearchData;
@@ -60,7 +61,7 @@ void DeleteSearch(MemorySearchData* search);
 // DON'T DELETE THE MAP AFTER CALLING THIS FUNCTION. it becomes part of the
 // search object and will be deleted when the search object is deleted.
 MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
-                                   int pred, void* value);
+    int pred, void* value, unsigned long long size);
 
 const char* GetSearchTypeName(int type);
 int GetSearchTypeByName(const char* name);

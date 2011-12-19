@@ -48,11 +48,11 @@ static inline bswap_int64_t(void* a) {
 // operator declarations
 
 #define DECLARE_OP_FUNCTION(type, op, name) \
-  static int name(type* a, type* b) { \
+  static int name(type* a, type* b, int size) { \
     return op; \
   }
 #define DECLARE_LE_OP_FUNCTION(type, op, name) \
-  static int name(type* a, type* b) { \
+  static int name(type* a, type* b, int size) { \
     bswap_##type(a); \
     bswap_##type(b); \
     type rv = op; \
@@ -61,7 +61,7 @@ static inline bswap_int64_t(void* a) {
     return rv; \
   }
 
-static int null_pred(void* a, void* b) { return 1; }
+static int null_pred(void* a, void* b, int size) { return 1; }
 
 #define FLAG_OP   (*a ^ *b) && !((*a ^ *b) & ((*a ^ *b) - 1))
 
@@ -116,49 +116,65 @@ DECLARE_LE_OPS_FOR_TYPE(int64_t)
 DECLARE_LE_OPS_FOR_TYPE_NOFLAG(float)
 DECLARE_LE_OPS_FOR_TYPE_NOFLAG(double)
 
+static int data_lt(void* a, void* b, int size) { return (memcmp(a, b, size) < 0); }
+static int data_gt(void* a, void* b, int size) { return (memcmp(a, b, size) > 0); }
+static int data_le(void* a, void* b, int size) { return (memcmp(a, b, size) <= 0); }
+static int data_ge(void* a, void* b, int size) { return (memcmp(a, b, size) >= 0); }
+static int data_eq(void* a, void* b, int size) { return !memcmp(a, b, size); }
+static int data_ne(void* a, void* b, int size) { return !!memcmp(a, b, size); }
 
+static int data_flag(void* a, void* b, int size) {
+  int bit_found = 0;
+  int x;
+  for (x = 0; (x < size) && (bit_found < 2); x++) {
+    char axb = *(char*)a ^ *(char*)b;
+    if (axb && !(axb & (axb - 1)))
+      bit_found++;
+  }
+  return (bit_found == 1);
+}
 
 #define INFIX_FUNCTION_POINTERS_FOR_TYPE(type) \
-  {(int (*)(void*, void*))type##_lt, \
-   (int (*)(void*, void*))type##_gt, \
-   (int (*)(void*, void*))type##_le, \
-   (int (*)(void*, void*))type##_ge, \
-   (int (*)(void*, void*))type##_eq, \
-   (int (*)(void*, void*))type##_ne, \
-   (int (*)(void*, void*))type##_flag, \
-   (int (*)(void*, void*))null_pred}
+  {(int (*)(void*, void*, int))type##_lt, \
+   (int (*)(void*, void*, int))type##_gt, \
+   (int (*)(void*, void*, int))type##_le, \
+   (int (*)(void*, void*, int))type##_ge, \
+   (int (*)(void*, void*, int))type##_eq, \
+   (int (*)(void*, void*, int))type##_ne, \
+   (int (*)(void*, void*, int))type##_flag, \
+   (int (*)(void*, void*, int))null_pred}
 #define INFIX_FUNCTION_POINTERS_FOR_TYPE_NOFLAG(type) \
-  {(int (*)(void*, void*))type##_lt, \
-   (int (*)(void*, void*))type##_gt, \
-   (int (*)(void*, void*))type##_le, \
-   (int (*)(void*, void*))type##_ge, \
-   (int (*)(void*, void*))type##_eq, \
-   (int (*)(void*, void*))type##_ne, \
+  {(int (*)(void*, void*, int))type##_lt, \
+   (int (*)(void*, void*, int))type##_gt, \
+   (int (*)(void*, void*, int))type##_le, \
+   (int (*)(void*, void*, int))type##_ge, \
+   (int (*)(void*, void*, int))type##_eq, \
+   (int (*)(void*, void*, int))type##_ne, \
    NULL, \
-   (int (*)(void*, void*))null_pred}
+   (int (*)(void*, void*, int))null_pred}
 #define INFIX_LE_FUNCTION_POINTERS_FOR_TYPE(type) \
-  {(int (*)(void*, void*))type##_lt_r, \
-   (int (*)(void*, void*))type##_gt_r, \
-   (int (*)(void*, void*))type##_le_r, \
-   (int (*)(void*, void*))type##_ge_r, \
-   (int (*)(void*, void*))type##_eq_r, \
-   (int (*)(void*, void*))type##_ne_r, \
-   (int (*)(void*, void*))type##_flag_r, \
-   (int (*)(void*, void*))null_pred}
+  {(int (*)(void*, void*, int))type##_lt_r, \
+   (int (*)(void*, void*, int))type##_gt_r, \
+   (int (*)(void*, void*, int))type##_le_r, \
+   (int (*)(void*, void*, int))type##_ge_r, \
+   (int (*)(void*, void*, int))type##_eq_r, \
+   (int (*)(void*, void*, int))type##_ne_r, \
+   (int (*)(void*, void*, int))type##_flag_r, \
+   (int (*)(void*, void*, int))null_pred}
 #define INFIX_LE_FUNCTION_POINTERS_FOR_TYPE_NOFLAG(type) \
-  {(int (*)(void*, void*))type##_lt_r, \
-   (int (*)(void*, void*))type##_gt_r, \
-   (int (*)(void*, void*))type##_le_r, \
-   (int (*)(void*, void*))type##_ge_r, \
-   (int (*)(void*, void*))type##_eq_r, \
-   (int (*)(void*, void*))type##_ne_r, \
+  {(int (*)(void*, void*, int))type##_lt_r, \
+   (int (*)(void*, void*, int))type##_gt_r, \
+   (int (*)(void*, void*, int))type##_le_r, \
+   (int (*)(void*, void*, int))type##_ge_r, \
+   (int (*)(void*, void*, int))type##_eq_r, \
+   (int (*)(void*, void*, int))type##_ne_r, \
    NULL, \
-   (int (*)(void*, void*))null_pred}
+   (int (*)(void*, void*, int))null_pred}
 
 struct _SearchTypeConfig {
-  int (*funcs[8])(void* a, void* b);
+  int (*funcs[8])(void* a, void* b, int size);
   int field_size;
-} typeConfigs[18] = {
+} typeConfigs[19] = {
   {INFIX_FUNCTION_POINTERS_FOR_TYPE(uint8_t),          1},
   {INFIX_FUNCTION_POINTERS_FOR_TYPE(uint16_t),         2},
   {INFIX_LE_FUNCTION_POINTERS_FOR_TYPE(uint16_t),      2},
@@ -177,7 +193,7 @@ struct _SearchTypeConfig {
   {INFIX_LE_FUNCTION_POINTERS_FOR_TYPE_NOFLAG(float),  4},
   {INFIX_FUNCTION_POINTERS_FOR_TYPE_NOFLAG(double),    8},
   {INFIX_LE_FUNCTION_POINTERS_FOR_TYPE_NOFLAG(double), 8},
-  //{INFIX_FUNCTION_POINTERS_FOR_TYPE(data),             1},
+  {INFIX_FUNCTION_POINTERS_FOR_TYPE(data),             1},
 };
 
 
@@ -191,6 +207,7 @@ MemorySearchData* CreateNewSearch(int type, const char* name) {
     return NULL;
 
   strncpy(s->name, name, 0x80);
+  s->prev_size = 0;
   s->type = type;
   s->numResults = 0;
   s->memory = NULL;
@@ -216,7 +233,7 @@ void DeleteSearch(MemorySearchData* search) {
 
 // copies a memory search data structure
 MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
-                                   int pred, void* value) {
+    int pred, void* value, unsigned long long size) {
 
   int x;
 
@@ -257,6 +274,13 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
       return NULL;
     }
 
+    // there is no previous search: if this is a data search, then size better
+    // not be zero
+    if ((n->type == SEARCHTYPE_DATA) && !size) {
+      printf("zero size given on initial data search\n");
+      return NULL;
+    }
+
     // check every address in every region
     unsigned long long y;
     unsigned long long numAllocatedResults = 0;
@@ -268,12 +292,12 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
 
       // for every cell in the region...
       for (y = 0;
-           y < n->memory->regions[x].region._size;
+           y < n->memory->regions[x].region._size - size;
            y += typeConfigs[n->type].field_size) {
 
         // do the comparison; skip it if it fails
         if (!typeConfigs[n->type].funcs[pred](&n->memory->regions[x].u8_data[y],
-                                              value))
+                                              value, size))
           continue;
 
         // expand the result list if necessary
@@ -296,8 +320,6 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
         n->numResults++;
       }
     }
-    return (MemorySearchData*)realloc(n, sizeof(MemorySearchData) +
-                n->numResults * sizeof(unsigned long long));
 
   // this isn't the first search: we need to verify the results
   } else {
@@ -330,7 +352,8 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
       void* target_data = (value && s->memory) ? value :
         (void*)(n->results[x] - s->memory->regions[currentRegion].region._address +
          (unsigned long long)s->memory->regions[currentRegion].data);
-      if (!(typeConfigs[n->type].funcs[pred](current_data, target_data)))
+      if (!(typeConfigs[n->type].funcs[pred](current_data, target_data,
+                                             size ? size : n->prev_size)))
         n->results[x] = 0;
     }
 
@@ -343,9 +366,12 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
       }
     }
     n->numResults = numRemainingResults;
-    return (MemorySearchData*)realloc(n, sizeof(MemorySearchData) +
-        n->numResults * sizeof(unsigned long long));
   }
+
+  // save the prev size and return
+  n->prev_size = size;
+  return (MemorySearchData*)realloc(n, sizeof(MemorySearchData) +
+                                    n->numResults * sizeof(unsigned long long));
 }
 
 // returns a string representing the given search type name
@@ -369,6 +395,7 @@ const char* GetSearchTypeName(int type) {
     case SEARCHTYPE_FLOAT_LE:  return "lfloat";
     case SEARCHTYPE_DOUBLE:    return "double";
     case SEARCHTYPE_DOUBLE_LE: return "ldouble";
+    case SEARCHTYPE_DATA:      return "arbitrary";
     case SEARCHTYPE_UNKNOWN:   return "unknown";
   }
 }
@@ -378,6 +405,9 @@ int GetSearchTypeByName(const char* name) {
   // skip whitespace
   while (name[0] == ' ' || name[0] == '\t')
     name++;
+
+  if (name[0] == 'a')
+    return SEARCHTYPE_DATA;
 
   // l = reverse-endian
   if (name[0] == 'l') {

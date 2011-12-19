@@ -342,6 +342,7 @@ int memory_search(pid_t pid, int pause_during) {
 
         // check if a value followed the predicate
         void* value = NULL;
+        size = 0;
         char* value_text = skip_word(arguments);
         if (*value_text) {
 
@@ -359,6 +360,9 @@ int memory_search(pid_t pid, int pause_during) {
           } else if (search->type == SEARCHTYPE_DOUBLE) {
             sscanf(value_text, "%lf", &dvalue);
             value = &dvalue;
+          } else if (search->type == SEARCHTYPE_DATA) {
+            size = read_string_data(value_text, strlen(value_text), value_text);
+            value = value_text;
           }
         }
 
@@ -376,7 +380,7 @@ int memory_search(pid_t pid, int pause_during) {
 
         // run the search
         MemorySearchData* search_result = ApplyMapToSearch(search, map, pred,
-                                                           value);
+                                                           value, size);
         map = NULL;
         free(arguments);
 
@@ -388,7 +392,7 @@ int memory_search(pid_t pid, int pause_during) {
 
         DeleteSearch(search);
         search = search_result;
-        if (search->numResults >= 100) {
+        if (search->numResults >= 20) {
           printf("results: %lld\n", search->numResults);
           break;
         }

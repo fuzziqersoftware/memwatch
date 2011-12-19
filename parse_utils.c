@@ -78,7 +78,7 @@ unsigned long long read_stream_data(FILE* in, void** vdata) {
   unsigned char** data = (unsigned char**)vdata;
 
   long x;
-  int in_ch, chr;
+  int in_ch, chr = 0;
   int read, string = 0, unicodestring = 0, high = 1;
   unsigned long size = 0;
   while ((in_ch = fgetc(in)) != EOF) {
@@ -167,7 +167,7 @@ char* skip_word(char* in) {
 int read_string_data(const char* in_buffer, long in_size,
                      unsigned char* out_buffer) {
   long x,size = 0;
-  int chr;
+  int chr = 0;
   int read,string = 0,unicodestring = 0,high = 1;
   
   for (x = 0; x < in_size; x++) {
