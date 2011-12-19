@@ -1,0 +1,4 @@
+*.o
+memwatch
+value_test
+value_test_float
