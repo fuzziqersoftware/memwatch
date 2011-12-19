@@ -1,0 +1,26 @@
+CC=gcc
+OBJECTS=memwatch.o vmmap.o memory_search.o search_data.o vmmap_data.o process_utils.o parse_utils.o freeze_region.o
+CFLAGS=-g -m64
+LDFLAGS=-m64
+
+all: memwatch value_test value_test_float
+
+install: memwatch
+	cp memwatch /usr/bin/memwatch
+
+memwatch: $(OBJECTS)
+	g++ $(LDFLAGS) -o memwatch $^
+
+value_test: value_test.o
+	g++ $(LDFLAGS) -o value_test $^
+
+value_test_float: value_test_float.o
+	g++ $(LDFLAGS) -o value_test_float $^
+
+.cpp.o:
+	g++ $(CFLAGS) -c $<
+
+clean:
+	-rm *.o memwatch value_test
+
+.PHONY: clean
