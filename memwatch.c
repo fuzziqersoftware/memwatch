@@ -72,7 +72,6 @@ void print_usage() {
 "    -w<file>    write file to memory\n"
 "    -d<data>    write given data to memory\n"
 "    -g          do not loop; read/write once and exit\n"
-"    -k          use memwatch variable finder (overrides other arguments)\n"
 "    -s<flag>    set display flags\n"
 "    -i<time>    set update interval, in microseconds (default 1 second)\n"
 "\n"
@@ -83,7 +82,9 @@ void print_usage() {
 "example: write \"hello\" (with trailing \\0) to 0x1058EA9C in process 7698 once\n"
 "    sudo memwatch 7698 0x1058EA9C -d\"hello\"00 -g\n"
 "example: write data.bin to 0xF1096820 in process 933 every second\n"
-"    sudo memwatch 933 0xF1096820 -wdata.bin\n");
+"    sudo memwatch 933 0xF1096820 -wdata.bin\n"
+"example: use variable finder on Firefox\n"
+"    sudo memwatch firefox\n");
 }
 
 // main()
@@ -103,7 +104,6 @@ int main(int argc, char* argv[]) {
   int interval = 1000000;
   char* write_filename = NULL;
   void* write_data = NULL;
-  int use_searcher = 0;
   int pause_during = 0;
   char processname[PROCESS_NAME_LENGTH] = {0};
 
@@ -114,10 +114,6 @@ int main(int argc, char* argv[]) {
     // -g, --once-only: don't loop
     if (!strcmp(argv[x], "-g") || !strcmp(argv[x], "--once-only"))
       loop = 0;
-
-    // -k, --search: enable memory searching routines
-    else if (!strcmp(argv[x], "-k") || !strcmp(argv[x], "--search"))
-      use_searcher = 1;
 
     // -p, --pause: pause program while doing things to it
     else if (!strcmp(argv[x], "-p") || !strcmp(argv[x], "--pause"))
@@ -220,17 +216,6 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  // memory searching?
-  if (use_searcher) {
-    if (getuid())
-      printf("warning: memwatch likely will not work if not run as root\n");
-    if (!pid) {
-      printf("memory search mode requires a process id or name\n");
-      return (-2);
-    }
-    return memory_search(pid, pause_during);
-  }
-
   // listing processes or commands?
   if (list_procs) {
     enumprocesses(print_process, NULL, 0);
@@ -239,6 +224,16 @@ int main(int argc, char* argv[]) {
   if (list_commands) {
     enumprocesses(print_process, NULL, 1);
     return 0;
+  }
+
+  if (!addr && !size && !write_filename) {
+    if (!pid) {
+      printf("memory search mode requires a process id or name\n");
+      return (-2);
+    }
+    if (getuid())
+      printf("warning: memwatch likely will not work if not run as root\n");
+    return memory_search(pid, pause_during);
   }
 
   // some arguments missing? show usage
