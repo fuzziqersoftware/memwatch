@@ -21,6 +21,6 @@ value_test_float: value_test_float.o
 	g++ $(CFLAGS) -c $<
 
 clean:
-	-rm *.o memwatch value_test
+	-rm *.o memwatch value_test value_test_float
 
 .PHONY: clean
