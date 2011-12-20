@@ -90,16 +90,31 @@ int memory_search(pid_t pid, int pause_during) {
 "  x                     print current search results\n"
 "  -                     pause process\n"
 "  +                     resume process\n"
+"  q                     exit memwatch\n"
 "\n"
 "<addr+size> may be either <addr(hex)> <size(dec)> or <addr(hex)>:<size(hex)>.\n"
 "all <data> arguments are in immediate format (see main usage statement).\n"
+"\n"
 "the f command is like the w command, but the write is repeated in the\n"
 "  background until canceled by a u command.\n"
 "new freezes will be named with the same name as the current search (if any).\n"
-"valid types for S command: u8, u16, u32, u64, s8, s16, s32, s64, float, double.\n"
-"any type except u8 and s8 may be prefixed with l to make it reverse-endian.\n"
+"\n"
+"searches done with the s command will increment on the previous search and\n"
+"  narrow down the results. searches donw ti the t command are one-time searches\n"
+"  and don\'t affect the current search results.\n"
+"\n"
+"valid types for S command: u8, u16, u32, u64, s8, s16, s32, s64,\n"
+"  float, double, arbitrary.\n"
+"any type except arbitrary may be prefixed with l to make it reverse-endian.\n"
+"arbitrary may be used to search for a string; i.e. the values being searched\n"
+"  for are given in immediate data format.\n"
+"reverse-endian searches are usually not necessary. one case in which they may\n"
+"  be necessary is when the target is an emulator emulating a reverse-endian\n"
+"  system; i.e. on mac os x, a powerpc app will require reverse-endian searches.\n"
+"\n"
 "valid operators for s command: = < > <= >= != $\n"
 "the $ operator does a flag search (finds values that differ by only one bit).\n"
+"  for example, 04 $ 0C is true, but 04 $ 02 is false.\n"
 "if the value on the s command is omitted, the previous value (from the last\n"
 "  search) is used.\n"
 "\n"
@@ -182,6 +197,7 @@ int memory_search(pid_t pid, int pause_during) {
         size = read_stream_data(stdin, &write_data);
 
         // find the string in a region somewhere
+        unsigned long long num_results = 0;
         for (x = 0; x < map->numRegions; x++) {
 
           // skip regions with no data
@@ -193,9 +209,11 @@ int memory_search(pid_t pid, int pause_during) {
             if (!memcmp(&map->regions[x].s8_data[y], write_data, size)) {
               printf("string found at %016llX\n",
                      map->regions[x].region._address + y);
+              num_results++;
             }
           }
         }
+        printf("results: %llu\n", num_results);
 
         free(write_data);
         DestroyDataMap(map);
@@ -402,10 +420,18 @@ int memory_search(pid_t pid, int pause_during) {
       // print search results
       case 'x':
       case 'X':
+        if (!search) {
+          printf("no search currently open\n");
+          break;
+        }
+        if (!search->memory) {
+          printf("no initial search performed\n");
+          break;
+        }
         for (x = 0; x < search->numResults; x++)
           printf("%016llX\n", search->results[x]);
         printf("results: %lld\n", search->numResults);
-
+        
         break;
 
       // pause process
