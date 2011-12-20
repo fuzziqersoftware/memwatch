@@ -7,6 +7,21 @@
 #include "memory_search.h"
 #include "parse_utils.h"
 
+// signal handler for ctrl+c: cancel operations
+
+int* cancel_var = NULL;
+
+void sigint(int signum) {
+  if (cancel_var) {
+    printf(" -- canceling operation\n");
+    *cancel_var = 0;
+    cancel_var = NULL;
+  } else {
+    printf("no operation to cancel - terminating\n");
+    exit(0);
+  }
+}
+
 // callbacks for process enumaration
 
 // prints the process
@@ -94,6 +109,7 @@ int main(int argc, char* argv[]) {
 
   // hello there
   printf("fuzziqer software memwatch\n\n");
+  signal(SIGINT, sigint);
 
   // omg tons of variables
   mach_vm_address_t addr = 0;
@@ -271,9 +287,10 @@ int main(int argc, char* argv[]) {
   }
 
   // repeatedly read & write data
-  int error;
+  int error, cont = 1;
   void* read_data = malloc((unsigned int)size);
   getpidname(pid, processname, 0x40);
+  cancel_var = &cont;
   do {
     if (error = VMReadBytes(pid, addr, read_data, &size))
       print_process_data(processname, addr, read_data, size);
@@ -287,7 +304,7 @@ int main(int argc, char* argv[]) {
       break;
     printf("\n");
     usleep(interval);
-  } while (error);
+  } while (error && cont);
   free(read_data);
   if (write_data)
     free(write_data);

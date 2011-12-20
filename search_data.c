@@ -3,6 +3,8 @@
 #include "vmmap_data.h"
 #include "search_data.h"
 
+extern int* cancel_var;
+
 ////////////////////////////////////////////////////////////////////////////////
 // byteswap routines
 
@@ -284,7 +286,9 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
     // check every address in every region
     unsigned long long y;
     unsigned long long numAllocatedResults = 0;
-    for (x = 0; x < n->memory->numRegions; x++) {
+    int cont = 1;
+    cancel_var = &cont;
+    for (x = 0; cont && (x < n->memory->numRegions); x++) {
 
       // if the region has no data, skip it
       if (!n->memory->regions[x].data)
@@ -292,7 +296,7 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
 
       // for every cell in the region...
       for (y = 0;
-           y < n->memory->regions[x].region._size - size;
+           cont && (y < n->memory->regions[x].region._size - size);
            y += typeConfigs[n->type].field_size) {
 
         // do the comparison; skip it if it fails
@@ -320,6 +324,13 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
         n->numResults++;
       }
     }
+    cancel_var = NULL;
+
+    // if we were canceled, return NULL
+    if (!cont) {
+      DeleteSearch(n);
+      return NULL;
+    }
 
   // this isn't the first search: we need to verify the results
   } else {
@@ -328,7 +339,9 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
     // by setting its address to 0
     int x;
     int currentRegion = 0;
-    for (x = 0; x < n->numResults; x++) {
+    int cont = 1;
+    cancel_var = &cont;
+    for (x = 0; cont && (x < n->numResults); x++) {
 
       // move the current region until we're inside it
       while (currentRegion < n->memory->numRegions &&
@@ -366,6 +379,14 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
       }
     }
     n->numResults = numRemainingResults;
+    cancel_var = NULL;
+    
+    // if we were canceled, return NULL
+    if (!cont) {
+      DeleteSearch(n);
+      return NULL;
+    }
+    
   }
 
   // save the prev size and return

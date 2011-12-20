@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include "vmmap_data.h"
 
+extern int* cancel_var;
+
 VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
 
   // read the first region
@@ -21,7 +23,10 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
   map->numRegions = 0;
 
   // now, for each region...
-  for (; !VMEqualRegions(vmr, VMNullRegion); vmr = VMNextRegion(pid, vmr)) {
+  int cont = 1;
+  cancel_var = &cont;
+  for (; !VMEqualRegions(vmr, VMNullRegion) && cont;
+       vmr = VMNextRegion(pid, vmr)) {
 
     // is this the NULL region? skip it
     if (!vmr._address)
@@ -36,6 +41,7 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
                                     sizeof(VMRegionData) * (map->numRegions + 1));
     if (!map) {
       printf("warning: GetProcessRegionList: out of memory (in progress)\n");
+      cancel_var = NULL;
       return NULL;
     }
 
@@ -46,6 +52,13 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
     map->regions[map->numRegions].region._attributes = vmr._attributes;
     map->regions[map->numRegions].data = NULL;
     map->numRegions++;
+  }
+  cancel_var = NULL;
+
+  // if we were canceled, return NULL
+  if (!cont) {
+    DestroyDataMap(map);
+    return NULL;
   }
 
   return map;
@@ -61,13 +74,16 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
     return NULL;
 
   // now, for each region...
-  for (x = 0; x < map->numRegions; x++) {
+  int cont = 1;
+  cancel_var = &cont;
+  for (x = 0; cont && (x < map->numRegions); x++) {
 
     // alloc space for this region's data
     map->regions[x].data = malloc(map->regions[x].region._size);
     if (!map->regions[x].data) {
       DestroyDataMap(map);
       printf("warning: DumpProcessMemory: can\'t allocate for region\n");
+      cancel_var = NULL;
       return NULL;
     }
 
@@ -101,7 +117,14 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
         printf("warning: failed to make region readable\n");
     }
   }
-
+  cancel_var = NULL;
+  
+  // if we were canceled, return NULL
+  if (!cont) {
+    DestroyDataMap(map);
+    return NULL;
+  }
+  
   return map;
 }
 
@@ -112,6 +135,8 @@ int UpdateDataMap(VMRegionDataMap* map) {
   int error;
 
   // for each region...
+  int cont = 1;
+  cancel_var = &cont;
   for (x = 0; x < map->numRegions; x++) {
 
     // read the data in this section
@@ -122,10 +147,17 @@ int UpdateDataMap(VMRegionDataMap* map) {
     // error? do something about it
     // TODO: should delete offending section
     if (error || (map->regions[x].region._size != newsize))
-      printf("> error: failed to read section %016llx\n",
+      printf("warning: failed to read section %016llx\n",
              map->regions[x].region._address);
   }
-
+  cancel_var = NULL;
+  
+  // if we were canceled, return error
+  if (!cont) {
+    DestroyDataMap(map);
+    return 1;
+  }
+  
   return 0;
 }
 

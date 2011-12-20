@@ -26,6 +26,8 @@
     break; \
   } }
 
+extern int* cancel_var;
+
 // memory searching user interface!
 int memory_search(pid_t pid, int pause_during) {
 
@@ -198,7 +200,9 @@ int memory_search(pid_t pid, int pause_during) {
 
         // find the string in a region somewhere
         unsigned long long num_results = 0;
-        for (x = 0; x < map->numRegions; x++) {
+        int cont = 1;
+        cancel_var = &cont;
+        for (x = 0; cont && (x < map->numRegions); x++) {
 
           // skip regions with no data
           if (!map->regions[x].data)
@@ -213,6 +217,7 @@ int memory_search(pid_t pid, int pause_during) {
             }
           }
         }
+        cancel_var = NULL;
         printf("results: %llu\n", num_results);
 
         free(write_data);
