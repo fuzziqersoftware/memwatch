@@ -1,7 +1,7 @@
 CC=gcc
 OBJECTS=memwatch.o vmmap.o memory_search.o search_data.o vmmap_data.o process_utils.o parse_utils.o freeze_region.o
-CFLAGS=-g -m64
-LDFLAGS=-m64
+CFLAGS=-g
+LDFLAGS=
 
 all: memwatch value_test value_test_float
 

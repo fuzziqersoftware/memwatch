@@ -7,13 +7,16 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
   // read the first region
   VMRegion vmr = VMNextRegion(pid, VMNullRegion);
   if (VMEqualRegions(vmr, VMNullRegion)) {
+    printf("warning: GetProcessRegionList: no regions\n");
     return NULL;
   }
 
   // alloc a new map header
   VMRegionDataMap* map = (VMRegionDataMap*)malloc(sizeof(VMRegionDataMap));
-  if (!map)
+  if (!map) {
+    printf("warning: GetProcessRegionList: out of memory (before)\n");
     return NULL;
+  }
   map->process = pid;
   map->numRegions = 0;
 
@@ -31,8 +34,10 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
     // alloc space for this region's metadata in the map
     map = (VMRegionDataMap*)realloc(map, sizeof(VMRegionDataMap) +
                                     sizeof(VMRegionData) * (map->numRegions + 1));
-    if (!map)
+    if (!map) {
+      printf("warning: GetProcessRegionList: out of memory (in progress)\n");
       return NULL;
+    }
 
     // fill in region info and advance
     map->regions[map->numRegions].region._process = pid;
@@ -62,6 +67,7 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
     map->regions[x].data = malloc(map->regions[x].region._size);
     if (!map->regions[x].data) {
       DestroyDataMap(map);
+      printf("warning: DumpProcessMemory: can\'t allocate for region\n");
       return NULL;
     }
 
