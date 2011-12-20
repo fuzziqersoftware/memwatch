@@ -70,9 +70,10 @@ void print_region_map(VMRegionDataMap* map) {
 
   // initialize the counters
   unsigned long long total_error = 0, total_readable = 0, total_writable = 0,
-      total_executable = 0, total_bytes = 0;
+      total_executable = 0, total_accessible = 0, total_inaccessible = 0,
+      total_bytes = 0;
   unsigned long long num_error = 0, num_readable = 0, num_writable = 0,
-      num_executable = 0;
+      num_executable = 0, num_accessible = 0, num_inaccessible = 0;
 
   // enumerate the regions
   unsigned long x;
@@ -106,6 +107,13 @@ void print_region_map(VMRegionDataMap* map) {
       total_executable += map->regions[x].region._size;
       num_executable++;
     }
+    if (map->regions[x].region._attributes & VMREGION_ALL) {
+      total_accessible += map->regions[x].region._size;
+      num_accessible++;
+    } else {
+      total_inaccessible += map->regions[x].region._size;
+      num_inaccessible++;
+    }
     total_bytes += map->regions[x].region._size;
   }
 
@@ -113,10 +121,14 @@ void print_region_map(VMRegionDataMap* map) {
   printf("%5lu regions (%lld bytes) in total\n", map->numRegions, total_bytes);
   printf("%5lld regions (%lld bytes) unread by memwatch\n", num_error,
          total_error);
+  printf("%5lld regions (%lld bytes) accessible\n", num_accessible,
+         total_accessible);
   printf("%5lld regions (%lld bytes) readable\n", num_readable, total_readable);
   printf("%5lld regions (%lld bytes) writable\n", num_writable, total_writable);
   printf("%5lld regions (%lld bytes) executable\n", num_executable,
          total_executable);
+  printf("%5lld regions (%lld bytes) inaccessible\n", num_inaccessible,
+         total_inaccessible);
 }
 
 // prints a chunk of data, along with the process' name and the current time
