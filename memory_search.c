@@ -5,10 +5,13 @@
 #include "vmmap.h"
 #include "vmmap_data.h"
 #include "search_data.h"
+#include "search_data_list.h"
+
 #include "parse_utils.h"
 #include "process_utils.h"
-#include "memory_search.h"
 #include "freeze_region.h"
+
+#include "memory_search.h"
 
 #define read_addr_size(addr, size) \
   { fscanf(stdin, "%llX", &addr); \
@@ -55,7 +58,8 @@ int memory_search(pid_t pid, int pause_during) {
   void* write_data = NULL;
   VMRegionDataMap* map = NULL;
   VMRegionDataMap* newmap;
-  MemorySearchData* search = NULL;
+  MemorySearchDataList* searches = CreateSearchList();
+  MemorySearchData* search = NULL; // the current search
 
   // while we have stuff to do...
   while (command) {
@@ -87,9 +91,12 @@ int memory_search(pid_t pid, int pause_during) {
 "  f <addr> <data>       freeze data in memory\n"
 "  u                     list frozen regions\n"
 "  u <index>             unfreeze frozen region\n"
+"  S                     show previous named searches\n"
+"  S <name>              switch to a previous named search\n"
 "  S <type> [name]       begin new search\n"
 "  s <operator> [value]  search for a changed value\n"
 "  x                     print current search results\n"
+"  p                     delete current search\n"
 "  -                     pause process\n"
 "  +                     resume process\n"
 "  q                     exit memwatch\n"
@@ -104,6 +111,8 @@ int memory_search(pid_t pid, int pause_during) {
 "searches done with the s command will increment on the previous search and\n"
 "  narrow down the results. searches donw ti the t command are one-time searches\n"
 "  and don\'t affect the current search results.\n"
+"note that a search name is optional: if no name is given, the search is deleted\n"
+"  upon switching to a named search or opening a new search.\n"
 "\n"
 "valid types for S command: u8, u16, u32, u64, s8, s16, s32, s64,\n"
 "  float, double, arbitrary.\n"
@@ -328,10 +337,17 @@ int memory_search(pid_t pid, int pause_during) {
         arguments = read_string_delimited(stdin, '\n');
         trim_spaces(arguments);
 
-        // delete the current search
+        // no arguments: show the list of searches
+        if (!arguments[0]) {
+          PrintSearches(searches);
+          break;
+        }
+
+        // check if a search by this name exists or not
+        search = GetSearchByName(searches, arguments);
         if (search) {
-          DeleteSearch(search);
-          printf("current search deleted\n");
+          printf("switched to search %s\n", search->name);
+          break;
         }
 
         // check if a name followed the type
@@ -339,10 +355,15 @@ int memory_search(pid_t pid, int pause_during) {
 
         // make a new search
         search = CreateNewSearchByTypeName(arguments, name);
-        if (search)
-          printf("opened new search of type %s\n",
-                 GetSearchTypeName(search->type));
-        else
+        if (search) {
+          AddSearchToList(searches, search);
+          if (search->name[0])
+            printf("opened new %s search named %s\n",
+                   GetSearchTypeName(search->type), name);
+          else
+            printf("opened new %s search (unnamed)\n",
+                   GetSearchTypeName(search->type));
+        } else
           printf("failed to open new search - did you use a valid typename?\n");
 
         free(arguments);
@@ -413,8 +434,8 @@ int memory_search(pid_t pid, int pause_during) {
           break;
         }
 
-        DeleteSearch(search);
         search = search_result;
+        AddSearchToList(searches, search);
         if (search->numResults >= 20) {
           printf("results: %lld\n", search->numResults);
           break;
@@ -437,6 +458,25 @@ int memory_search(pid_t pid, int pause_during) {
           printf("%016llX\n", search->results[x]);
         printf("results: %lld\n", search->numResults);
         
+        break;
+
+      // delete current search
+      case 'p':
+      case 'P':
+
+        // check if there's a current search
+        if (!search) {
+          printf("no search currently open\n");
+          break;
+        }
+
+        // delete the search
+        if (search->name[0])
+          DeleteSearchByName(searches, search->name);
+        else
+          DeleteSearch(search);
+        search = NULL;
+
         break;
 
       // pause process
@@ -471,6 +511,7 @@ int memory_search(pid_t pid, int pause_during) {
   }
 
   // shut down the region freezer and return
+  DeleteSearchList(searches);
   CleanupRegionFreezer();
   return 0;
 }
