@@ -39,7 +39,6 @@ static __inline__ vm_map_t _VMTaskFromPID(pid_t process)
   vm_map_t current = current_task();
   if (task_for_pid(current, process, &task) == KERN_SUCCESS)
     return task;
-  printf("warning: task_for_pid failed\n");
   return 0;
 }
 

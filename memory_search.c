@@ -97,6 +97,7 @@ int memory_search(pid_t pid, int pause_during) {
 "  s <operator> [value]  search for a changed value\n"
 "  x                     print current search results\n"
 "  p                     delete current search\n"
+"  p <name>              delete search by name\n"
 "  -                     pause process\n"
 "  +                     resume process\n"
 "  q                     exit memwatch\n"
@@ -464,18 +465,38 @@ int memory_search(pid_t pid, int pause_during) {
       case 'p':
       case 'P':
 
-        // check if there's a current search
-        if (!search) {
-          printf("no search currently open\n");
-          break;
-        }
+        // read the type
+        arguments = read_string_delimited(stdin, '\n');
+        trim_spaces(arguments);
 
-        // delete the search
-        if (search->name[0])
-          DeleteSearchByName(searches, search->name);
-        else
-          DeleteSearch(search);
-        search = NULL;
+        // no name present? then we're deleting the current search
+        if (!arguments[0]) {
+          free(arguments);
+
+          // check if there's a current search
+          if (!search) {
+            printf("no search currently open\n");
+            break;
+          }
+
+          // delete the search
+          if (search->name[0])
+            DeleteSearchByName(searches, search->name);
+          else
+            DeleteSearch(search);
+          search = NULL;
+
+        // name present? then delete the search by name
+        } else {
+
+          // if the search we're deleting is the current search, then the
+          // current search should become NULL
+          if (search && !strcmp(arguments, search->name))
+            search = NULL;
+
+          // delete the search
+          DeleteSearchByName(searches, arguments);
+        }
 
         break;
 
