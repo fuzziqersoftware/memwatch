@@ -110,8 +110,8 @@ int memory_search(pid_t pid, int pause_during) {
 "new freezes will be named with the same name as the current search (if any).\n"
 "\n"
 "searches done with the s command will increment on the previous search and\n"
-"  narrow down the results. searches donw ti the t command are one-time searches\n"
-"  and don\'t affect the current search results.\n"
+"  narrow down the results. searches done with the t command are one-time\n"
+"  searches and don\'t affect the current search results.\n"
 "note that a search name is optional: if no name is given, the search is deleted\n"
 "  upon switching to a named search or opening a new search.\n"
 "\n"
@@ -524,6 +524,10 @@ int memory_search(pid_t pid, int pause_during) {
       case 'Q':
         command = 0; // tell the outer loop to quit
         break;
+
+      // unknown
+      default:
+        printf("unknown command - try \'h\'\n");
     }
 
     // read extra junk at end of command
