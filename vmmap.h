@@ -65,6 +65,8 @@ static inline int VMStopProcess(pid_t process)
   { return (kill(process, SIGSTOP) == 0); }
 static inline int VMContinueProcess(pid_t process)
   { return (kill(process, SIGCONT) == 0); }
+static inline int VMKillProcess(pid_t process)
+  { return (kill(process, SIGKILL) == 0); }
 
 // lower-level reading/writing/protection functions
 int VMSetRegionProtection(pid_t process, mach_vm_address_t address,
