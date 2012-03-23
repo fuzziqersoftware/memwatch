@@ -132,7 +132,7 @@ int parse_ull(char* in, unsigned long long* value, int default_hex) {
 }
 
 // reads a string from the given stream. return value must be free'd later
-char* read_string_delimited(FILE* in, char delimiter) {
+char* read_string_delimited(FILE* in, char delimiter, int consume_delim) {
   char* string = NULL;
   int len = 0;
   do {
@@ -141,7 +141,8 @@ char* read_string_delimited(FILE* in, char delimiter) {
     string[len - 1] = fgetc(stdin);
   } while (string[len - 1] != delimiter);
   string[len - 1] = 0;
-  ungetc(delimiter, in);
+  if (!consume_delim)
+    ungetc(delimiter, in);
   return string;
 }
 

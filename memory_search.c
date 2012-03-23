@@ -81,33 +81,35 @@ int memory_search(pid_t pid, int pause_during) {
 "memwatch memory search utility\n"
 "\n"
 "commands:\n"
-"  l                     list memory regions\n"
-"  d                     dump memory\n"
-"  t <data>              find occurrences of data\n"
-"  m <addr>              enable all access types on region containing address\n"
-"  r <addr+size>         read from memory\n"
-"  w <addr> <data>       write to memory\n"
-"  W <addr> <filename>   write file to memory\n"
-"  f <addr> <data>       freeze data in memory\n"
-"  u                     list frozen regions\n"
-"  u <index>             unfreeze frozen region\n"
-"  S                     show previous named searches\n"
-"  S <name>              switch to a previous named search\n"
-"  S <type> [name]       begin new search\n"
-"  s <operator> [value]  search for a changed value\n"
-"  x                     print current search results\n"
-"  p                     delete current search\n"
-"  p <name>              delete search by name\n"
-"  -                     pause process\n"
-"  +                     resume process\n"
-"  q                     exit memwatch\n"
+"  l                         list memory regions\n"
+"  d                         dump memory\n"
+"  t <data>                  find occurrences of data\n"
+"  m <addr>                  enable all access on region containing address\n"
+"  r <addr+size>             read from memory\n"
+"  w <addr> <data>           write to memory\n"
+"  W <addr> <filename>       write file to memory\n"
+"  f <addr> <data>           freeze data in memory\n"
+"  f \"<name>\" <addr> <data>  freeze data in memory, with given name"
+"  u                         list frozen regions\n"
+"  u <index>                 unfreeze frozen region\n"
+"  S                         show previous named searches\n"
+"  S <name>                  switch to a previous named search\n"
+"  S <type> [name]           begin new search\n"
+"  s <operator> [value]      search for a changed value\n"
+"  x                         print current search results\n"
+"  p                         delete current search\n"
+"  p <name>                  delete search by name\n"
+"  -                         pause process\n"
+"  +                         resume process\n"
+"  q                         exit memwatch\n"
 "\n"
 "<addr+size> may be either <addr(hex)> <size(dec)> or <addr(hex)>:<size(hex)>.\n"
 "all <data> arguments are in immediate format (see main usage statement).\n"
 "\n"
 "the f command is like the w command, but the write is repeated in the\n"
 "  background until canceled by a u command.\n"
-"new freezes will be named with the same name as the current search (if any).\n"
+"new freezes will be named with the same name as the current search (if any),\n"
+"  unless a specific name is given\n"
 "\n"
 "searches done with the s command will increment on the previous search and\n"
 "  narrow down the results. searches done with the t command are one-time\n"
@@ -287,7 +289,7 @@ int memory_search(pid_t pid, int pause_during) {
 
         // read the parameters
         read_addr_size(addr, size);
-        char* filename = read_string_delimited(stdin, '\n');
+        char* filename = read_string_delimited(stdin, '\n', 0);
         trim_spaces(filename);
 
         // write the file
@@ -299,6 +301,14 @@ int memory_search(pid_t pid, int pause_during) {
       // freeze value with immediate data
       case 'f':
 
+        // if a quote is given, read the name
+        while ((command = fgetc(stdin)) == ' ');
+        char* freeze_name = NULL;
+        if ((command == '\'') || (command == '\"')) {
+          freeze_name = read_string_delimited(stdin, command, 1);
+        } else
+          ungetc(command, stdin);
+
         // read the address
         fscanf(stdin, "%llX", &addr);
 
@@ -306,12 +316,15 @@ int memory_search(pid_t pid, int pause_during) {
         size = read_stream_data(stdin, &write_data);
 
         // and freeze it
-        if (FreezeRegion(pid, addr, size, write_data,
-                         search ? search->name : "[no associated search]"))
+        char* use_name = freeze_name ? freeze_name :
+                         (search ? search->name : "[no associated search]");
+        if (FreezeRegion(pid, addr, size, write_data, use_name))
           printf("failed to freeze region\n");
         else
           printf("region frozen\n");
         free(write_data);
+        if (freeze_name)
+          free(freeze_name);
         break;
 
       // unfreeze a var by index, or print frozen regions
@@ -335,7 +348,7 @@ int memory_search(pid_t pid, int pause_during) {
       case 'S':
 
         // read the type
-        arguments = read_string_delimited(stdin, '\n');
+        arguments = read_string_delimited(stdin, '\n', 0);
         trim_spaces(arguments);
 
         // no arguments: show the list of searches
@@ -381,7 +394,7 @@ int memory_search(pid_t pid, int pause_during) {
         }
 
         // read the predicate
-        arguments = read_string_delimited(stdin, '\n');
+        arguments = read_string_delimited(stdin, '\n', 0);
         trim_spaces(arguments);
         int pred = GetPredicateByName(arguments);
 
@@ -466,7 +479,7 @@ int memory_search(pid_t pid, int pause_during) {
       case 'P':
 
         // read the type
-        arguments = read_string_delimited(stdin, '\n');
+        arguments = read_string_delimited(stdin, '\n', 0);
         trim_spaces(arguments);
 
         // no name present? then we're deleting the current search

@@ -15,7 +15,7 @@ void CRYPT_PrintData(unsigned long long address, void* ds,
 
 unsigned long long read_stream_data(FILE* in, void** vdata);
 int read_ull(FILE* in, unsigned long long* value, int default_hex);
-char* read_string_delimited(FILE* in, char delimiter);
+char* read_string_delimited(FILE* in, char delimiter, int consume_delim);
 void trim_spaces(char* string);
 char* skip_word(char* string);
 
