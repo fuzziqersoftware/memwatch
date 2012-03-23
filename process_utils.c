@@ -49,11 +49,12 @@ int enumprocesses(int callback(pid_t pid, const char* proc, void* param),
   int offset;
   while (!feof(run)) {
     fscanf(run, "%u", &pid);
+    while ((name[0] = fgetc(run)) == ' ');
+    ungetc(name[0], run);
+
     for (offset = 0; offset < namelen - 1; offset++) {
       name[offset] = fgetc(run);
-      if (name[offset] == ' ')
-        offset--;
-      else if (name[offset] == -1 || name[offset] == '\n') {
+      if (name[offset] == -1 || name[offset] == '\n') {
         name[offset] = 0;
         break;
       }

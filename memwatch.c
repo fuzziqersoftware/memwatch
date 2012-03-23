@@ -31,6 +31,8 @@ int print_process(pid_t pid, const char* proc, void* param) {
 }
 
 // searches the process list for a given process
+int ignore_match = -1;
+
 typedef struct _find_pid_data {
   char name[PROCESS_NAME_LENGTH];
   pid_t pid;
@@ -38,6 +40,9 @@ typedef struct _find_pid_data {
 } find_pid_data;
 
 int find_pid_for_process_name(pid_t pid, const char* proc, void* param) {
+  if (pid == ignore_match)
+    return 0;
+
   int x;
   char compare_name[PROCESS_NAME_LENGTH];
   find_pid_data* data = (find_pid_data*)param;
@@ -221,6 +226,7 @@ int main(int argc, char* argv[]) {
     if (d.matches_found == 0) {
       printf("warning: no processes found by executable name; searching commands\n");
       d.matches_found = 0;
+      ignore_match = getpid(); // don't match this process by command
       enumprocesses(find_pid_for_process_name, &d, 1);
       pid = d.pid;
     }
