@@ -221,7 +221,7 @@ int main(int argc, char* argv[]) {
     if (d.matches_found == 0) {
       printf("warning: no processes found by executable name; searching commands\n");
       d.matches_found = 0;
-      enumprocesses(find_pid_for_process_name, &d, 0);
+      enumprocesses(find_pid_for_process_name, &d, 1);
       pid = d.pid;
     }
     if (d.matches_found == 0) {
