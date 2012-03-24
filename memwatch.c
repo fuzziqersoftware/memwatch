@@ -58,6 +58,7 @@ int find_pid_for_process_name(pid_t pid, const char* proc, void* param) {
     if (!strncmp(&compare_name[x], data->name, strlen(data->name))) {
       data->pid = pid;
       data->matches_found++;
+      break;
     }
   }
 
