@@ -1,6 +1,7 @@
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "vmmap.h"
 #include "vmmap_data.h"
@@ -52,12 +53,10 @@ int memory_search(pid_t pid, int pause_during) {
   int command = 1;
   char *arguments, *filename;
   int x, error;
-  VMRegion vmr;
   unsigned long long size;
   unsigned long long addr;
   void* write_data = NULL;
   VMRegionDataMap* map = NULL;
-  VMRegionDataMap* newmap;
   MemorySearchDataList* searches = CreateSearchList();
   MemorySearchData* search = NULL; // the current search
 
@@ -295,7 +294,7 @@ int memory_search(pid_t pid, int pause_during) {
           printf("failed to allocate memory for reading\n");
           break;
         }
-        if (error = VMReadBytes(pid, addr, read_data, &size)) {
+        if ((error = VMReadBytes(pid, addr, read_data, &size))) {
           print_process_data(processname, addr, read_data, size);
         } else
           printf("failed to read data from process\n");
@@ -312,7 +311,7 @@ int memory_search(pid_t pid, int pause_during) {
         size = read_stream_data(stdin, &write_data);
 
         // and write it
-        if (error = VMWriteBytes(pid, addr, write_data, size))
+        if ((error = VMWriteBytes(pid, addr, write_data, size)))
           printf("wrote %llX bytes\n", size);
         else
           printf("failed to write data to process\n");
@@ -454,7 +453,8 @@ int memory_search(pid_t pid, int pause_during) {
             sscanf(value_text, "%lf", &dvalue);
             value = &dvalue;
           } else if (search->type == SEARCHTYPE_DATA) {
-            size = read_string_data(value_text, strlen(value_text), value_text);
+            size = read_string_data(value_text, strlen(value_text),
+                                    (unsigned char*)value_text);
             value = value_text;
           }
         }

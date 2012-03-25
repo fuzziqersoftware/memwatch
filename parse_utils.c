@@ -77,7 +77,6 @@ unsigned long long read_stream_data(FILE* in, void** vdata) {
   *vdata = NULL;
   unsigned char** data = (unsigned char**)vdata;
 
-  long x;
   int in_ch, chr = 0;
   int read, string = 0, unicodestring = 0, high = 1;
   unsigned long size = 0;

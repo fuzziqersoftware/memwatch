@@ -16,7 +16,7 @@ typedef struct {
 } FrozenRegion;
 
 int InitRegionFreezer();
-int CleanupRegionFreezer();
+void CleanupRegionFreezer();
 
 int FreezeRegion(pid_t pid, mach_vm_address_t addr, mach_vm_size_t size,
                  const void* data, const char* name);
@@ -25,5 +25,6 @@ int UnfreezeRegionByAddr(mach_vm_address_t addr);
 int UnfreezeRegionByName(const char* name);
 
 void GetFrozenRegions(const FrozenRegion** regions, int* numRegions);
+void PrintFrozenRegions(int printData);
 
 #endif // FREEZE_THREAD_H

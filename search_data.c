@@ -8,17 +8,17 @@ extern int* cancel_var;
 ////////////////////////////////////////////////////////////////////////////////
 // byteswap routines
 
-static inline bswap_int8_t(void* a) { }
+static inline void bswap_int8_t(void* a) { }
 #define bswap_uint8_t bswap_int8_t
 
-static inline bswap_int16_t(void* a) {
+static inline void bswap_int16_t(void* a) {
   ((int8_t*)a)[0] ^= ((int8_t*)a)[1];
   ((int8_t*)a)[1] ^= ((int8_t*)a)[0];
   ((int8_t*)a)[0] ^= ((int8_t*)a)[1];
 }
 #define bswap_uint16_t bswap_int16_t
 
-static inline bswap_int32_t(void* a) {
+static inline void bswap_int32_t(void* a) {
   ((int8_t*)a)[0] ^= ((int8_t*)a)[3];
   ((int8_t*)a)[3] ^= ((int8_t*)a)[0];
   ((int8_t*)a)[0] ^= ((int8_t*)a)[3];
@@ -29,7 +29,7 @@ static inline bswap_int32_t(void* a) {
 #define bswap_uint32_t bswap_int32_t
 #define bswap_float bswap_int32_t
 
-static inline bswap_int64_t(void* a) {
+static inline void bswap_int64_t(void* a) {
   ((int8_t*)a)[0] ^= ((int8_t*)a)[7];
   ((int8_t*)a)[7] ^= ((int8_t*)a)[0];
   ((int8_t*)a)[0] ^= ((int8_t*)a)[7];
@@ -417,8 +417,8 @@ const char* GetSearchTypeName(int type) {
     case SEARCHTYPE_DOUBLE:    return "double";
     case SEARCHTYPE_DOUBLE_LE: return "ldouble";
     case SEARCHTYPE_DATA:      return "arbitrary";
-    case SEARCHTYPE_UNKNOWN:   return "unknown";
   }
+  return "unknown";
 }
 
 // returns the search type associated with the given string
@@ -506,8 +506,8 @@ const char* GetPredicateName(int pred) {
     case PRED_NOT_EQUAL:        return "!=";
     case PRED_FLAG:             return "$";
     case PRED_NULL:             return "null";
-    case PRED_UNKNOWN:          return "unknown";
   }
+  return "unknown";
 }
 
 // returns the predicate associated with the given string

@@ -1,9 +1,11 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "vmmap.h"
 #include "freeze_region.h"
+#include "parse_utils.h"
 
 static pthread_t _freezeThread;
 static pthread_mutex_t _mutex;
@@ -22,6 +24,7 @@ static void* _freeze_thread_routine(void* data) {
     pthread_mutex_unlock(&_mutex);
     usleep(10000);
   }
+  return NULL;
 }
 
 // initializes the region freezer
@@ -41,7 +44,7 @@ int InitRegionFreezer() {
 }
 
 // shuts down the region freezer
-int CleanupRegionFreezer() {
+void CleanupRegionFreezer() {
 
   // stop the writer thread
   _freezerClosing = 1;
@@ -166,7 +169,7 @@ int UnfreezeRegionByName(const char* name) {
 void PrintFrozenRegions(int printData) {
 
   // lock, print, unlock
-  int x, rv = 0;
+  int x;
   pthread_mutex_lock(&_mutex);
   for (x = 0; x < _numFrozenRegions; x++) {
     printf("%3d: %6u %016llX:%016llX [%d] %s\n", x, _frozen[x].pid,

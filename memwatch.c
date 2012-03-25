@@ -1,6 +1,8 @@
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <ctype.h>
 
 #include "vmmap.h"
 #include "process_utils.h"
@@ -299,7 +301,7 @@ int main(int argc, char* argv[]) {
   getpidname(pid, processname, 0x40);
   cancel_var = &cont;
   do {
-    if (error = VMReadBytes(pid, addr, read_data, &size))
+    if ((error = VMReadBytes(pid, addr, read_data, &size)))
       print_process_data(processname, addr, read_data, size);
     else
       printf("failed to read data from process\n");
