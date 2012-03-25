@@ -50,7 +50,7 @@ int memory_search(pid_t pid, int pause_during) {
   // yep, lots of variables (see the code below for their explanations)
   int process_running = 1;
   int command = 1;
-  char* arguments;
+  char *arguments, *filename;
   int x, error;
   VMRegion vmr;
   unsigned long long size;
@@ -174,6 +174,10 @@ int memory_search(pid_t pid, int pause_during) {
       case 'd':
       case 'D':
 
+        // read the filename prefix
+        filename = read_string_delimited(stdin, '\n', 0);
+        trim_spaces(filename);
+
         // stop the process if necessary, dump memory, and resume the process
         if (process_running && pause_during)
           VMStopProcess(pid);
@@ -185,9 +189,40 @@ int memory_search(pid_t pid, int pause_during) {
           break;
         }
 
-        // print it out and delete it
-        // TODO: do something useful with the map, duh
-        print_region_map(map);
+        // save each piece with the given filename
+        if (filename[0]) {
+          char* filename_piece = (char*)malloc(strlen(filename) + 64);
+
+          unsigned long x;
+          for (x = 0; x < map->numRegions; x++) {
+
+            sprintf(filename_piece, "%s_%016llX", filename, map->regions[x].region._address);
+
+            // print region info
+            printf("%016llX %016llX %016llX %c%c%c%s\n",
+                   map->regions[x].region._address,
+                   map->regions[x].region._address + map->regions[x].region._size,
+                   map->regions[x].region._size,
+                   (map->regions[x].region._attributes & VMREGION_READABLE) ? 'r' : '-',
+                   (map->regions[x].region._attributes & VMREGION_WRITABLE) ? 'w' : '-',
+                   (map->regions[x].region._attributes & VMREGION_EXECUTABLE) ? 'x' : '-',
+                   map->regions[x].data ? filename_piece : " [data not read]");
+
+            // save the file
+            if (map->regions[x].data) {
+              FILE* f = fopen(filename_piece, "wb");
+              fwrite(map->regions[x].data, map->regions[x].region._size, 1, f);
+              fclose(f);
+            }
+          }
+          free(filename_piece);
+        } else {
+          // no filename? then don't save it
+          print_region_map(map);
+        }
+        free(filename);
+
+        // delete the data map
         DestroyDataMap(map);
         break;
 
@@ -289,7 +324,7 @@ int memory_search(pid_t pid, int pause_during) {
 
         // read the parameters
         read_addr_size(addr, size);
-        char* filename = read_string_delimited(stdin, '\n', 0);
+        filename = read_string_delimited(stdin, '\n', 0);
         trim_spaces(filename);
 
         // write the file
