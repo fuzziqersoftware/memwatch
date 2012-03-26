@@ -93,7 +93,8 @@ int memory_search(pid_t pid, int pause_during) {
 "  u <index>                 unfreeze frozen region\n"
 "  S                         show previous named searches\n"
 "  S <name>                  switch to a previous named search\n"
-"  S <type> [name]           begin new search\n"
+"  S <type> [name]           begin new search over writable memory only\n"
+"  S! <type> [name]          begin new search over all memory\n"
 "  s <operator> [value]      search for a changed value\n"
 "  x                         print current search results\n"
 "  p                         delete current search\n"
@@ -381,6 +382,15 @@ int memory_search(pid_t pid, int pause_during) {
       // begin new search
       case 'S':
 
+        // if it's S!, we'll search read-only as well (don't know why anyone
+        // would want to do this though... :/)
+        command = fgetc(stdin);
+        int readonly_search = 0;
+        if (command == '!')
+          readonly_search = 1;
+        else
+          ungetc(command, stdin);
+
         // read the type
         arguments = read_string_delimited(stdin, '\n', 0);
         trim_spaces(arguments);
@@ -402,7 +412,8 @@ int memory_search(pid_t pid, int pause_during) {
         const char* name = skip_word(arguments);
 
         // make a new search
-        search = CreateNewSearchByTypeName(arguments, name);
+        search = CreateNewSearchByTypeName(arguments, name, readonly_search ?
+                                           SEARCHFLAG_ALLMEMORY : 0);
         if (search) {
           AddSearchToList(searches, search);
           if (search->name[0])
@@ -462,7 +473,8 @@ int memory_search(pid_t pid, int pause_during) {
         // stop the process if necessary, dump memory, and resume the process
         if (process_running && pause_during)
           VMStopProcess(pid);
-        map = DumpProcessMemory(pid, 0);
+        map = DumpProcessMemory(pid, search->searchflags & SEARCHFLAG_ALLMEMORY
+                                ? 0 : VMREGION_WRITABLE);
         if (process_running && pause_during)
           VMContinueProcess(pid);
         if (!map) {

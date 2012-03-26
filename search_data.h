@@ -35,6 +35,8 @@
 #define PRED_NULL              7
 #define PRED_UNKNOWN           8
 
+#define SEARCHFLAG_ALLMEMORY   1
+
 /* possible states for MemorySearchData:
  * 
  * known value search: memory and results always valid after 1st search
@@ -45,6 +47,7 @@
 
 typedef struct _MemorySearchData {
   int type;
+  long searchflags;
   char name[0x80];
   VMRegionDataMap* memory;
   unsigned long long prev_size;
@@ -52,8 +55,9 @@ typedef struct _MemorySearchData {
   unsigned long long results[0];
 } MemorySearchData;
 
-MemorySearchData* CreateNewSearch(int type, const char* name);
-MemorySearchData* CreateNewSearchByTypeName(const char* type, const char* name);
+MemorySearchData* CreateNewSearch(int type, const char* name, long flags);
+MemorySearchData* CreateNewSearchByTypeName(const char* type, const char* name,
+                                            long flags);
 void DeleteSearch(MemorySearchData* search);
 
 // does the actual searching. ComparePredicate tells which comparator to use,

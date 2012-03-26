@@ -88,11 +88,14 @@ void PrintSearches(MemorySearchDataList* list) {
 
   int x;
   for (x = 0; x < list->numSearches; x++) {
+    printf("  %s ", list->searches[x]->name);
     if (!list->searches[x]->memory)
-      printf("  %s (initial search not done)\n", list->searches[x]->name);
+      printf("(initial search not done)");
     else
-      printf("  %s (%llu results)\n", list->searches[x]->name,
-             list->searches[x]->numResults);
+      printf("(%llu results)", list->searches[x]->numResults);
+    if (list->searches[x]->searchflags & SEARCHFLAG_ALLMEMORY)
+      printf(" (all memory)");
+    printf("\n");
   }
   printf("total searches: %d\n", list->numSearches);
 }

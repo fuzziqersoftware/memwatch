@@ -201,7 +201,7 @@ struct _SearchTypeConfig {
 
 
 // opens a new search given the search type
-MemorySearchData* CreateNewSearch(int type, const char* name) {
+MemorySearchData* CreateNewSearch(int type, const char* name, long flags) {
 
   // alloc a new search object
   MemorySearchData* s = (MemorySearchData*)malloc(sizeof(MemorySearchData));
@@ -209,6 +209,7 @@ MemorySearchData* CreateNewSearch(int type, const char* name) {
     return NULL;
 
   strncpy(s->name, name, 0x80);
+  s->searchflags = flags;
   s->prev_size = 0;
   s->type = type;
   s->numResults = 0;
@@ -217,11 +218,12 @@ MemorySearchData* CreateNewSearch(int type, const char* name) {
 }
 
 // opens a new search given the search type name
-MemorySearchData* CreateNewSearchByTypeName(const char* type, const char* name) {
+MemorySearchData* CreateNewSearchByTypeName(const char* type, const char* name,
+                                            long flags) {
   int t = GetSearchTypeByName(type);
   if (t == SEARCHTYPE_UNKNOWN)
     return NULL;
-  return CreateNewSearch(t, name);
+  return CreateNewSearch(t, name, flags);
 }
 
 // deletes a search data set
