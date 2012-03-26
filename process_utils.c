@@ -9,7 +9,7 @@
 // gets the name for the specified process
 int getpidname(pid_t pid, char* name, int namelen) {
   char command[0x80];
-  sprintf(command, "ps -ax -c -o pid -o command | grep %u | sed s/[0-9]*\\ //g",
+  sprintf(command, "ps -ax -c -o pid -o command | grep ^\\ *%u\\ | sed s/[0-9]*\\ //g",
           pid);
   FILE* run = popen(command, "r");
   if (!run)
