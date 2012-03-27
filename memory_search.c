@@ -106,6 +106,7 @@ int memory_search(pid_t pid, int pause_during) {
 "  p <name>                  delete search by name\n"
 "  -                         pause process\n"
 "  +                         resume process\n"
+"  * <signal_number>         send unix signal to process\n"
 "  q                         exit memwatch\n"
 "\n"
 "<addr+size> may be either <addr(hex)> <size(dec)> or <addr(hex)>:<size(hex)>.\n"
@@ -160,10 +161,10 @@ int memory_search(pid_t pid, int pause_during) {
 
         // stop the process if necessary, get the list, and resume the process
         if (process_running && pause_during)
-          VMStopProcess(pid);
+          kill(pid, SIGSTOP);
         map = GetProcessRegionList(pid, 0);
         if (process_running && pause_during)
-          VMContinueProcess(pid);
+          kill(pid, SIGCONT);
         if (!map) {
           printf("get process region list failed\n");
           break;
@@ -184,10 +185,10 @@ int memory_search(pid_t pid, int pause_during) {
 
         // stop the process if necessary, dump memory, and resume the process
         if (process_running && pause_during)
-          VMStopProcess(pid);
+          kill(pid, SIGSTOP);
         map = DumpProcessMemory(pid, 0);
         if (process_running && pause_during)
-          VMContinueProcess(pid);
+          kill(pid, SIGCONT);
         if (!map) {
           printf("memory dump failed\n");
           break;
@@ -236,10 +237,10 @@ int memory_search(pid_t pid, int pause_during) {
         // stop the process if necessary, dump memory, and resume the process
         printf("reading memory\n");
         if (process_running && pause_during)
-          VMStopProcess(pid);
+          kill(pid, SIGSTOP);
         map = DumpProcessMemory(pid, 0);
         if (process_running && pause_during)
-          VMContinueProcess(pid);
+          kill(pid, SIGCONT);
         if (!map) {
           printf("memory dump failed\n");
           break;
@@ -471,11 +472,11 @@ int memory_search(pid_t pid, int pause_during) {
 
         // stop the process if necessary, dump memory, and resume the process
         if (process_running && pause_during)
-          VMStopProcess(pid);
+          kill(pid, SIGSTOP);
         map = DumpProcessMemory(pid, search->searchflags & SEARCHFLAG_ALLMEMORY
                                 ? 0 : VMREGION_WRITABLE);
         if (process_running && pause_during)
-          VMContinueProcess(pid);
+          kill(pid, SIGCONT);
         if (!map) {
           printf("memory dump failed\n");
           break;
@@ -560,16 +561,29 @@ int memory_search(pid_t pid, int pause_during) {
 
       // pause process
       case '-':
-        VMStopProcess(pid);
+        kill(pid, SIGSTOP);
         process_running = 0;
         printf("process suspended\n");
         break;
 
       // resume process
       case '+':
-        VMContinueProcess(pid);
+        kill(pid, SIGCONT);
         process_running = 1;
         printf("process resumed\n");
+        break;
+
+      // send signal to process
+      case '*':
+        size = atoi(skip_word(command, ' '));
+        kill(pid, size);
+        if (size == SIGSTOP)
+          process_running = 0;
+        if (size == SIGCONT)
+          process_running = 1;
+        if (size == SIGKILL)
+          run = 0;
+        printf("signal %llu sent to process\n", size);
         break;
 
       // quit

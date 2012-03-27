@@ -60,14 +60,6 @@ VMRegion VMNextRegion(pid_t process, VMRegion previous);
 VMRegion VMNextRegionWithAttributes(pid_t process, VMRegion previous,
                                     unsigned int attribs);
 
-// stop/resume processes
-static inline int VMStopProcess(pid_t process)
-  { return (kill(process, SIGSTOP) == 0); }
-static inline int VMContinueProcess(pid_t process)
-  { return (kill(process, SIGCONT) == 0); }
-static inline int VMKillProcess(pid_t process)
-  { return (kill(process, SIGKILL) == 0); }
-
 // lower-level reading/writing/protection functions
 int VMSetRegionProtection(pid_t process, mach_vm_address_t address,
                           mach_vm_size_t size, int prot_flags, int prot_mask);
