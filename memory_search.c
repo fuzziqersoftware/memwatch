@@ -199,14 +199,13 @@ int memory_search(pid_t pid, int pause_during) {
             sprintf(filename_piece, "%s_%016llX", filename, map->regions[x].region._address);
 
             // print region info
-            printf("%016llX %016llX %016llX %c%c%c%s\n",
+            printf("%016llX %016llX %c%c%c %s\n",
                    map->regions[x].region._address,
-                   map->regions[x].region._address + map->regions[x].region._size,
                    map->regions[x].region._size,
                    (map->regions[x].region._attributes & VMREGION_READABLE) ? 'r' : '-',
                    (map->regions[x].region._attributes & VMREGION_WRITABLE) ? 'w' : '-',
                    (map->regions[x].region._attributes & VMREGION_EXECUTABLE) ? 'x' : '-',
-                   map->regions[x].data ? filename_piece : " [data not read]");
+                   map->regions[x].data ? filename_piece : "[data not read]");
 
             // save the file
             if (map->regions[x].data) {

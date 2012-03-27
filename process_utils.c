@@ -82,9 +82,8 @@ void print_region_map(VMRegionDataMap* map) {
   for (x = 0; x < map->numRegions; x++) {
 
     // print region info
-    printf("%016llX %016llX %016llX %c%c%c%s\n",
+    printf("%016llX %016llX %c%c%c%s\n",
       map->regions[x].region._address,
-      map->regions[x].region._address + map->regions[x].region._size,
       map->regions[x].region._size,
       (map->regions[x].region._attributes & VMREGION_READABLE) ? 'r' : '-',
       (map->regions[x].region._attributes & VMREGION_WRITABLE) ? 'w' : '-',
