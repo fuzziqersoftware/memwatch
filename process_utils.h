@@ -1,5 +1,5 @@
-#ifndef MEMORY_UTILS_H
-#define MEMORY_UTILS_H
+#ifndef PROCESS_UTILS_H
+#define PROCESS_UTILS_H
 
 #include <sys/time.h>
 #include <stdio.h>
@@ -26,4 +26,4 @@ void print_process_data(const char* processname, unsigned long long addr,
 int write_file_to_process(const char* filename, unsigned long long size,
                           pid_t pid, unsigned long long addr);
 
-#endif // MEMORY_UTILS_H
+#endif // PROCESS_UTILS_H

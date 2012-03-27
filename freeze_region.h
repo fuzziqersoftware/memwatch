@@ -1,5 +1,5 @@
-#ifndef FREEZE_THREAD_H
-#define FREEZE_THREAD_H
+#ifndef FREEZE_REGION_H
+#define FREEZE_REGION_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,4 +27,4 @@ int UnfreezeRegionByName(const char* name);
 void GetFrozenRegions(const FrozenRegion** regions, int* numRegions);
 void PrintFrozenRegions(int printData);
 
-#endif // FREEZE_THREAD_H
+#endif // FREEZE_REGION_H
