@@ -15,8 +15,6 @@
 
 #define PROCESS_NAME_LENGTH 0x100
 
-void CRYPT_PrintData(unsigned long long address, void* ds,
-                     unsigned long long data_size, int flags);
 int getpidname(pid_t pid, char* name, int namelen);
 int enumprocesses(int callback(pid_t pid, const char* proc, void* param),
                   void* param, int commands);

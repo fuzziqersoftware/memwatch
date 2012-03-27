@@ -2,11 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "parse_utils.h"
 
 // prints data! wheeee
-void CRYPT_PrintData(unsigned long long address, void* ds,
+void CRYPT_PrintData(unsigned long long address, const void* ds,
                      unsigned long long data_size, int flags) {
 
   unsigned char* data_source = (unsigned char*)ds;
@@ -122,9 +123,63 @@ unsigned long long read_stream_data(FILE* in, void** vdata) {
   return size;
 }
 
+// like read_stream_data, but stops at the end of the string
+unsigned long long read_string_data(const char* in, void** vdata) {
+  
+  *vdata = NULL;
+  unsigned char** data = (unsigned char**)vdata;
+  
+  int chr = 0;
+  int read, string = 0, unicodestring = 0, high = 1;
+  unsigned long size = 0;
+  while (in[0]) {
+    read = 0;
+    if (string) {
+      if (in[0] == '\"') string = 0;
+      else write_byte(in[0]);
+      in++;
+    } else if (unicodestring) {
+      if (in[0] == '\'') unicodestring = 0;
+      else write_2byte(in[0], 0);
+      in++;
+    } else if (in[0] == '#') {
+      expand(4);
+      in++;
+      sscanf(in, "%ld", (long*)(&((*data)[size - 4])));
+      while (isdigit(in[0]))
+        in++;
+    } else {
+      if ((in[0] >= '0') && (in[0] <= '9')) {
+        read = 1;
+        chr |= (in[0] - '0');
+      }
+      if ((in[0] >= 'A') && (in[0] <= 'F')) {
+        read = 1;
+        chr |= (in[0] - 'A' + 0x0A);
+      }
+      if ((in[0] >= 'a') && (in[0] <= 'f')) {
+        read = 1;
+        chr |= (in[0] - 'a' + 0x0A);
+      }
+      if (in[0] == '\"') string = 1;
+      if (in[0] == '\'') unicodestring = 1;
+      in++;
+    }
+    if (read) {
+      if (high) chr = chr << 4;
+      else {
+        write_byte(chr);
+        chr = 0;
+      }
+      high = !high;
+    }
+  }
+  return size;
+}
+
 // reads an unsigned long long from the input file
 // returns 0 if an error occurred
-int parse_ull(char* in, unsigned long long* value, int default_hex) {
+int parse_ull(const char* in, unsigned long long* value, int default_hex) {
   if ((in[0] == '0') && ((in[1] == 'x') || (in[1] == 'X')))
     return sscanf(&in[2], "%llx", value);
   return sscanf(in, default_hex ? "%llx" : "%llu", value);
@@ -147,73 +202,72 @@ char* read_string_delimited(FILE* in, char delimiter, int consume_delim) {
 
 // removes spaces from the beginning of a string
 void trim_spaces(char* string) {
-  while (string[0] == ' ')
-    strcpy(string, &string[1]);
+  if (!string)
+    return;
+  int x;
+  for (x = 0; string[x] == ' ' && string[x]; x++);
+  strcpy(string, &string[x]);
 }
 
 // finds the end of the word, returns a pointer to the first word after
-char* skip_word(char* in) {
-  for (; *in != ' ' && *in; in++);
+const char* skip_word(const char* in, char delim) {
+  if (!in)
+    return NULL;
+
+  for (; *in != delim && *in; in++);
   if (!*in)
     return in;
 
-  *in = 0;
   in++;
-  for (; *in == ' '; in++);
+  for (; *in == delim; in++);
   return in;
 }
 
-// like read_stream_data, but stops at the end of the string
-int read_string_data(const char* in_buffer, long in_size,
-                     unsigned char* out_buffer) {
-  long x,size = 0;
-  int chr = 0;
-  int read,string = 0,unicodestring = 0,high = 1;
-  
-  for (x = 0; x < in_size; x++) {
-    read = 0;
-    if (string) {
-      if (in_buffer[x] == '\"') string = 0;
-      else {
-        out_buffer[size] = in_buffer[x];
-        size++;
-      }
-    } else if (unicodestring) {
-      if (in_buffer[x] == '\'') unicodestring = 0;
-      else {
-        out_buffer[size] = in_buffer[x];
-        out_buffer[size + 1] = 0;
-        size += 2;
-      }
-    } else if (in_buffer[x] == '#') {
-      sscanf(&in_buffer[x + 1],"%ld",(long*)&out_buffer[size]);
-      size += 4;
-      while ((in_buffer[x + 1] >= '0') && (in_buffer[x + 1] <= '9')) x++;
-    } else {
-      if ((in_buffer[x] >= '0') && (in_buffer[x] <= '9')) {
-        read = 1;
-        chr |= (in_buffer[x] - '0');
-      }
-      if ((in_buffer[x] >= 'A') && (in_buffer[x] <= 'F')) {
-        read = 1;
-        chr |= (in_buffer[x] - 'A' + 0x0A);
-      }
-      if ((in_buffer[x] >= 'a') && (in_buffer[x] <= 'f')) {
-        read = 1;
-        chr |= (in_buffer[x] - 'a' + 0x0A);
-      }
-      if (in_buffer[x] == '\"') string = 1;
-      if (in_buffer[x] == '\'') unicodestring = 1;
-    }
-    if (read) {
-      if (high) chr = chr << 4;
-      else {
-        out_buffer[size] = chr;
-        chr = 0;
-        size++;
-      }
-      high = !high;
-    }
+// makes a copy of the quoted string given, taking care of escaped items. the
+// quote character is the first character of in.
+// returns the number of chars consumed in input, or -1 on error
+int copy_quoted_string(const char* in, char** out) {
+  if (!in || !out)
+    return -1;
+  if (!in[0])
+    return 0;
+
+  const char* in_orig = in;
+  int out_size = 0;
+  *out = NULL;
+  char quote = in[0];
+  for (in++; in[0] && in[0] != quote; in++) {
+    out_size++;
+    *out = (char*)realloc(*out, out_size * sizeof(char*));
+    if (in[0] == '\\' && in[1]) {
+      (*out)[out_size - 1] = in[1];
+      in++;
+    } else
+      (*out)[out_size - 1] = in[0];
   }
-  return size;
+  if (in[0] == quote)
+    in++;
+
+  return in - in_orig;
+}
+
+// reads addr:size (hex) or addr size (dec) from a string; returns the number of
+// chars used up, or 0 if an error occurred
+int read_addr_size(const char* str, unsigned long long* addr,
+                   unsigned long long* size) {
+
+  // read address
+  sscanf(str, "%llX", addr);
+
+  // : means size is hex; space means it's decimal
+  const char* next_col = skip_word(str, ':');
+  const char* next_spc = skip_word(str, ' ');
+  if (next_spc - next_col > 0 && next_col[0]) {
+    sscanf(next_col, "%llX", size);
+    return skip_word(next_col, ' ') - str;
+  } else if (next_spc[0]) {
+    sscanf(next_spc, "%llu", size);
+    return skip_word(next_spc, ' ') - str;
+  }
+  return 0;
 }

@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <readline/readline.h>
+#include <readline/history.h>
+
 #include "vmmap.h"
 #include "vmmap_data.h"
 #include "search_data.h"
@@ -14,21 +17,9 @@
 
 #include "memory_search.h"
 
-#define read_addr_size(addr, size) \
-  { fscanf(stdin, "%llX", &addr); \
-  command = fgetc(stdin); \
-  if (command == ':') \
-    fscanf(stdin, "%llX", &size); \
-  else if (command == ' ') \
-    fscanf(stdin, "%llu", &size); \
-  else if (command == '\n') { \
-    printf("invalid command format\n"); \
-    ungetc('\n', stdin); \
-    break; \
-  } else { \
-    printf("invalid command format\n"); \
-    break; \
-  } }
+// TODO: undoing searches
+// TODO: unfreeze by address or name
+// TODO: fix file writing to memory
 
 extern int* cancel_var;
 
@@ -50,9 +41,9 @@ int memory_search(pid_t pid, int pause_during) {
  
   // yep, lots of variables (see the code below for their explanations)
   int process_running = 1;
-  int command = 1;
-  char *arguments, *filename;
-  int x, error;
+  char *command = NULL;
+  const char *command_read = NULL, *arguments = NULL;
+  int x, error, run = 1;
   unsigned long long size;
   unsigned long long addr;
   void* write_data = NULL;
@@ -61,17 +52,30 @@ int memory_search(pid_t pid, int pause_during) {
   MemorySearchData* search = NULL; // the current search
 
   // while we have stuff to do...
-  while (command) {
+  while (run) {
 
-    // prompt the user
-    if (search)
-      printf("(memwatch:%u/%s#%s) ", pid, processname, search->name);
-    else
-      printf("(memwatch:%u/%s) ", pid, processname);
+    // decide what to prompt the user with
+    char* prompt;
+    if (search) {
+      prompt = (char*)malloc(30 + strlen(processname) +
+                                   strlen(search->name));
+      sprintf(prompt, "(memwatch:%u/%s#%s) ", pid, processname, search->name);
+    } else {
+      prompt = (char*)malloc(30 + strlen(processname));
+      sprintf(prompt, "(memwatch:%u/%s) ", pid, processname);
+    }
+
+    // delete the old command, if present
+    if (command)
+      free(command);
+    command = readline(prompt);
+    trim_spaces(command);
+    if (command && command[0])
+      add_history(command);
+    free(prompt);
 
     // what is thy bidding, my master?
-    command = fgetc(stdin);
-    switch (command) {
+    switch (command[0]) {
 
       // TODO: print help message
       case 'h':
@@ -82,13 +86,14 @@ int memory_search(pid_t pid, int pause_during) {
 "commands:\n"
 "  l                         list memory regions\n"
 "  d                         dump memory\n"
+"  d <filename>              dump memory regions to <filename>_<addr> files\n"
 "  t <data>                  find occurrences of data\n"
 "  m <addr>                  enable all access on region containing address\n"
 "  r <addr+size>             read from memory\n"
 "  w <addr> <data>           write to memory\n"
 "  W <addr> <filename>       write file to memory\n"
 "  f <addr> <data>           freeze data in memory\n"
-"  f \"<name>\" <addr> <data>  freeze data in memory, with given name"
+"  f \"<name>\" <addr> <data>  freeze data in memory, with given name\n"
 "  u                         list frozen regions\n"
 "  u <index>                 unfreeze frozen region\n"
 "  S                         show previous named searches\n"
@@ -175,8 +180,7 @@ int memory_search(pid_t pid, int pause_during) {
       case 'D':
 
         // read the filename prefix
-        filename = read_string_delimited(stdin, '\n', 0);
-        trim_spaces(filename);
+        arguments = skip_word(command, ' ');
 
         // stop the process if necessary, dump memory, and resume the process
         if (process_running && pause_during)
@@ -190,13 +194,14 @@ int memory_search(pid_t pid, int pause_during) {
         }
 
         // save each piece with the given filename
-        if (filename[0]) {
-          char* filename_piece = (char*)malloc(strlen(filename) + 64);
+        if (arguments[0]) {
+          char* filename_piece = (char*)malloc(strlen(arguments) + 64);
 
           unsigned long x;
           for (x = 0; x < map->numRegions; x++) {
 
-            sprintf(filename_piece, "%s_%016llX", filename, map->regions[x].region._address);
+            sprintf(filename_piece, "%s_%016llX", arguments,
+                    map->regions[x].region._address);
 
             // print region info
             printf("%016llX %016llX %c%c%c %s\n",
@@ -219,7 +224,6 @@ int memory_search(pid_t pid, int pause_during) {
           // no filename? then don't save it
           print_region_map(map);
         }
-        free(filename);
 
         // delete the data map
         DestroyDataMap(map);
@@ -242,7 +246,7 @@ int memory_search(pid_t pid, int pause_during) {
         }
 
         // read the string
-        size = read_stream_data(stdin, &write_data);
+        size = read_string_data(skip_word(command, ' '), &write_data);
 
         // find the string in a region somewhere
         unsigned long long num_results = 0;
@@ -275,7 +279,7 @@ int memory_search(pid_t pid, int pause_during) {
       case 'M':
 
         // read the address
-        fscanf(stdin, "%llX", &addr);
+        sscanf(skip_word(command, ' '), "%llX", &addr);
 
         // attempt to make it all-access
         if (VMSetRegionProtection(pid, addr, 1, VMREGION_ALL, VMREGION_ALL))
@@ -287,16 +291,19 @@ int memory_search(pid_t pid, int pause_during) {
       // read from memory
       case 'r':
       case 'R':
-        read_addr_size(addr, size);
+        if (!read_addr_size(skip_word(command, ' '), &addr, &size)) {
+          printf("invalid command format\n");
+          break;
+        }
 
         void* read_data = malloc(size);
         if (!read_data) {
           printf("failed to allocate memory for reading\n");
           break;
         }
-        if ((error = VMReadBytes(pid, addr, read_data, &size))) {
+        if ((error = VMReadBytes(pid, addr, read_data, &size)))
           print_process_data(processname, addr, read_data, size);
-        } else
+        else
           printf("failed to read data from process\n");
         free(read_data);
         break;
@@ -304,15 +311,15 @@ int memory_search(pid_t pid, int pause_during) {
       // write data to memory
       case 'w':
 
-        // read the address
-        fscanf(stdin, "%llX", &addr);
-
-        // read the data
-        size = read_stream_data(stdin, &write_data);
+        // read the address and data
+        command_read = skip_word(command, ' ');
+        sscanf(command_read, "%llX", &addr);
+        command_read = skip_word(command_read, ' ');
+        size = read_string_data(command_read, &write_data);
 
         // and write it
         if ((error = VMWriteBytes(pid, addr, write_data, size)))
-          printf("wrote %llX bytes\n", size);
+          printf("wrote %llu (0x%llX) bytes\n", size, size);
         else
           printf("failed to write data to process\n");
         free(write_data);
@@ -322,13 +329,12 @@ int memory_search(pid_t pid, int pause_during) {
       case 'W':
 
         // read the parameters
-        read_addr_size(addr, size);
-        filename = read_string_delimited(stdin, '\n', 0);
-        trim_spaces(filename);
+        command_read = skip_word(command, ' ');
+        sscanf(command_read, "%llX", &addr);
+        command_read = skip_word(command_read, ' '); // skip space after addr/size
 
         // write the file
-        write_file_to_process(filename, size, pid, addr);
-        free(filename);
+        write_file_to_process(command_read, size, pid, addr);
 
         break;
 
@@ -336,18 +342,19 @@ int memory_search(pid_t pid, int pause_during) {
       case 'f':
 
         // if a quote is given, read the name
-        while ((command = fgetc(stdin)) == ' ');
+        command_read = skip_word(command, ' ');
         char* freeze_name = NULL;
-        if ((command == '\'') || (command == '\"')) {
-          freeze_name = read_string_delimited(stdin, command, 1);
-        } else
-          ungetc(command, stdin);
+        if ((command_read[0] == '\'') || (command_read[0] == '\"')) {
+          command_read += copy_quoted_string(command_read, &freeze_name);
+          command_read = skip_word(command_read, ' ');
+        }
 
         // read the address
-        fscanf(stdin, "%llX", &addr);
+        sscanf(command_read, "%llX", &addr);
+        command_read = skip_word(command_read, ' ');
 
         // read the data
-        size = read_stream_data(stdin, &write_data);
+        size = read_string_data(command_read, &write_data);
 
         // and freeze it
         char* use_name = freeze_name ? freeze_name :
@@ -364,15 +371,19 @@ int memory_search(pid_t pid, int pause_during) {
       // unfreeze a var by index, or print frozen regions
       case 'u':
 
-        // read the address
-        if (fgetc(stdin) != '\n') {
-          fscanf(stdin, "%lld", &addr);
+        // find the unfreeze index
+        command_read = skip_word(command, ' ');
+
+        // index given? unfreeze it
+        if (command_read[0]) {
+          sscanf(command_read, "%lld", &addr);
           if (UnfreezeRegionByIndex(addr))
             printf("failed to unfreeze region\n");
           else
             printf("region unfrozen\n");
+
+        // else, print frozen regions
         } else {
-          ungetc('\n', stdin);
           printf("frozen regions:\n");
           PrintFrozenRegions(0);
         }
@@ -381,20 +392,8 @@ int memory_search(pid_t pid, int pause_during) {
       // begin new search
       case 'S':
 
-        // if it's S!, we'll search read-only as well (don't know why anyone
-        // would want to do this though... :/)
-        command = fgetc(stdin);
-        int readonly_search = 0;
-        if (command == '!')
-          readonly_search = 1;
-        else
-          ungetc(command, stdin);
-
-        // read the type
-        arguments = read_string_delimited(stdin, '\n', 0);
-        trim_spaces(arguments);
-
-        // no arguments: show the list of searches
+        // read the type. if no type, show the list of searches
+        arguments = skip_word(command, ' ');
         if (!arguments[0]) {
           PrintSearches(searches);
           break;
@@ -408,11 +407,14 @@ int memory_search(pid_t pid, int pause_during) {
         }
 
         // check if a name followed the type
-        const char* name = skip_word(arguments);
+        const char* name = skip_word(arguments, ' ');
 
+        // if it's S!, we'll search read-only as well (don't know why anyone
+        // would want to do this though... :/)
+        int search_flags = (command[1] == '!') ? SEARCHFLAG_ALLMEMORY : 0;
+        
         // make a new search
-        search = CreateNewSearchByTypeName(arguments, name, readonly_search ?
-                                           SEARCHFLAG_ALLMEMORY : 0);
+        search = CreateNewSearchByTypeName(arguments, name, search_flags);
         if (search) {
           AddSearchToList(searches, search);
           if (search->name[0])
@@ -424,7 +426,6 @@ int memory_search(pid_t pid, int pause_during) {
         } else
           printf("failed to open new search - did you use a valid typename?\n");
 
-        free(arguments);
         break;
 
       // search for a value
@@ -438,14 +439,14 @@ int memory_search(pid_t pid, int pause_during) {
         }
 
         // read the predicate
-        arguments = read_string_delimited(stdin, '\n', 0);
-        trim_spaces(arguments);
+        arguments = skip_word(command, ' ');
         int pred = GetPredicateByName(arguments);
 
         // check if a value followed the predicate
         void* value = NULL;
         size = 0;
-        char* value_text = skip_word(arguments);
+        write_data = NULL;
+        const char* value_text = skip_word(arguments, ' ');
         if (*value_text) {
 
           // we have a value... blargh
@@ -463,9 +464,8 @@ int memory_search(pid_t pid, int pause_during) {
             sscanf(value_text, "%lf", &dvalue);
             value = &dvalue;
           } else if (search->type == SEARCHTYPE_DATA) {
-            size = read_string_data(value_text, strlen(value_text),
-                                    (unsigned char*)value_text);
-            value = value_text;
+            size = read_string_data(value_text, &write_data);
+            value = write_data;
           }
         }
 
@@ -478,7 +478,6 @@ int memory_search(pid_t pid, int pause_during) {
           VMContinueProcess(pid);
         if (!map) {
           printf("memory dump failed\n");
-          free(arguments);
           break;
         }
 
@@ -486,7 +485,8 @@ int memory_search(pid_t pid, int pause_during) {
         MemorySearchData* search_result = ApplyMapToSearch(search, map, pred,
                                                            value, size);
         map = NULL;
-        free(arguments);
+        if (write_data)
+          free(write_data);
 
         // success? then save the result
         if (!search_result) {
@@ -494,6 +494,7 @@ int memory_search(pid_t pid, int pause_during) {
           break;
         }
 
+        // add this search to the list
         search = search_result;
         AddSearchToList(searches, search);
         if (search->numResults >= 20) {
@@ -501,7 +502,7 @@ int memory_search(pid_t pid, int pause_during) {
           break;
         }
 
-        // fall through to display results
+        // fall through to display results if there are less than 20
 
       // print search results
       case 'x':
@@ -525,12 +526,10 @@ int memory_search(pid_t pid, int pause_during) {
       case 'P':
 
         // read the type
-        arguments = read_string_delimited(stdin, '\n', 0);
-        trim_spaces(arguments);
+        arguments = skip_word(command, ' ');
 
         // no name present? then we're deleting the current search
         if (!arguments[0]) {
-          free(arguments);
 
           // check if there's a current search
           if (!search) {
@@ -573,25 +572,16 @@ int memory_search(pid_t pid, int pause_during) {
         printf("process resumed\n");
         break;
 
-      // end-of-line, herp derp
-      case '\n':
-        ungetc('\n', stdin);
-        break;
-
       // quit
       case 'q':
       case 'Q':
-        command = 0; // tell the outer loop to quit
+        run = 0;
         break;
 
       // unknown
       default:
         printf("unknown command - try \'h\'\n");
     }
-
-    // read extra junk at end of command
-    while (fgetc(stdin) != '\n')
-      usleep(10000);
   }
 
   // shut down the region freezer and return

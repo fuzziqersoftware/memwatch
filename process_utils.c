@@ -6,6 +6,8 @@
 #include "vmmap_data.h"
 #include "process_utils.h"
 
+#include "parse_utils.h"
+
 // gets the name for the specified process
 int getpidname(pid_t pid, char* name, int namelen) {
   char command[0x80];
@@ -189,7 +191,7 @@ int write_file_to_process(const char* filename, unsigned long long size,
   if (VMWriteBytes(pid, addr, write_data, size))
     printf("failed to write data to process\n");
   else
-    printf("wrote %llX bytes\n", size);
+    printf("wrote %llu (%llX) bytes\n", size, size);
   free(write_data);
 
   return 0;

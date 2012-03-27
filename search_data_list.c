@@ -88,7 +88,8 @@ void PrintSearches(MemorySearchDataList* list) {
 
   int x;
   for (x = 0; x < list->numSearches; x++) {
-    printf("  %s ", list->searches[x]->name);
+    printf("  %s %s ", GetSearchTypeName(list->searches[x]->type),
+           list->searches[x]->name);
     if (!list->searches[x]->memory)
       printf("(initial search not done)");
     else

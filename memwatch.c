@@ -183,9 +183,7 @@ int main(int argc, char* argv[]) {
         printf("can\'t use -d with a given size\n");
         return (-2);
       }
-      size = strlen(&argv[x][2]);
-      write_data = malloc(size);
-      size = read_string_data(&argv[x][2], size, write_data);
+      size = read_string_data(&argv[x][2], &write_data);
 
     // first non-dash param: a process name or pid
     } else if (!pid && !processname[0]) {
