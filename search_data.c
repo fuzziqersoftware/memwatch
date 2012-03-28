@@ -235,11 +235,33 @@ void DeleteSearch(MemorySearchData* search) {
   }
 }
 
+// byteswaps a value, for use in ApplyMapToSearch
+void _ApplyMapToSearch_ByteswapValueIfLE(int searchtype, void* value) {
+
+  if (!value)
+    return;
+
+  if (searchtype == SEARCHTYPE_UINT16_LE || searchtype == SEARCHTYPE_INT16_LE)
+    bswap_int16_t(value);
+
+  else if (searchtype == SEARCHTYPE_UINT32_LE ||
+           searchtype == SEARCHTYPE_INT32_LE ||
+           searchtype == SEARCHTYPE_FLOAT_LE)
+    bswap_int32_t(value);
+
+  else if (searchtype == SEARCHTYPE_UINT64_LE ||
+           searchtype == SEARCHTYPE_INT64_LE ||
+           searchtype == SEARCHTYPE_DOUBLE_LE)
+    bswap_int64_t(value);
+}
+
 // copies a memory search data structure
+// note that ApplyMapToSearch may modify the value
 MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
     int pred, void* value, unsigned long long size) {
 
   int x;
+  _ApplyMapToSearch_ByteswapValueIfLE(s->type, value);
 
   // ensure that the input search and predicate are valid
   if (s->type < 0 || s->type >= SEARCHTYPE_UNKNOWN) {

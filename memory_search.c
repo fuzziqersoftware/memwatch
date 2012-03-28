@@ -469,10 +469,12 @@ int memory_search(pid_t pid, int pause_during) {
           if (IsIntegerSearchType(search->type)) {
             sscanf(value_text, "%lld", &ivalue);
             value = &ivalue;
-          } else if (search->type == SEARCHTYPE_FLOAT) {
+          } else if (search->type == SEARCHTYPE_FLOAT ||
+                     search->type == SEARCHTYPE_FLOAT_LE) {
             sscanf(value_text, "%f", &fvalue);
             value = &fvalue;
-          } else if (search->type == SEARCHTYPE_DOUBLE) {
+          } else if (search->type == SEARCHTYPE_DOUBLE ||
+                     search->type == SEARCHTYPE_DOUBLE_LE) {
             sscanf(value_text, "%lf", &dvalue);
             value = &dvalue;
           } else if (search->type == SEARCHTYPE_DATA) {
