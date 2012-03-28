@@ -8,17 +8,13 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
 
   // read the first region
   VMRegion vmr = VMNextRegion(pid, VMNullRegion);
-  if (VMEqualRegions(vmr, VMNullRegion)) {
-    printf("warning: GetProcessRegionList: no regions\n");
+  if (VMEqualRegions(vmr, VMNullRegion))
     return NULL;
-  }
 
   // alloc a new map header
   VMRegionDataMap* map = (VMRegionDataMap*)malloc(sizeof(VMRegionDataMap));
-  if (!map) {
-    printf("warning: GetProcessRegionList: out of memory (before)\n");
+  if (!map)
     return NULL;
-  }
   map->process = pid;
   map->numRegions = 0;
 
@@ -40,7 +36,6 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
     map = (VMRegionDataMap*)realloc(map, sizeof(VMRegionDataMap) +
                                     sizeof(VMRegionData) * (map->numRegions + 1));
     if (!map) {
-      printf("warning: GetProcessRegionList: out of memory (in progress)\n");
       cancel_var = NULL;
       return NULL;
     }
@@ -82,7 +77,6 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
     map->regions[x].data = malloc(map->regions[x].region._size);
     if (!map->regions[x].data) {
       DestroyDataMap(map);
-      printf("warning: DumpProcessMemory: can\'t allocate for region\n");
       cancel_var = NULL;
       return NULL;
     }
@@ -91,8 +85,6 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
     if (!(map->regions[x].region._attributes & VMREGION_READABLE)) {
       error = VMSetRegionProtection(pid, map->regions[x].region._address,
           map->regions[x].region._size, VMREGION_READABLE, VMREGION_READABLE);
-      if (!error)
-        printf("warning: failed to make region readable\n");
     }
 
     // read the region's contents!
@@ -113,8 +105,6 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
       error = VMSetRegionProtection(pid, map->regions[x].region._address,
           map->regions[x].region._size, map->regions[x].region._attributes,
           VMREGION_ALL);
-      if (!error)
-        printf("warning: failed to make region readable\n");
     }
   }
   cancel_var = NULL;
@@ -146,9 +136,6 @@ int UpdateDataMap(VMRegionDataMap* map) {
 
     // error? do something about it
     // TODO: should delete offending section
-    if (error || (map->regions[x].region._size != newsize))
-      printf("warning: failed to read section %016llx\n",
-             map->regions[x].region._address);
   }
   cancel_var = NULL;
   
