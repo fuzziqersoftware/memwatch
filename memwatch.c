@@ -19,14 +19,14 @@ void sigint(int signum) {
     *cancel_var = 0;
     cancel_var = NULL;
   } else {
-    printf("no operation to cancel - terminating\n");
+    printf(" -- no operation to cancel - terminating\n");
     exit(0);
   }
 }
 
 // callbacks for process enumaration
 
-// prints the process
+// prints the process pid and name
 int print_process(pid_t pid, const char* proc, void* param) {
   printf("%6u - %s\n", pid, proc);
   return 0;
