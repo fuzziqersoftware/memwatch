@@ -126,6 +126,7 @@ static int _UnfreezeRegionByIndexUnlocked(int index) {
 }
 
 // removes a region from the freeze-list
+// returns an error code, or 0 on success
 int UnfreezeRegionByIndex(int index) {
 
   // easy: lock, delete, and unlock
@@ -136,6 +137,7 @@ int UnfreezeRegionByIndex(int index) {
 }
 
 // removes a region by address from the freeze-list
+// returns an error code, or 0 on success
 int UnfreezeRegionByAddr(mach_vm_address_t addr) {
 
   // lock, find region by addr, delete, and unlock
@@ -146,21 +148,27 @@ int UnfreezeRegionByAddr(mach_vm_address_t addr) {
       break;
   if (x < _numFrozenRegions)
     rv = _UnfreezeRegionByIndexUnlocked(x);
+  else
+    rv = 1; // no such region
   pthread_mutex_unlock(&_mutex);
   return rv;
 }
 
 // removes a region from the freeze-list by name
+// returns the number of regions unfrozen
 int UnfreezeRegionByName(const char* name) {
 
   // lock, find region by name, delete, and unlock
   int x, rv = 0;
   pthread_mutex_lock(&_mutex);
-  for (x = 0; x < _numFrozenRegions; x++)
-    if (!strcmp(_frozen[x].name, name))
-      break;
-  if (x < _numFrozenRegions)
-    rv = _UnfreezeRegionByIndexUnlocked(x);
+  for (x = 0; x < _numFrozenRegions; x++) {
+    if (!strcmp(_frozen[x].name, name)) {
+      if (!_UnfreezeRegionByIndexUnlocked(x)) {
+        x--;
+        rv++;
+      }
+    }
+  }
   pthread_mutex_unlock(&_mutex);
   return rv;
 }
@@ -171,11 +179,15 @@ void PrintFrozenRegions(int printData) {
   // lock, print, unlock
   int x;
   pthread_mutex_lock(&_mutex);
-  for (x = 0; x < _numFrozenRegions; x++) {
-    printf("%3d: %6u %016llX:%016llX [%d] %s\n", x, _frozen[x].pid,
-           _frozen[x].addr, _frozen[x].size, _frozen[x].error, _frozen[x].name);
-    if (printData)
-      CRYPT_PrintData(_frozen[x].addr, _frozen[x].data, _frozen[x].size, 0);
-  }
+  if (_numFrozenRegions > 0) {
+    printf("frozen regions:\n");
+    for (x = 0; x < _numFrozenRegions; x++) {
+      printf("%3d: %6u %016llX:%016llX [%d] %s\n", x, _frozen[x].pid,
+             _frozen[x].addr, _frozen[x].size, _frozen[x].error, _frozen[x].name);
+      if (printData)
+        CRYPT_PrintData(_frozen[x].addr, _frozen[x].data, _frozen[x].size, 0);
+    }
+  } else
+    printf("no regions frozen\n");
   pthread_mutex_unlock(&_mutex);  
 }

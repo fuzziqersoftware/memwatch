@@ -18,8 +18,8 @@
 #include "memory_search.h"
 
 // TODO: undoing searches
-// TODO: unfreeze by address or name
 // TODO: fix file writing to memory
+// TODO: show nice memory sizes also in list/dump views
 
 extern int* cancel_var;
 
@@ -377,17 +377,28 @@ int memory_search(pid_t pid, int pause_during) {
 
         // index given? unfreeze it
         if (command_read[0]) {
-          sscanf(command_read, "%lld", &addr);
-          if (UnfreezeRegionByIndex(addr))
-            printf("failed to unfreeze region\n");
-          else
+          int num_by_name = UnfreezeRegionByName(command_read);
+          if (num_by_name == 1) {
             printf("region unfrozen\n");
+          } else if (num_by_name > 1) {
+            printf("%d regions unfrozen\n", num_by_name);
+          } else {
+            sscanf(command_read, "%llX", &addr);
+            if (!UnfreezeRegionByAddr(addr))
+              printf("region unfrozen\n");
+            else {
+              sscanf(command_read, "%llu", &addr);
+              if (!UnfreezeRegionByIndex(addr))
+                printf("region unfrozen\n");
+              else
+                printf("failed to unfreeze region\n");
+            }
+          }
 
         // else, print frozen regions
-        } else {
-          printf("frozen regions:\n");
+        } else
           PrintFrozenRegions(0);
-        }
+
         break;
 
       // begin new search
