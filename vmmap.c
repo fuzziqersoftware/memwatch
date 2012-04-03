@@ -1,3 +1,7 @@
+// vmmap.c, by Martin Michelsen, 2012
+// virtual memory management functions between processes
+// adapted from VMRegion; license included below
+
 // VMRegion 0.1
 // Virtual Memory Wrapper
 //

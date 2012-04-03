@@ -1,3 +1,6 @@
+// memory_search.c, by Martin Michelsen, 2012
+// interface for interactive memory search
+
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>

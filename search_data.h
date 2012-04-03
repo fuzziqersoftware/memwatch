@@ -1,3 +1,6 @@
+// search_data.c, by Martin Michelsen, 2012
+// library to support iteratively searching memory snapshots of a process
+
 #ifndef SEARCH_DATA_H
 #define SEARCH_DATA_H
 

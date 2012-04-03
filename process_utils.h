@@ -1,3 +1,6 @@
+// process_utils.h, by Martin Michelsen, 2012
+// odds and ends used for messing with processes
+
 #ifndef PROCESS_UTILS_H
 #define PROCESS_UTILS_H
 
@@ -19,7 +22,6 @@ int getpidname(pid_t pid, char* name, int namelen);
 int enumprocesses(int callback(pid_t pid, const char* proc, void* param),
                   void* param, int commands);
 
-unsigned long long read_stream_data(FILE* in, void** vdata);
 void print_region_map(VMRegionDataMap* map);
 void print_process_data(const char* processname, unsigned long long addr,
                         void* read_data, unsigned long long size);

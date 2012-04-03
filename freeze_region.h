@@ -1,3 +1,6 @@
+// freeze_region.h, by Martin Michelsen, 2012
+// library to freeze memory locations in other processes
+
 #ifndef FREEZE_REGION_H
 #define FREEZE_REGION_H
 

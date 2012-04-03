@@ -1,3 +1,6 @@
+// process_utils.c, by Martin Michelsen, 2012
+// odds and ends used for messing with processes
+
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>

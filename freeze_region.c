@@ -1,3 +1,6 @@
+// freeze_region.c, by Martin Michelsen, 2012
+// library to freeze memory locations in other processes
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,3 +1,6 @@
+// search_data.c, by Martin Michelsen, 2012
+// library to support iteratively searching memory snapshots of a process
+
 #include <stdlib.h>
 #include <stdio.h>
 #include "vmmap_data.h"
@@ -118,6 +121,7 @@ DECLARE_LE_OPS_FOR_TYPE(int64_t)
 DECLARE_LE_OPS_FOR_TYPE_NOFLAG(float)
 DECLARE_LE_OPS_FOR_TYPE_NOFLAG(double)
 
+// comparators for arbitrary data type
 static int data_lt(void* a, void* b, int size) { return (memcmp(a, b, size) < 0); }
 static int data_gt(void* a, void* b, int size) { return (memcmp(a, b, size) > 0); }
 static int data_le(void* a, void* b, int size) { return (memcmp(a, b, size) <= 0); }

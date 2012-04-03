@@ -1,3 +1,7 @@
+// value_test_float.c, by Martin Michelsen, 2012
+// simple app that repeatedly asks for a new value for its internal variables
+// useful for testing memory search routines
+
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>

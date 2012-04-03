@@ -1,3 +1,6 @@
+// parse_utils.h, by Martin Michelsen, 2012
+// odds and ends used for messing with text and data
+
 #ifndef PARSE_UTILS_H
 #define PARSE_UTILS_H
 

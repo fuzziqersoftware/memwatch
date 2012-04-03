@@ -1,3 +1,6 @@
+// search_data_list.h, by Martin Michelsen, 2012
+// simple collection of searches
+
 #ifndef SEARCH_DATA_LIST_H
 #define SEARCH_DATA_LIST_H
 

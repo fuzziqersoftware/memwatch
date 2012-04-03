@@ -1,3 +1,6 @@
+// memwatch.c, by Martin Michelsen, 2012
+// the main app itself
+
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,7 +12,8 @@
 #include "memory_search.h"
 #include "parse_utils.h"
 
-// signal handler for ctrl+c: cancel operations
+// signal handler for ctrl+c: cancel operations first; if there are none to
+// cancel, then quit
 
 int* cancel_var = NULL;
 
@@ -112,7 +116,7 @@ void print_usage() {
 "    sudo memwatch firefox\n");
 }
 
-// main()
+// entry point
 int main(int argc, char* argv[]) {
 
   // hello there

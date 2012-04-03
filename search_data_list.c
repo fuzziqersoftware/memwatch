@@ -1,3 +1,6 @@
+// search_data_list.c, by Martin Michelsen, 2012
+// simple collection of searches
+
 #include <stdlib.h>
 #include <stdio.h>
 #include "search_data_list.h"

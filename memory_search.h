@@ -1,3 +1,6 @@
+// memory_search.h, by Martin Michelsen, 2012
+// interface for interactive memory search
+
 #ifndef MEMORY_SEARCH_H
 #define MEMORY_SEARCH_H
 

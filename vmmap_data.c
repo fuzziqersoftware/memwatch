@@ -1,3 +1,6 @@
+// vmmap_data.c, by Martin Michelsen, 2012
+// process memory state capture functions
+
 #include <stdlib.h>
 #include <stdio.h>
 #include "vmmap_data.h"

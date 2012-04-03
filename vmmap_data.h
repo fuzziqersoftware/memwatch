@@ -1,3 +1,6 @@
+// vmmap_data.h, by Martin Michelsen, 2012
+// process memory state capture functions
+
 #ifndef VMMAP_DATA_H
 #define VMMAP_DATA_H
 
