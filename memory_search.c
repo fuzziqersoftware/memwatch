@@ -43,7 +43,7 @@ int memory_search(pid_t pid, int pause_during) {
   InitRegionFreezer();
  
   // yep, lots of variables (see the code below for their explanations)
-  int process_running = 1;
+  int process_running = 1, cont;
   char *command = NULL;
   const char *command_read = NULL, *arguments = NULL;
   int x, error, run = 1;
@@ -93,6 +93,7 @@ int memory_search(pid_t pid, int pause_during) {
 "  t <data>                  find occurrences of data\n"
 "  m <addr>                  enable all access on region containing address\n"
 "  r <addr+size>             read from memory\n"
+"  R <addr+size>             read from memory every second (ctrl+c to stop)\n"
 "  w <addr> <data>           write to memory\n"
 "  W <addr> <filename>       write file to memory\n"
 "  f <addr> <data>           freeze data in memory\n"
@@ -256,7 +257,7 @@ int memory_search(pid_t pid, int pause_during) {
 
         // find the string in a region somewhere
         unsigned long long num_results = 0;
-        int cont = 1;
+        cont = 1;
         cancel_var = &cont;
         for (x = 0; cont && (x < map->numRegions); x++) {
 
@@ -297,21 +298,34 @@ int memory_search(pid_t pid, int pause_during) {
       // read from memory
       case 'r':
       case 'R':
+
+        // read addr/size
         if (!read_addr_size(skip_word(command, ' '), &addr, &size)) {
           printf("invalid command format\n");
           break;
         }
 
+        // alloc local read buffer
         void* read_data = malloc(size);
         if (!read_data) {
           printf("failed to allocate memory for reading\n");
           break;
         }
-        if ((error = VMReadBytes(pid, addr, read_data, &size)))
-          print_process_data(processname, addr, read_data, size);
-        else
-          printf("failed to read data from process\n");
+
+        // if it's lowercase, do it once; if it's uppercase, do it once every
+        // second
+        cont = (command[0] == 'R');
+        cancel_var = &cont;
+        do {
+          if ((error = VMReadBytes(pid, addr, read_data, &size)))
+            print_process_data(processname, addr, read_data, size);
+          else
+            printf("failed to read data from process\n");
+          if (cont)
+            usleep(1000000);
+        } while (cont);
         free(read_data);
+        cancel_var = NULL;
         break;
 
       // write data to memory

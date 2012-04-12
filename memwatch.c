@@ -17,14 +17,25 @@
 
 int* cancel_var = NULL;
 
+int recent_cancel = 0;
+int recent_cancel_count = 0;
+
 void sigint(int signum) {
   if (cancel_var) {
     printf(" -- canceling operation\n");
     *cancel_var = 0;
     cancel_var = NULL;
   } else {
-    printf(" -- no operation to cancel - terminating\n");
-    exit(0);
+    if (recent_cancel == time(NULL)) {
+      if (recent_cancel_count > 1) {
+        printf(" -- no operation to cancel - terminating\n");
+        exit(0);
+      } else
+        recent_cancel_count++;
+    } else {
+      recent_cancel = time(NULL);
+      recent_cancel_count = 0;
+    }
   }
 }
 
