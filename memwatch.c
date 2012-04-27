@@ -232,8 +232,16 @@ int main(int argc, char* argv[]) {
       printf("unrecognized or unnecessary command line argument: %s\n", argv[x]);
   }
 
+  // are we working on the kernel? (WOO DANGEROUS)
+  int operate_on_kernel = 0;
+  if (!strcmp(processname, "KERNEL")) {
+    pid = 0;
+    operate_on_kernel = 1;
+    printf("warning: operating on operating system kernel\n");
+  }
+
   // find pid for process name
-  if (processname[0] && !pid) {
+  if (processname[0] && !pid && !operate_on_kernel) {
     find_pid_data d;
     strcpy(d.name, processname);
     for (x = 0; d.name[x]; x++)
@@ -270,13 +278,13 @@ int main(int argc, char* argv[]) {
   }
 
   // some arguments missing? show usage
-  if (!pid) {
+  if (!pid && !operate_on_kernel) {
     print_usage();
     return 0;
   }
 
   if (!addr && !size && !write_filename) {
-    if (!pid) {
+    if (!pid && !operate_on_kernel) {
       printf("memory search mode requires a process id or name\n");
       return (-2);
     }

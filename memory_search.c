@@ -31,7 +31,10 @@ int memory_search(pid_t pid, int pause_during) {
 
   // first get the process name
   char processname[PROCESS_NAME_LENGTH];
-  getpidname(pid, processname, PROCESS_NAME_LENGTH);
+  if (!pid)
+    strcpy(processname, "KERNEL");
+  else
+    getpidname(pid, processname, PROCESS_NAME_LENGTH);
 
   // no process name? process doesn't exist!
   if (!strlen(processname)) {
@@ -41,7 +44,7 @@ int memory_search(pid_t pid, int pause_during) {
 
   // init the region freezer
   InitRegionFreezer();
- 
+
   // yep, lots of variables (see the code below for their explanations)
   int process_running = 1, cont;
   char *command = NULL;
@@ -51,6 +54,7 @@ int memory_search(pid_t pid, int pause_during) {
   unsigned long long addr;
   void* write_data = NULL;
   VMRegionDataMap* map = NULL;
+  VMThreadState* thread_state = NULL;
   MemorySearchDataList* searches = CreateSearchList();
   MemorySearchData* search = NULL; // the current search
 
@@ -110,6 +114,7 @@ int memory_search(pid_t pid, int pause_during) {
 "  x                         print current search results\n"
 "  p                         delete current search\n"
 "  p <name>                  delete search by name\n"
+"  g                         view register contents on all threads\n"
 "  -                         pause process\n"
 "  +                         resume process\n"
 "  * <signal_number>         send unix signal to process\n"
@@ -587,6 +592,57 @@ int memory_search(pid_t pid, int pause_during) {
 
           // delete the search
           DeleteSearchByName(searches, arguments);
+        }
+
+        break;
+
+      // view registers on threads
+      case 'g':
+        error = VMGetThreadRegisters(pid, &thread_state);
+        if (error < 0)
+          printf("failed to get registers; error %d\n", error);
+        else if (error == 0)
+          printf("no threads in process\n");
+        else {
+          for (x = 0; x < error; x++)
+            VMPrintThreadRegisters(&thread_state[x]);
+          free(thread_state);
+        }
+        break;
+
+      // set register on threads
+      case 'G':
+
+        // read the value and regname
+        arguments = skip_word(command, ' ');
+        uint64_t regvalue = 0;
+        sscanf(arguments, "%llX", &regvalue);
+        arguments = skip_word(arguments, ' ');
+
+        // read the thread regs on each thread
+        error = VMGetThreadRegisters(pid, &thread_state);
+        if (error < 0)
+          printf("failed to get registers; error %d\n", error);
+        else if (error == 0)
+          printf("no threads in process\n");
+        else {
+
+          // change the reg in each thread
+          for (x = 0; x < error; x++)
+            VMSetRegisterValueByName(&thread_state[x], arguments, regvalue);
+
+          // print regs to write
+          // TODO: get rid of this
+          for (x = 0; x < error; x++)
+            VMPrintThreadRegisters(&thread_state[x]);
+
+          // write the reg contents back to the process
+          error = VMSetThreadRegisters(pid, thread_state, error);
+          if (error)
+            printf("failed to set registers; error %d\n", error);
+          else
+            printf("modified thread registers\n");
+          free(thread_state);
         }
 
         break;

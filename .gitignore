@@ -2,3 +2,6 @@
 memwatch
 value_test
 value_test_float
+register_test32
+register_test64
+

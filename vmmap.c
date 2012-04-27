@@ -34,7 +34,10 @@
 
 #include <mach/mach_init.h> // for current_task
 #include <mach/mach_traps.h> // for task_for_pid(3)
+#include <mach/task.h> // for task_for_pid(3)
+#include <mach/thread_act.h> // for task_for_pid(3)
 #include <signal.h> // for stop(2)
+#include <stdlib.h> // for stop(2)
 #include <stdio.h> // for debugging
 
 static __inline__ vm_map_t _VMTaskFromPID(pid_t process)
@@ -247,6 +250,341 @@ unsigned int _VMAttributesFromAddress(pid_t process, mach_vm_address_t address)
     if (info.protection & VM_PROT_EXECUTE)
       attribs |= VMREGION_EXECUTABLE;
     return attribs;
+  }
+  return 0;
+}
+
+
+
+// prints the register contents in a thread state
+void VMPrintThreadRegisters(VMThreadState* state) {
+  
+  if (!state->is64) {
+    printf("[thread 32-bit @ eip:%016X]\n", state->st32.__eip);
+    printf("  eax: %08X  ecx: %08X  edx: %08X  ebx: %08X\n", state->st32.__eax,
+           state->st32.__ecx, state->st32.__edx, state->st32.__ebx);
+    printf("  ebp: %08X  esp: %08X  esi: %08X  edi: %08X\n", state->st32.__ebp,
+           state->st32.__esp, state->st32.__esi, state->st32.__edi);
+    printf("  eflags: %08X\n", state->st32.__eflags);
+    printf("  cs:  %08X  ds:  %08X  es:  %08X  fs:  %08X\n", state->st32.__cs,
+           state->st32.__ds, state->st32.__es, state->st32.__fs);
+    printf("  gs:  %08X  ss:  %08X\n", state->st32.__gs, state->st32.__ss);
+    // TODO: print floating & debug state
+    printf("  dr0: %08X  dr1: %08X  dr2: %08X  dr3: %08X\n", state->db32.__dr0,
+           state->db32.__dr1, state->db32.__dr2, state->db32.__dr3);
+    printf("  dr4: %08X  dr5: %08X  dr6: %08X  dr7: %08X\n", state->db32.__dr4,
+           state->db32.__dr5, state->db32.__dr6, state->db32.__dr7);
+  } else {
+    printf("[thread 64-bit @ rip:%016llX]\n", state->st64.__rip);
+    printf("  rax: %016llX  rcx: %016llX  rdx: %016llX\n", state->st64.__rax,
+           state->st64.__rcx, state->st64.__rdx);
+    printf("  rbx: %016llX  rbp: %016llX  rsp: %016llX\n", state->st64.__rbx,
+           state->st64.__rbp, state->st64.__rsp);
+    printf("  rsi: %016llX  rdi: %016llX  r8:  %016llX\n", state->st64.__rsi,
+           state->st64.__rdi, state->st64.__r8);
+    printf("  r9:  %016llX  r10: %016llX  r11: %016llX\n", state->st64.__r9,
+           state->st64.__r10, state->st64.__r11);
+    printf("  r12: %016llX  r13: %016llX  r14: %016llX\n", state->st64.__r12,
+           state->st64.__r13, state->st64.__r14);
+    printf("  r15: %016llX  rflags: %016llX\n", state->st64.__r15,
+           state->st64.__rflags);
+    printf("  cs:  %016llX  fs:  %016llX  gs:  %016llX\n", state->st64.__cs,
+           state->st64.__fs, state->st64.__gs);
+    // TODO: print floating & debug state
+    printf("  dr0: %016llX  dr1: %016llX  dr2: %016llX\n", state->db64.__dr0,
+           state->db64.__dr1, state->db64.__dr2);
+    printf("  dr3: %016llX  dr4: %016llX  dr5: %016llX\n", state->db64.__dr3,
+           state->db64.__dr4, state->db64.__dr5);
+    printf("  dr6: %016llX  dr7: %016llX\n", state->db64.__dr6,
+           state->db64.__dr7);
+  }
+}
+
+#define offsetof(st, m) __builtin_offsetof(st, m)
+
+// sets a regiter value in the given state by name
+int VMSetRegisterValueByName(VMThreadState* state, const char* name,
+                             uint64_t value) {
+
+  static const struct {
+    char name[8];
+    int offset32;
+    int offset64;
+    int size;
+  } registers[] = {
+
+    // 64-bit regs
+    {"rax", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rax), 8},
+    {"rcx", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rcx), 8},
+    {"rdx", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rdx), 8},
+    {"rbx", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rbx), 8},
+    {"rsp", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rsp), 8},
+    {"rbp", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rbp), 8},
+    {"rsi", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rsi), 8},
+    {"rdi", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rdi), 8},
+    {"r8",  0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rax), 8},
+    {"r9",  0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rcx), 8},
+    {"r10", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rdx), 8},
+    {"r11", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rbx), 8},
+    {"r12", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rsp), 8},
+    {"r13", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rbp), 8},
+    {"r14", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rsi), 8},
+    {"r15", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rdi), 8},
+    {"rflags", 0, offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rflags), 8},
+
+    // 32-bit regs
+    {"eax", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __eax),
+            offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rax), 4},
+    {"ecx", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ecx),
+            offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rcx), 4},
+    {"edx", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __edx),
+            offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rdx), 4},
+    {"ebx", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ebx),
+            offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rbx), 4},
+    {"esp", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __esp),
+            offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rsp), 4},
+    {"ebp", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ebp),
+            offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rbp), 4},
+    {"esi", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __esi),
+            offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rsi), 4},
+    {"edi", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __edi),
+            offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rdi), 4},
+    {"eflags", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __eflags),
+               offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rflags), 4},
+
+    // 16-bit regs
+    {"ax", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __eax),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rax), 2},
+    {"cx", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ecx),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rcx), 2},
+    {"dx", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __edx),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rdx), 2},
+    {"bx", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ebx),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rbx), 2},
+    {"sp", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __esp),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rsp), 2},
+    {"bp", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ebp),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rbp), 2},
+    {"si", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __esi),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rsi), 2},
+    {"di", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __edi),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rdi), 2},
+    {"flags", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __eflags),
+              offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rflags), 2},
+
+    // 8-bit regs
+    {"al", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __eax),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rax), 1},
+    {"cl", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ecx),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rcx), 1},
+    {"dl", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __edx),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rdx), 1},
+    {"bl", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ebx),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rbx), 1},
+    {"ah", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __eax) + 1,
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rax) + 1, 1},
+    {"ch", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ecx) + 1,
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rcx) + 1, 1},
+    {"dh", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __edx) + 1,
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rdx) + 1, 1},
+    {"bh", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ebx) + 1,
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __rbx) + 1, 1},
+
+    // segment regs
+    {"cs", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __cs),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __cs), 4},
+    {"ds", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ds), 0, 4},
+    {"es", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __es), 0, 4},
+    {"fs", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __fs),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __fs), 4},
+    {"gs", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __gs),
+           offsetof(VMThreadState, st64) + offsetof(x86_thread_state64_t, __gs), 4},
+    {"ss", offsetof(VMThreadState, st32) + offsetof(x86_thread_state32_t, __ss), 0, 4},
+
+    // no more registers...
+    {"", 0, 0, 0}};
+
+  // find the named register
+  int x;
+  for (x = 0; registers[x].name[0]; x++)
+    if (!strcmp(registers[x].name, name))
+      break;
+  if (!registers[x].name[0])
+    return -1;
+
+  // find the write offset
+  int write_offset = state->is64 ? registers[x].offset64 : registers[x].offset32;
+  if (!write_offset)
+    return -2;
+
+  // write to state
+  switch (registers[x].size) {
+    case 1:
+      *(uint8_t*)((uint8_t*)state + write_offset) = value;
+      break;
+    case 2:
+      *(uint16_t*)((uint8_t*)state + write_offset) = value;
+      break;
+    case 4:
+      *(uint32_t*)((uint8_t*)state + write_offset) = value;
+      break;
+    case 8:
+      *(uint64_t*)((uint8_t*)state + write_offset) = value;
+      break;
+  }
+
+  return 0;
+}
+
+// gets thread registers for all threads in the process
+// return: number of threads if > 0
+// return: < 0 if error
+// the states must be free()'d when no longer required.
+int VMGetThreadRegisters(pid_t process, VMThreadState** states) {
+
+  // get the task port
+  vm_map_t task = _VMTaskFromPID(process);
+  if (!task)
+    return -1;
+
+  // get the thread list
+  thread_act_port_array_t thread_list;
+  mach_msg_type_number_t thread_count;
+  if (task_threads(task, &thread_list, &thread_count) != KERN_SUCCESS)
+    return -2;
+
+  // no threads? return NULL and 0
+  if (!thread_count) {
+    *states = NULL;
+    return 0;
+  }
+  
+  // alloc the thread info list
+  *states = (VMThreadState*)malloc(sizeof(VMThreadState) * thread_count);
+  if (!*states)
+    return -3;
+
+  // for each thread...
+  int x;
+  for (x = 0; x < thread_count; x++) {
+
+    // get the thread state
+    x86_thread_state_t state;
+    x86_float_state_t fstate;
+    x86_debug_state_t dstate;
+    mach_msg_type_number_t sc = x86_THREAD_STATE_COUNT;
+    if (thread_get_state(thread_list[x], x86_THREAD_STATE,
+                         (thread_state_t)&state, &sc) != KERN_SUCCESS) {
+      free(*states);
+      return -4;
+    }
+    sc = x86_FLOAT_STATE_COUNT;
+    if (thread_get_state(thread_list[x], x86_FLOAT_STATE,
+                         (thread_state_t)&fstate, &sc) != KERN_SUCCESS) {
+      free(*states);
+      return -5;
+    }
+    sc = x86_DEBUG_STATE_COUNT;
+    if (thread_get_state(thread_list[x], x86_DEBUG_STATE,
+                         (thread_state_t)&dstate, &sc) != KERN_SUCCESS) {
+      free(*states);
+      return -6;
+    }
+
+    // add the thread state to our list
+    if (state.tsh.flavor == x86_THREAD_STATE32 &&
+        fstate.fsh.flavor == x86_FLOAT_STATE32 &&
+        dstate.dsh.flavor == x86_DEBUG_STATE32) {
+      (*states)[x].is64 = 0;
+      memcpy(&(*states)[x].st32, &state.uts.ts32, sizeof(x86_thread_state32_t));
+      memcpy(&(*states)[x].fl32, &fstate.ufs.fs32, sizeof(x86_float_state32_t));
+      memcpy(&(*states)[x].db32, &dstate.uds.ds32, sizeof(x86_debug_state32_t));
+    } else if (state.tsh.flavor == x86_THREAD_STATE64 &&
+               fstate.fsh.flavor == x86_FLOAT_STATE64 &&
+               dstate.dsh.flavor == x86_DEBUG_STATE64) {
+      (*states)[x].is64 = 1;
+      memcpy(&(*states)[x].st64, &state.uts.ts64, sizeof(x86_thread_state64_t));
+      memcpy(&(*states)[x].fl64, &fstate.ufs.fs64, sizeof(x86_float_state64_t));
+      memcpy(&(*states)[x].db64, &dstate.uds.ds64, sizeof(x86_debug_state64_t));
+    } else {
+      free(*states);
+      return -7;
+    }
+  }
+  return thread_count;
+}
+
+/*int VMSetThreadRegisters(pid_t process, const VMThreadState* state) {
+
+  // use set_thread_state, like this:
+  thread_set_state(thread_list[thread], PPC_THREAD_STATE,
+                   (thread_state_t)&ppc_state, sc);
+  return 0;
+} */
+
+// sets thread registers for all threads in the process
+// return: number of threads if > 0
+// return: < 0 if error
+// the states must be free()'d when no longer required.
+int VMSetThreadRegisters(pid_t process, const VMThreadState* states, int num) {
+
+  // get the task port
+  vm_map_t task = _VMTaskFromPID(process);
+  if (!task)
+    return -1;
+
+  // get the thread list
+  thread_act_port_array_t thread_list;
+  mach_msg_type_number_t thread_count;
+  if (task_threads(task, &thread_list, &thread_count) != KERN_SUCCESS)
+    return -2;
+
+  // no threads? return NULL and 0
+  if (!thread_count || (thread_count != num))
+    return -3;
+  
+  // for each thread...
+  int x, error;
+  for (x = 0; x < thread_count; x++) {
+
+    // set the thread state
+    if (!states[x].is64) {
+      error = thread_set_state(thread_list[x], x86_THREAD_STATE32,
+          (thread_state_t)&states[x].st32, x86_THREAD_STATE_COUNT);
+      if (error != KERN_SUCCESS)
+        return error;
+    } else {
+      error = thread_set_state(thread_list[x], x86_THREAD_STATE64,
+          (thread_state_t)&states[x].st64, x86_THREAD_STATE_COUNT);
+      if (error != KERN_SUCCESS)
+        return error;
+    }
+
+    // set the floating state
+    if (!states[x].is64) {
+      error = thread_set_state(thread_list[x], x86_FLOAT_STATE32,
+          (thread_state_t)&states[x].fl32, x86_FLOAT_STATE_COUNT);
+      if (error != KERN_SUCCESS)
+        return error;
+    } else {
+      error = thread_set_state(thread_list[x], x86_FLOAT_STATE64,
+          (thread_state_t)&states[x].fl64, x86_FLOAT_STATE_COUNT);
+      if (error != KERN_SUCCESS)
+        return error;
+    }
+
+    // set the debug state
+    if (!states[x].is64) {
+      error = thread_set_state(thread_list[x], x86_DEBUG_STATE32,
+          (thread_state_t)&states[x].db32, x86_DEBUG_STATE_COUNT);
+      if (error != KERN_SUCCESS)
+        return error;
+    } else {
+      error = thread_set_state(thread_list[x], x86_DEBUG_STATE64,
+          (thread_state_t)&states[x].db64, x86_DEBUG_STATE_COUNT);
+      if (error != KERN_SUCCESS)
+        return error;
+    }
   }
   return 0;
 }

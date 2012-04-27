@@ -107,4 +107,29 @@ static inline int VMEqualRegions(VMRegion region1, VMRegion region2)
             region1._size == region2._size &&
             region1._attributes == region2._attributes); }
 
+
+
+typedef struct {
+  int is64;
+  int tid;
+  union {
+    x86_thread_state32_t st32;
+    x86_thread_state64_t st64;
+  };
+  union {
+    x86_float_state32_t fl32;
+    x86_float_state64_t fl64;
+  };
+  union {
+    x86_debug_state32_t db32;
+    x86_debug_state64_t db64;
+  };
+} VMThreadState;
+
+void VMPrintThreadRegisters(VMThreadState* state);
+int VMSetRegisterValueByName(VMThreadState* state, const char* name,
+                             uint64_t value);
+int VMGetThreadRegisters(pid_t process, VMThreadState** state);
+int VMSetThreadRegisters(pid_t process, const VMThreadState* state, int num);
+
 #endif // VMMAP_H

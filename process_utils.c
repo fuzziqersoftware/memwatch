@@ -35,7 +35,7 @@ int getpidname(pid_t pid, char* name, int namelen) {
       offset--;
     }
   }
-  
+
   return 0;
 }
 
