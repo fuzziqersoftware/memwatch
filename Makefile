@@ -17,10 +17,8 @@ memwatch: $(OBJECTS)
 
 value_test: value_test.c
 	g++ $(LDFLAGS) -o value_test $^
-
 value_test_float: value_test_float.c
 	g++ $(LDFLAGS) -o value_test_float $^
-
 register_test64: register_test64.s
 	g++ $(LDFLAGS) -m64 -o register_test64 $^
 register_test32: register_test32.s
