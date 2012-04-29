@@ -271,7 +271,7 @@ void VMPrintThreadRegisters(VMThreadState* state) {
     printf("  cs:  %08X  ds:  %08X  es:  %08X  fs:  %08X\n", state->st32.__cs,
            state->st32.__ds, state->st32.__es, state->st32.__fs);
     printf("  gs:  %08X  ss:  %08X\n", state->st32.__gs, state->st32.__ss);
-    // TODO: print floating & debug state
+    // TODO: print floating state
     printf("  dr0: %08X  dr1: %08X  dr2: %08X  dr3: %08X\n", state->db32.__dr0,
            state->db32.__dr1, state->db32.__dr2, state->db32.__dr3);
     printf("  dr4: %08X  dr5: %08X  dr6: %08X  dr7: %08X\n", state->db32.__dr4,
@@ -292,7 +292,7 @@ void VMPrintThreadRegisters(VMThreadState* state) {
            state->st64.__rflags);
     printf("  cs:  %016llX  fs:  %016llX  gs:  %016llX\n", state->st64.__cs,
            state->st64.__fs, state->st64.__gs);
-    // TODO: print floating & debug state
+    // TODO: print floating state
     printf("  dr0: %016llX  dr1: %016llX  dr2: %016llX\n", state->db64.__dr0,
            state->db64.__dr1, state->db64.__dr2);
     printf("  dr3: %016llX  dr4: %016llX  dr5: %016llX\n", state->db64.__dr3,

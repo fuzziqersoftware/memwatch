@@ -84,7 +84,7 @@ int memory_search(pid_t pid, int pause_during) {
     // what is thy bidding, my master?
     switch (command[0]) {
 
-      // TODO: print help message
+      // print help message
       case 'h':
       case 'H':
         printf(
@@ -639,7 +639,6 @@ int memory_search(pid_t pid, int pause_during) {
           }
 
           // print regs to write
-          // TODO: get rid of this
           for (x = 0; x < error; x++)
             VMPrintThreadRegisters(&thread_state[x]);
 

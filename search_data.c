@@ -338,10 +338,12 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
             numAllocatedResults = 128;
           else
             numAllocatedResults *= 2;
+          VMRegionDataMap* old_mem = n->memory;
           n = (MemorySearchData*)realloc(n, sizeof(MemorySearchData) +
               numAllocatedResults * sizeof(unsigned long long));
-          // TODO: fix potential n->memory memory leak here
           if (!n) {
+            if (old_mem)
+              DestroyDataMap(old_mem);
             printf("out of memory for result set expansion\n");
             return NULL;
           }

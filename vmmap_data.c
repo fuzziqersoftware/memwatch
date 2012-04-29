@@ -98,7 +98,6 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
 
     // if reading failed, don't include the region's data
     if (!error || (map->regions[x].region._size != local_size)) {
-      // TODO: why does this error occur?
       free(map->regions[x].data);
       map->regions[x].data = NULL;
     }
