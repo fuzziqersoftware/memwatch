@@ -60,7 +60,7 @@ void CRYPT_PrintData(unsigned long long address, const void* ds,
       buffer[y] = ' ';
   for (y = 0; y < 16 - off; y++)
     printf("   ");
-  printf("| %s",buffer);
+  printf("| %s\n",buffer);
 }
 
 // macros used by read_stream_data to append to a buffer

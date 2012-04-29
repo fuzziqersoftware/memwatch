@@ -115,6 +115,7 @@ int memory_search(pid_t pid, int pause_during) {
 "  p                         delete current search\n"
 "  p <name>                  delete search by name\n"
 "  g                         view register contents on all threads\n"
+"  G <value> <reg>           modify register contents on all threads\n"
 "  -                         pause process\n"
 "  +                         resume process\n"
 "  * <signal_number>         send unix signal to process\n"
@@ -629,7 +630,13 @@ int memory_search(pid_t pid, int pause_during) {
 
           // change the reg in each thread
           for (x = 0; x < error; x++)
-            VMSetRegisterValueByName(&thread_state[x], arguments, regvalue);
+            if (VMSetRegisterValueByName(&thread_state[x], arguments, regvalue))
+              break;
+          if (x < error) {
+            free(thread_state);
+            printf("invalid register name\n");
+            break;
+          }
 
           // print regs to write
           // TODO: get rid of this

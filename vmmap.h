@@ -111,6 +111,7 @@ static inline int VMEqualRegions(VMRegion region1, VMRegion region2)
 
 typedef struct {
   int is64;
+  mach_msg_type_number_t count, fcount, dcount;
   int tid;
   union {
     x86_thread_state32_t st32;
