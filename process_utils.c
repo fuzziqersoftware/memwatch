@@ -83,7 +83,7 @@ void print_region_map(VMRegionDataMap* map) {
 
   // enumerate the regions
   unsigned long x;
-  printf("address, end address, size, access flags\n");
+  printf("address, end address, access flags\n");
   for (x = 0; x < map->numRegions; x++) {
 
     // print region info
