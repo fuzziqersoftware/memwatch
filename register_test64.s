@@ -11,7 +11,7 @@ _main:
   mov eax, 0x54389843
   //// rax = 0x0000000054389843
 
-  pop rcx
+  mov rcx, [rsp]
   //// rcx is an address in the code that called main
 
   call __geteip
@@ -25,4 +25,4 @@ __geteip:
   je 1b // hurr
 
   // return
-  jmp rcx
+  ret

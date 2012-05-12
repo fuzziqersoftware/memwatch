@@ -10,7 +10,7 @@ _main:
   mov eax, 0x54389843
   //// eax = 0x0000000054389843
 
-  pop ecx
+  mov ecx, [esp]
   //// ecx is an address in the code that called main
 
   call __geteip
@@ -24,4 +24,4 @@ __geteip:
   je 1b // hurr
 
   // return
-  jmp ecx
+  ret

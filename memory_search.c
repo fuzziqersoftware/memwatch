@@ -653,6 +653,58 @@ int memory_search(pid_t pid, int pause_during) {
 
         break;
 
+      // set breakpoint in dr0
+      case 'B':
+
+        // read the value and regname
+        size = 0;
+        for (arguments = skip_word(command, ' ');
+             *arguments && (*arguments != ' '); arguments++) {
+          if (*arguments == 'x' || *arguments == 'X')
+            size = 0;
+          if (*arguments == 'w' || *arguments == 'W')
+            size = 1;
+          if (*arguments == 'i' || *arguments == 'I')
+            size = 2;
+          if (*arguments == 'r' || *arguments == 'R')
+            size = 3;
+        }
+        sscanf(arguments, "%llX", &addr);
+
+        // read the thread regs on each thread
+        error = VMGetThreadRegisters(pid, &thread_state);
+        if (error < 0)
+          printf("failed to get registers; error %d\n", error);
+        else if (error == 0)
+          printf("no threads in process\n");
+        else {
+          
+          // change the reg in each thread
+          for (x = 0; x < error; x++) {
+            if (thread_state[x].is64) {
+              thread_state[x].db64.__dr0 = addr;
+              thread_state[x].db64.__dr7 |= (0x000C0001 | (size << 16));
+            } else {
+              thread_state[x].db32.__dr0 = addr;
+              thread_state[x].db32.__dr7 |= (0x000C0001 | (size << 16));
+            }
+          }
+
+          // print regs to write
+          for (x = 0; x < error; x++)
+            VMPrintThreadRegisters(&thread_state[x]);
+
+          // write the reg contents back to the process
+          error = VMSetThreadRegisters(pid, thread_state, error);
+          if (error)
+            printf("failed to set registers; error %d\n", error);
+          else
+            printf("modified thread registers\n");
+          free(thread_state);
+        }
+
+        break;
+
       // pause process
       case '-':
         kill(pid, SIGSTOP);

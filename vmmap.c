@@ -456,8 +456,16 @@ int VMSetRegisterValueByName(VMThreadState* state, const char* name,
             offsetof(VMThreadState, db64.__dr7), 4, 8},
 
     // instruction pointer
-    {"pc", offsetof(VMThreadState, st32.__eip),
-           offsetof(VMThreadState, st64.__rip), 4, 8},
+    // pc, ip, eip, rip are all aliases of each other, for safety (can't write
+    // just part of the program counter)
+    {"pc",  offsetof(VMThreadState, st32.__eip),
+            offsetof(VMThreadState, st64.__rip), 4, 8},
+    {"ip",  offsetof(VMThreadState, st32.__eip),
+            offsetof(VMThreadState, st64.__rip), 4, 8},
+    {"eip", offsetof(VMThreadState, st32.__eip),
+            offsetof(VMThreadState, st64.__rip), 4, 8},
+    {"rip", offsetof(VMThreadState, st32.__eip),
+            offsetof(VMThreadState, st64.__rip), 4, 8},
 
     // no more registers...
     {"", 0, 0, 0}};
@@ -521,9 +529,12 @@ int VMGetThreadRegisters(pid_t process, VMThreadState** states) {
   }
   
   // alloc the thread info list
+  int error = 0;
   *states = (VMThreadState*)malloc(sizeof(VMThreadState) * thread_count);
-  if (!*states)
-    return -3;
+  if (!*states) {
+    error = -3;
+    goto VMGetThreadRegisters_cleanup;
+  }
 
   // for each thread...
   int x;
@@ -538,7 +549,8 @@ int VMGetThreadRegisters(pid_t process, VMThreadState** states) {
     if (thread_get_state(thread_list[x], x86_THREAD_STATE,
                          (thread_state_t)&state, &sc) != KERN_SUCCESS) {
       free(*states);
-      return -4;
+      error = -4;
+      goto VMGetThreadRegisters_cleanup;
     }
     (*states)[x].count = state.tsh.count;
 
@@ -546,7 +558,8 @@ int VMGetThreadRegisters(pid_t process, VMThreadState** states) {
     if (thread_get_state(thread_list[x], x86_FLOAT_STATE,
                          (thread_state_t)&fstate, &sc) != KERN_SUCCESS) {
       free(*states);
-      return -5;
+      error = -5;
+      goto VMGetThreadRegisters_cleanup;
     }
     (*states)[x].fcount = fstate.fsh.count;
 
@@ -554,7 +567,8 @@ int VMGetThreadRegisters(pid_t process, VMThreadState** states) {
     if (thread_get_state(thread_list[x], x86_DEBUG_STATE,
                          (thread_state_t)&dstate, &sc) != KERN_SUCCESS) {
       free(*states);
-      return -6;
+      error = -6;
+      goto VMGetThreadRegisters_cleanup;
     }
     (*states)[x].dcount = dstate.dsh.count;
 
@@ -575,9 +589,19 @@ int VMGetThreadRegisters(pid_t process, VMThreadState** states) {
       memcpy(&(*states)[x].db64, &dstate.uds.ds64, sizeof(x86_debug_state64_t));
     } else {
       free(*states);
-      return -7;
+      error = -7;
+      goto VMGetThreadRegisters_cleanup;
     }
   }
+
+VMGetThreadRegisters_cleanup:
+  if (error)
+    vm_deallocate(mach_task_self(), (vm_address_t)thread_list,
+                  (thread_count * sizeof (int)));
+  else
+    error = vm_deallocate(mach_task_self(), (vm_address_t)thread_list,
+                          (thread_count * sizeof (int)));
+
   return thread_count;
 }
 
@@ -611,7 +635,7 @@ int VMSetThreadRegisters(pid_t process, const VMThreadState* states, int num) {
     return -3;
   
   // for each thread...
-  int x, error;
+  int x, error = 0;
   x86_thread_state_t state;
   x86_float_state_t fstate;
   x86_debug_state_t dstate;
@@ -641,19 +665,27 @@ int VMSetThreadRegisters(pid_t process, const VMThreadState* states, int num) {
     error = thread_set_state(thread_list[x], x86_THREAD_STATE,
         (thread_state_t)&state, x86_THREAD_STATE_COUNT);
     if (error != KERN_SUCCESS)
-      return error;
+      goto VMSetThreadRegisters_cleanup;
 
     // set the floating state
     error = thread_set_state(thread_list[x], x86_FLOAT_STATE,
         (thread_state_t)&fstate, x86_FLOAT_STATE_COUNT);
     if (error != KERN_SUCCESS)
-      return error;
+      goto VMSetThreadRegisters_cleanup;
 
     // set the debug state
     error = thread_set_state(thread_list[x], x86_DEBUG_STATE,
         (thread_state_t)&dstate, x86_DEBUG_STATE_COUNT);
     if (error != KERN_SUCCESS)
-      return error;
+      goto VMSetThreadRegisters_cleanup;
   }
+
+VMSetThreadRegisters_cleanup:
+  if (error)
+    vm_deallocate(mach_task_self(), (vm_address_t)thread_list,
+                  (thread_count * sizeof (int)));
+  else
+    error = vm_deallocate(mach_task_self(), (vm_address_t)thread_list,
+                          (thread_count * sizeof (int)));
   return 0;
 }
