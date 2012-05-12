@@ -68,7 +68,7 @@ static int command_help(struct state* st, const char* command) {
 "  [c]lose <name>            delete search by name\n"
 "  regs                      view register contents on all threads\n"
 "  wregs <value> <reg>       modify register contents on all threads\n"
-"  [b]reak <type> <addr>     set breakpoint on addr\n"
+"  [b]reak <sizetype> <addr> set breakpoint on addr\n"
 "  pause (or -)              pause process\n"
 "  resume (or +)             resume process\n"
 "  [sig]nal <signal_number>  send unix signal to process\n"
@@ -594,6 +594,7 @@ static int command_breakpoint(struct state* st, const char* command) {
   // read the value and regname
   uint64_t addr;
   int type = 0;
+  int size = 0;
   for (; *command && (*command != ' '); command++) {
     if (*command == 'x' || *command == 'X')
       type = 0;
@@ -603,41 +604,71 @@ static int command_breakpoint(struct state* st, const char* command) {
       type = 2;
     if (*command == 'r' || *command == 'R')
       type = 3;
+    if (*command == '1')
+      size = 0;
+    if (*command == '2')
+      size = 1;
+    if (*command == '4')
+      size = 3; // WHY INTEL, WHY?
+    if (*command == '8')
+      size = 2;
   }
   sscanf(command, "%llX", &addr);
 
   // read the thread regs on each thread
-  VMThreadState* thread_state;
+  VMThreadState* thread_state = NULL;
   int x, error = VMGetThreadRegisters(st->pid, &thread_state);
-  if (error < 0)
-    printf("failed to get registers; error %d\n", error);
-  else if (error == 0)
-    printf("no threads in process\n");
-  else {
+  if (error <= 0)
+    goto command_breakpoint_error;
 
-    // change the reg in each thread
-    for (x = 0; x < error; x++) {
-      if (thread_state[x].is64) {
-        thread_state[x].db64.__dr0 = addr;
-        thread_state[x].db64.__dr7 |= (0x000C0001 | (type << 16));
-      } else {
-        thread_state[x].db32.__dr0 = addr;
-        thread_state[x].db32.__dr7 |= (0x000C0001 | (type << 16));
-      }
-    }
-
-    // print regs to write
-    for (x = 0; x < error; x++)
-      VMPrintThreadRegisters(&thread_state[x]);
-
-    // write the reg contents back to the process
-    error = VMSetThreadRegisters(st->pid, thread_state, error);
-    if (error)
-      printf("failed to set registers; error %d\n", error);
+  // change the reg in each thread
+  for (x = 0; x < error; x++) {
+    if (thread_state[x].is64)
+      thread_state[x].db64.__dr0 = addr;
     else
-      printf("modified thread registers\n");
-    free(thread_state);
+      thread_state[x].db32.__dr0 = addr;
   }
+
+  // write the reg contents back to the process
+  error = VMSetThreadRegisters(st->pid, thread_state, error);
+  if (error)
+    goto command_breakpoint_error;
+  free(thread_state);
+  thread_state = NULL;
+
+  // read the thread regs on each thread
+  error = VMGetThreadRegisters(st->pid, &thread_state);
+  if (error <= 0)
+    goto command_breakpoint_error;
+
+  // change the reg in each thread
+  for (x = 0; x < error; x++) {
+    if (thread_state[x].is64) {
+      thread_state[x].db64.__dr7 &= 0xFFFFFFFFFFF0FFFC;
+      thread_state[x].db64.__dr7 |= (1 | (type << 16) | (size << 18));
+    } else {
+      thread_state[x].db32.__dr7 &= 0xFFF0FFFC;
+      thread_state[x].db32.__dr7 |= (1 | (type << 16) | (size << 18));
+    }
+  }
+
+  // print regs to write
+  //for (x = 0; x < error; x++)
+  //  VMPrintThreadRegisters(&thread_state[x]);
+
+  // write the reg contents back to the process
+  error = VMSetThreadRegisters(st->pid, thread_state, error);
+  if (error)
+    goto command_breakpoint_error;
+
+  if (0) {
+command_breakpoint_error:
+    printf("failed to set breakpoint; error %d\n", error);
+  } else {
+    printf("breakpoint set\n");
+  }
+  if (thread_state)
+    free(thread_state);
 
   return 0;
 }
