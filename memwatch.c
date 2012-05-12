@@ -94,7 +94,6 @@ void print_usage() {
 "options:\n"
 "    -l          show a list of running processes, executable name only\n"
 "    -L          show a list of running processes, including commands\n"
-"    -p          pause the target process while reading or writing its memory\n"
 "    -w<file>    write file to memory\n"
 "    -d<data>    write given data to memory\n"
 "    -g          do not loop; read/write once and exit\n"
@@ -148,7 +147,6 @@ int main(int argc, char* argv[]) {
   int interval = 1000000;
   char* write_filename = NULL;
   void* write_data = NULL;
-  int pause_during = 0;
   char processname[PROCESS_NAME_LENGTH] = {0};
 
   // parse command line args
@@ -158,10 +156,6 @@ int main(int argc, char* argv[]) {
     // -g, --once-only: don't loop
     if (!strcmp(argv[x], "-g") || !strcmp(argv[x], "--once-only"))
       loop = 0;
-
-    // -p, --pause: pause program while doing things to it
-    else if (!strcmp(argv[x], "-p") || !strcmp(argv[x], "--pause"))
-      pause_during = 1;
 
     // -s, --showflags: determine how to display data
     else if (!strncmp(argv[x], "-s", 2))
@@ -290,7 +284,7 @@ int main(int argc, char* argv[]) {
     }
     if (getuid())
       printf("warning: memwatch likely will not work if not run as root\n");
-    return memory_search(pid, pause_during);
+    return memory_search(pid);
   }
 
   if (getuid())

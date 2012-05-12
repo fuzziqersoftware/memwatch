@@ -10,6 +10,6 @@
 
 #include "vmmap.h"
 
-int memory_search(pid_t pid, int pause_during);
+int memory_search(pid_t pid);
 
 #endif // MEMORY_SEARCH_H
