@@ -109,6 +109,11 @@ static inline int VMEqualRegions(VMRegion region1, VMRegion region2)
 
 
 
+int VMPauseProcess(pid_t pid);
+int VMResumeProcess(pid_t pid);
+
+
+
 typedef struct {
   int is64;
   mach_msg_type_number_t count, fcount, dcount;

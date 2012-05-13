@@ -116,8 +116,6 @@ VMRegion VMNextRegion(pid_t process, VMRegion previous)
   vm_map_t task = _VMTaskFromPID(process);
   unsigned int attribs = 0;
 
-  kern_return_t result;
-
   mach_vm_address_t address = 0x0;
   mach_vm_size_t size = 0;
   vm_region_basic_info_data_64_t info;
@@ -128,8 +126,8 @@ VMRegion VMNextRegion(pid_t process, VMRegion previous)
     address = previous._address + previous._size;
 
   // get the next region
-  result = mach_vm_region(task, &address, &size, VM_REGION_BASIC_INFO_64,
-                          (vm_region_info_t)(&info), &infoCnt, &object_name);
+  kern_return_t result = mach_vm_region(task, &address, &size,
+    VM_REGION_BASIC_INFO_64, (vm_region_info_t)(&info), &infoCnt, &object_name);
 
   if (result == KERN_SUCCESS) {
     // get the attributes & return the region
@@ -167,14 +165,13 @@ int VMSetRegionProtection(pid_t process, mach_vm_address_t address,
 
   vm_map_t task = _VMTaskFromPID(process);
 
-  kern_return_t result;
   vm_region_basic_info_data_64_t info;
   mach_msg_type_number_t infoCnt = VM_REGION_BASIC_INFO_COUNT_64;
   mach_port_t object_name = 0;
 
   // get the next region
-  result = mach_vm_region(task, &address, &size, VM_REGION_BASIC_INFO_64,
-                          (vm_region_info_t)(&info), &infoCnt, &object_name);
+  kern_return_t result = mach_vm_region(task, &address, &size,
+    VM_REGION_BASIC_INFO_64, (vm_region_info_t)(&info), &infoCnt, &object_name);
 
   if (result != KERN_SUCCESS)
     return 0;
@@ -206,12 +203,11 @@ int VMReadBytes(pid_t process, mach_vm_address_t address, void *bytes,
                 mach_vm_size_t *size)
 {
   vm_map_t task = _VMTaskFromPID(process);
-  kern_return_t result;
   mach_vm_size_t staticsize = *size;
   
   // perform the read
-  result = mach_vm_read_overwrite(task, address, staticsize,
-                                  (vm_offset_t)bytes, size);
+  kern_return_t result = mach_vm_read_overwrite(task, address, staticsize,
+                                                (vm_offset_t)bytes, size);
   if (result != KERN_SUCCESS)
     return 0;
   return 1;
@@ -221,10 +217,7 @@ int VMWriteBytes(pid_t process, mach_vm_address_t address, const void *bytes,
                  mach_vm_size_t size)
 {
   vm_map_t task = _VMTaskFromPID(process);
-  kern_return_t result;
-
-  // attempt to write the bytes and return success/failure
-  result = mach_vm_write(task, address, (vm_offset_t)bytes, size);
+  kern_return_t result = mach_vm_write(task, address, (vm_offset_t)bytes, size);
   return (result == KERN_SUCCESS);
 }
 
@@ -233,15 +226,14 @@ unsigned int _VMAttributesFromAddress(pid_t process, mach_vm_address_t address)
   vm_map_t task = _VMTaskFromPID(process);
   unsigned int attribs = 0;
 
-  kern_return_t result;
   mach_vm_size_t size = 0;
   vm_region_basic_info_data_64_t info;
   mach_msg_type_number_t infoCnt = VM_REGION_BASIC_INFO_COUNT_64;
   mach_port_t object_name = 0;
 
   // get the next region
-  result = mach_vm_region(task, &address, &size, VM_REGION_BASIC_INFO_64,
-                          (vm_region_info_t)(&info), &infoCnt, &object_name);
+  kern_return_t result = mach_vm_region(task, &address, &size,
+    VM_REGION_BASIC_INFO_64, (vm_region_info_t)(&info), &infoCnt, &object_name);
 
   if (result == KERN_SUCCESS) {
     // get the attributes and return them
@@ -254,6 +246,22 @@ unsigned int _VMAttributesFromAddress(pid_t process, mach_vm_address_t address)
     return attribs;
   }
   return 0;
+}
+
+
+
+// suspends a process using the Mach API
+int VMPauseProcess(pid_t pid) {
+  vm_map_t task = _VMTaskFromPID(pid);
+  kern_return_t result = task_suspend(task);
+  return (result == KERN_SUCCESS);
+}
+
+// resumes a process using the Mach API
+int VMResumeProcess(pid_t pid) {
+  vm_map_t task = _VMTaskFromPID(pid);
+  kern_return_t result = task_resume(task);
+  return (result == KERN_SUCCESS);
 }
 
 

@@ -674,14 +674,18 @@ command_breakpoint_error:
 }
 
 static int command_pause(struct state* st, const char* command) {
-  kill(st->pid, SIGSTOP);
-  printf("process suspended\n");
+  if (VMPauseProcess(st->pid))
+    printf("process suspended\n");
+  else
+    printf("failed to pause process\n");
   return 0;
 }
 
 static int command_resume(struct state* st, const char* command) {
-  kill(st->pid, SIGCONT);
-  printf("process resumed\n");
+  if (VMResumeProcess(st->pid))
+    printf("process resumed\n");
+  else
+    printf("failed to resume process\n");
   return 0;
 }
 
