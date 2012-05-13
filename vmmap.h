@@ -111,6 +111,7 @@ static inline int VMEqualRegions(VMRegion region1, VMRegion region2)
 
 int VMPauseProcess(pid_t pid);
 int VMResumeProcess(pid_t pid);
+int VMTerminateProcess(pid_t pid);
 
 
 

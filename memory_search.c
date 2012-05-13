@@ -42,36 +42,42 @@ static int command_help(struct state* st, const char* command) {
 
 "memwatch memory search utility\n"
 "\n"
-"commands:\n"
+"memory commands:\n"
 "  [a]ccess <addr>           enable all access on region containing address\n"
-"  [res]ults (or x)          print current search results\n"
 "  [l]ist                    list memory regions\n"
 "  [d]ump                    dump memory\n"
 "  [d]ump <filename>         dump memory regions to <filename>_<addr> files\n"
-"  [fi]nd <data>             find occurrences of data\n"
 "  [r]ead <addr+size>        read from memory\n"
 "  [r]ead !<addr+size>       read from memory every second (ctrl+c to stop)\n"
 "  [w]rite <addr> <data>     write to memory\n"
 "  wfile <addr> <filename>   write file to memory\n"
+"search commands:\n"
+"  [fi]nd <data>             find occurrences of data\n"
+"  [o]pen                    show previous named searches\n"
+"  [o]pen <name>             switch to a previous named search\n"
+"  [o]pen <type> [name]      begin new search over writable memory only\n"
+"  [o]pen !<type> [name]     begin new search over all memory\n"
+"  [c]lose                   delete current search\n"
+"  [c]lose <name>            delete search by name\n"
+"  [s]earch <oper> [value]   search for a changed value\n"
+"  [res]ults (or x)          print current search results\n"
+"freeze commands:\n"
 "  [f]reeze <addr> <data>    freeze data in memory\n"
 "  [f]reeze \"<nm>\" <ad> <dt> freeze data in memory, with given name\n"
 "  [u]nfreeze                list frozen regions\n"
 "  [u]nfreeze <index>        unfreeze frozen region by index\n"
 "  [u]nfreeze <address>      unfreeze frozen region by address\n"
 "  [u]nfreeze <name>         unfreeze frozen regions by name\n"
-"  [o]pen                    show previous named searches\n"
-"  [o]pen <name>             switch to a previous named search\n"
-"  [o]pen <type> [name]      begin new search over writable memory only\n"
-"  [o]pen !<type> [name]     begin new search over all memory\n"
-"  [s]earch <oper> [value]   search for a changed value\n"
-"  [c]lose                   delete current search\n"
-"  [c]lose <name>            delete search by name\n"
+"execution state commands:\n"
+"  pause (or -)              pause process\n"
+"  resume (or +)             resume process\n"
+"  [k]ill                    terminate process\n"
+"  [sig]nal <signal_number>  send unix signal to process\n"
 "  regs                      view register contents on all threads\n"
 "  wregs <value> <reg>       modify register contents on all threads\n"
 "  [b]reak <sizetype> <addr> set breakpoint on addr\n"
-"  pause (or -)              pause process\n"
-"  resume (or +)             resume process\n"
-"  [sig]nal <signal_number>  send unix signal to process\n"
+"general commands:\n"
+"  [h]elp                    display help message\n"
 "  [q]uit                    exit memwatch\n"
 "\n"
 "<addr+size> may be either <addr(hex)> <size(dec)> or <addr(hex)>:<size(hex)>.\n"
@@ -689,6 +695,15 @@ static int command_resume(struct state* st, const char* command) {
   return 0;
 }
 
+static int command_terminate(struct state* st, const char* command) {
+  if (VMTerminateProcess(st->pid)) {
+    printf("process terminated\n");
+    st->run = 0;
+  } else
+    printf("failed to terminate process\n");
+  return 0;
+}
+
 static int command_signal(struct state* st, const char* command) {
   int sig = atoi(command);
   kill(st->pid, sig);
@@ -727,6 +742,8 @@ static const struct {
   {"f", command_freeze},
   {"help", command_help},
   {"h", command_help},
+  {"kill", command_terminate},
+  {"k", command_terminate},
   {"list", command_list},
   {"l", command_list},
   {"open", command_open},

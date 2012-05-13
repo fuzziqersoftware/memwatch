@@ -264,6 +264,13 @@ int VMResumeProcess(pid_t pid) {
   return (result == KERN_SUCCESS);
 }
 
+// kills a process using the Mach API
+int VMTerminateProcess(pid_t pid) {
+  vm_map_t task = _VMTaskFromPID(pid);
+  kern_return_t result = task_terminate(task);
+  return (result == KERN_SUCCESS);
+}
+
 
 
 // prints the register contents in a thread state
