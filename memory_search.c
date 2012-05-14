@@ -621,6 +621,12 @@ static int command_breakpoint(struct state* st, const char* command) {
   }
   sscanf(command, "%llX", &addr);
 
+  // stop the task
+  int paused = VMPauseProcess(st->pid);
+  if (!paused)
+    printf("warning: failed to stop process while setting breakpoint\n");
+    
+
   // read the thread regs on each thread
   VMThreadState* thread_state = NULL;
   int x, error = VMGetThreadRegisters(st->pid, &thread_state);
@@ -667,6 +673,14 @@ static int command_breakpoint(struct state* st, const char* command) {
   if (error)
     goto command_breakpoint_error;
 
+  // breakpoint handling goes something like this:
+  //port_allocate
+  //task_set_exception_port
+  //msg_receive
+  //(handle message)
+  //msg_send
+  //port_deallocate
+
   if (0) {
 command_breakpoint_error:
     printf("failed to set breakpoint; error %d\n", error);
@@ -676,6 +690,8 @@ command_breakpoint_error:
   if (thread_state)
     free(thread_state);
 
+  if (paused)
+    VMResumeProcess(st->pid);
   return 0;
 }
 
