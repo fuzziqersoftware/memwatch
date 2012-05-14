@@ -425,6 +425,26 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
                                     n->numResults * sizeof(unsigned long long));
 }
 
+// deletes results from the search
+int DeleteResults(MemorySearchData* s, uint64_t start, uint64_t end) {
+  if (!s)
+    return (-1);
+
+  int startIndex, endIndex;
+  for (startIndex = 0; (startIndex < s->numResults) &&
+       (s->results[startIndex] < start); startIndex++);
+  for (endIndex = startIndex; (endIndex < s->numResults) &&
+       (s->results[endIndex] < end); endIndex++);
+  if (endIndex == startIndex)
+    return 0;
+
+  int numToRemove = endIndex - startIndex;
+  s->numResults -= numToRemove;
+  memcpy(&s->results[startIndex], &s->results[endIndex],
+         (s->numResults - startIndex) * sizeof(uint64_t));
+  return numToRemove;
+}
+
 // returns a string representing the given search type name
 const char* GetSearchTypeName(int type) {
   switch (type) {

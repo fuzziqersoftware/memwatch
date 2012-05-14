@@ -39,7 +39,6 @@ struct state {
 
 static int command_help(struct state* st, const char* command) {
   printf(
-
 "memwatch memory search utility\n"
 "\n"
 "memory commands:\n"
@@ -61,6 +60,7 @@ static int command_help(struct state* st, const char* command) {
 "  [c]lose <name>            delete search by name\n"
 "  [s]earch <oper> [value]   search for a changed value\n"
 "  [res]ults (or x)          print current search results\n"
+"  [del]ete <addr1> [addr2]  delete result at addr1, or between addr1 and addr2\n"
 "freeze commands:\n"
 "  [f]reeze <addr> <data>    freeze data in memory\n"
 "  [f]reeze \"<nm>\" <ad> <dt> freeze data in memory, with given name\n"
@@ -433,6 +433,30 @@ static int command_results(struct state* st, const char* command) {
   return 0;
 }
 
+static int command_delete(struct state* st, const char* command) {
+
+  if (!st->search) {
+    printf("no search currently open\n");
+    return 0;
+  }
+  if (!st->search->memory) {
+    printf("no initial search performed\n");
+    return 0;
+  }
+
+  uint64_t addr1 = 0, addr2 = 0;
+  sscanf(command, "%llX %llX", &addr1, &addr2);
+
+  if (addr2 < addr1)
+    addr2 = addr1 + 1;
+  DeleteResults(st->search, addr1, addr2);
+
+  if (st->search->numResults < 20)
+    return command_results(st, "");
+  printf("results: %lld\n", st->search->numResults);
+  return 0;
+}
+
 static int command_search(struct state* st, const char* command) {
 
   // make sure a search is opened
@@ -494,13 +518,15 @@ static int command_search(struct state* st, const char* command) {
   }
 
   // add this search to the list
+  // don't need to delete the old one - it'll be deleted by AddSearchToList if
+  // it's getting replaced
   st->search = search_result;
   AddSearchToList(st->searches, st->search);
-  if (st->search->numResults >= 20)
-    printf("results: %lld\n", st->search->numResults);
-  else
-    return command_results(st, "");
 
+  // print results if there aren't too many of them
+  if (st->search->numResults < 20)
+    return command_results(st, "");
+  printf("results: %lld\n", st->search->numResults);
   return 0;
 }
 
@@ -749,6 +775,8 @@ static const struct {
   {"b", command_breakpoint},
   {"close", command_close},
   {"c", command_close},
+  {"delete", command_delete},
+  {"del", command_delete},
   {"dump", command_dump},
   {"d", command_dump},
   {"find", command_find},
