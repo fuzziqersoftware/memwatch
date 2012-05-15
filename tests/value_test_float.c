@@ -3,10 +3,14 @@
 // useful for testing memory search routines
 
 #include <sys/types.h>
+#include <sys/ptrace.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 int main(int argc, char* argv[]) {
+
+  ptrace(PT_DENY_ATTACH, getpid(), NULL, 0);
 
   float f = 0;
   double d = 0;

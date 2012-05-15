@@ -88,7 +88,7 @@ static int command_help(struct state* st, const char* command) {
 "new freezes will be named with the same name as the current search (if any),\n"
 "  unless a specific name is given\n"
 "\n"
-"searches done with the search command will increment on the previous search"
+"searches done with the search command will increment on the previous search\n"
 "  and narrow down the results. searches done with the find command are one-\n"
 "  time searches and don\'t affect the current search results.\n"
 "note that a search name is optional: if no name is given, the search is\n"
