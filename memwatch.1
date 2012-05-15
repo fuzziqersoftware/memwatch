@@ -1,0 +1,123 @@
+.TH MEMWATCH 1 "14 May 2012"
+.SH NAME
+memwatch \- find and modify variables in other processes
+.SH SYNOPSIS
+.B memwatch
+[
+.I options
+] [
+.I pid_or_name
+]
+.SH DESCRIPTION
+.B memwatch
+provides an interactive interface to find and modify variables in the memory of a target process. sudo will be required if memwatch is used by a user that is not a member of the procmod group.
+.SH OPTIONS
+The following options are supported:
+.TP
+.B \-l
+Display a list of running processes (without arguments) and their PIDs, and exit.
+.TP
+.B \-L
+Display a list of running processes (with arguments) and their PIDs, and exit.
+.TP
+.B pid_or_name
+The process ID or partial name (case-insensitive) of a process to target. In the case of a partial name, first search the list of running processes. If no matching process is found, search the list of processes with arguments.
+
+.SH "GENERAL COMMANDS"
+.TP
+.BR "help"
+.RI "Display a help message detailing usage of the commands."
+.TP
+.BR "quit"
+.RI "Exit memwatch."
+
+.SH "MEMORY ACCESS COMMANDS"
+.BR memwatch "\'s interactive interface implements the following commands for reading, writing, and manipulating virtual memory:"
+.TP
+.BI "access " "address"
+.RI "Enable all types of access on the region containing " address .
+.TP
+.BI "list"
+.RI "List memory regions allocated in the target process\'s address space."
+.TP
+.BI "dump " "filename"
+.RI "If " filename " is given, dump all readable memory in the target process to files named " filename "_address. If " filename " is not given, only determine which regions are readable."
+.TP
+.BI "read " "address" " " "size"
+.RI "Read a block of " size " bytes from " address " in the target process\'s memory. " address " is specified in hexadecimal, and " size " is specified in decimal. To specify " size " in hex, use " "address:size" " instead of " "address size" ". In addition, " address " may be prepended with a ! to repeat the read every second until Ctrl+C is pressed."
+.TP
+.BI "write " "address data"
+.RI "Write " data " to " address " in the target process\'s memory. See below for the data format."
+.TP
+.BI "wfile " "address file"
+.RI "Write the contents of " file " to " address " in the target process\'s memory.
+
+.SH "MEMORY SEARCH COMMANDS"
+.BR memwatch "\'s interactive interface implements the following commands for searching a process\'s memory for variables:"
+.TP
+.BI "find " data
+.RI "Find all occurrences of " data " in readable regions of the target\'s memory. See below for the data format. Searches done with this command to not affect the current search results."
+.TP
+.BI "open " "type name"
+.RI "Open a search for a variable of the given type in writable memory regions. " type " may be prepended with a ! to search all readable memory instead. See below for valid search types. If " name " is given, name the search; otherwise, the search will be unnamed and cannot be resumed after another search is opened."
+.TP
+.BI "open " name
+.RI "If " name " is given, reopen a previous search. If " name " is not given, list all open searches."
+.TP
+.BI "close " name
+.RI "If " name " is given, close the specified search. If " name " is not given, close the current search."
+.TP
+.BI "search " "operator value"
+.RI "Read the values of variables in the current list of results, and filter out the results for which (new value " "operator prev value" ") is false. If " value " is not given, use the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
+.TP
+.BI "results"
+.RI "Display the current list of results."
+.TP
+.BI "delete " "addr1 addr2"
+.RI "If " addr2 " is given, delete all results between " addr1 " and " addr2 ". If " addr2 " is not given, delete the search result at " addr1 .
+
+.SH "MEMORY FREEZE COMMANDS"
+.BR memwatch " implements a memory freezer, which repeatedly writes values to the target\'s memory at a very short interval, effectively fixing the variable's value in the target process. The following commands allow manipulation of frozen variables:"
+.TP
+.BI "freeze " "[\'name\'] address data"
+.RI "Set a freeze on " address " with the given data. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any). If a previous frozen region has the same address as the new region, the previous region is unfrozen."
+.TP
+.BI "unfreeze " "id"
+.RI "If " id " is not given, display the list of currently-frozen regions. Otherwise, " id " may be the index, address, or name of the region to unfreeze. If a name is given and multiple regions have the same name, unfreeze all of them."
+
+.SH "EXECUTION STATE MANAGEMENT COMMANDS"
+.BR memwatch " implements experimental support for viewing and modifying execution state in the target process, implemented by the following commands:"
+.TP
+.BR "pause" " (or " - )
+.RI "Pause the target process."
+.TP
+.BR "resume" " (or " + )
+.RI "Unpause the target process."
+.TP
+.BR "kill"
+.RI "Kill the target process and exit."
+.TP
+.BI "signal " signum
+.RI "Send the Unix signal " signum " to the target process. See " "signal(3)" " for a list of signals."
+.TP
+.BI "regs"
+.RI "Read the register state for all threads in the target process. If the process is not paused, thread registers might not represent an actual overall state of the process at any point in time."
+.TP
+.BI "wregs" " value reg"
+.RI "Write " value " to " reg " in all threads of the target process."
+.TP
+.BI "break" " type address"
+.RI "Set a " type " breakpoint on " address ". " type " may contain the characters x (break on execute), r (break on read), w (break on read/write), or i (break on I/O), as well as 1, 2, 4, or 8 (specifying the size of the region to watch)."
+
+.SH "DATA FORMAT"
+Data is specified in "immediate" format. Every pair of hexadecimal digits represents one byte; a 32-bit integer may be specified by preceding it with a #; ASCII strings must be enclosed in "double quotes", and unicode strings in 'single quotes'. Any non-recognized characters are ignored. The endian-ness of the output depends on the endian-ness of the host machine: on an Intel machine, the resulting data would be little-endian.
+
+Example data string: 03 04 "dark" #-1 'cold'
+
+Resulting data (little-endian): 03 04 64 61 72 6B FF FF FF FF 63 00 6F 00 6C 00 64 00
+
+.SH "AUTHOR"
+Martin Michelsen <mjem@wildblue.net> is the original author and current maintainer of memwatch.
+
+.SH "SEE ALSO"
+ps(1), top(1), signal(3), scanmem(1), gdb(1)

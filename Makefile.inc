@@ -12,6 +12,7 @@ all: $(EXECUTABLES)
 
 install: memwatch
 	cp memwatch /usr/bin/memwatch
+	cp memwatch.1 /usr/local/share/man/man1/memwatch.1
 
 clean:
 	-rm *.o $(EXECUTABLES)
