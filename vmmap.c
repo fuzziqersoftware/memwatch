@@ -32,13 +32,16 @@
 
 #include "vmmap.h"
 
-#include <mach/mach_init.h> // for current_task
-#include <mach/mach_traps.h> // for task_for_pid(3)
-#include <mach/task.h> // for task_for_pid(3)
-#include <mach/thread_act.h> // for task_for_pid(3)
-#include <signal.h> // for stop(2)
-#include <stdlib.h> // for stop(2)
-#include <stdio.h> // for debugging
+#include <mach/mach_init.h>
+#include <mach/mach_port.h>
+#include <mach/mach_traps.h>
+#include <mach/mach.h>
+#include <mach/task.h>
+#include <mach/thread_act.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #include "parse_utils.h"
 
@@ -272,6 +275,9 @@ int VMTerminateProcess(pid_t pid) {
 }
 
 
+
+////////////////////////////////////////////////////////////////////////////////
+// register modification facilities
 
 // prints the register contents in a thread state
 void VMPrintThreadRegisters(VMThreadState* state) {
@@ -520,11 +526,106 @@ int VMSetRegisterValueByName(VMThreadState* state, const char* name,
   return 0;
 }
 
+// gets thread registers for any thread
+// return: < 0 if error
+int VMGetThreadRegisters(mach_port_t thread_port, VMThreadState* _state) {
+
+  // get the thread state
+  x86_thread_state_t state;
+  x86_float_state_t fstate;
+  x86_debug_state_t dstate;
+
+  mach_msg_type_number_t sc = x86_THREAD_STATE_COUNT;
+  if (thread_get_state(thread_port, x86_THREAD_STATE,
+                       (thread_state_t)&state, &sc) != KERN_SUCCESS)
+    return -4;
+  _state->count = state.tsh.count;
+
+  sc = x86_FLOAT_STATE_COUNT;
+  if (thread_get_state(thread_port, x86_FLOAT_STATE,
+                       (thread_state_t)&fstate, &sc) != KERN_SUCCESS)
+    return -5;
+  _state->fcount = fstate.fsh.count;
+
+  sc = x86_THREAD_STATE_COUNT;
+  if (thread_get_state(thread_port, x86_DEBUG_STATE,
+                       (thread_state_t)&dstate, &sc) != KERN_SUCCESS)
+    return -6;
+  _state->dcount = dstate.dsh.count;
+
+  // add the thread state to our list
+  if (state.tsh.flavor == x86_THREAD_STATE32 &&
+      fstate.fsh.flavor == x86_FLOAT_STATE32 &&
+      dstate.dsh.flavor == x86_DEBUG_STATE32) {
+    _state->is64 = 0;
+    memcpy(&_state->st32, &state.uts.ts32, sizeof(x86_thread_state32_t));
+    memcpy(&_state->fl32, &fstate.ufs.fs32, sizeof(x86_float_state32_t));
+    memcpy(&_state->db32, &dstate.uds.ds32, sizeof(x86_debug_state32_t));
+  } else if (state.tsh.flavor == x86_THREAD_STATE64 &&
+             fstate.fsh.flavor == x86_FLOAT_STATE64 &&
+             dstate.dsh.flavor == x86_DEBUG_STATE64) {
+    _state->is64 = 1;
+    memcpy(&_state->st64, &state.uts.ts64, sizeof(x86_thread_state64_t));
+    memcpy(&_state->fl64, &fstate.ufs.fs64, sizeof(x86_float_state64_t));
+    memcpy(&_state->db64, &dstate.uds.ds64, sizeof(x86_debug_state64_t));
+  } else
+    return -7;
+  return 0;
+}
+
+int VMSetThreadRegisters(mach_port_t thread_port, const VMThreadState* _state) {
+
+  int error = 0;
+  x86_thread_state_t state;
+  x86_float_state_t fstate;
+  x86_debug_state_t dstate;
+
+  // prepare the thread state
+  state.tsh.count = _state->count;
+  fstate.fsh.count = _state->fcount;
+  dstate.dsh.count = _state->dcount;
+  if (_state->is64) {
+    state.tsh.flavor = x86_THREAD_STATE64;
+    fstate.fsh.flavor = x86_FLOAT_STATE64;
+    dstate.dsh.flavor = x86_DEBUG_STATE64;
+    memcpy(&state.uts.ts64, &_state->st64, sizeof(x86_thread_state64_t));
+    memcpy(&fstate.ufs.fs64, &_state->fl64, sizeof(x86_float_state64_t));
+    memcpy(&dstate.uds.ds64, &_state->db64, sizeof(x86_debug_state64_t));
+  } else {
+    state.tsh.flavor = x86_THREAD_STATE32;
+    fstate.fsh.flavor = x86_FLOAT_STATE32;
+    dstate.dsh.flavor = x86_DEBUG_STATE32;
+    memcpy(&state.uts.ts32, &_state->st32, sizeof(x86_thread_state32_t));
+    memcpy(&fstate.ufs.fs32, &_state->fl32, sizeof(x86_float_state32_t));
+    memcpy(&dstate.uds.ds32, &_state->db32, sizeof(x86_debug_state32_t));
+  }
+
+  // set the thread state
+  error = thread_set_state(thread_port, x86_THREAD_STATE,
+                           (thread_state_t)&state, x86_THREAD_STATE_COUNT);
+  if (error != KERN_SUCCESS)
+    return error;
+
+  // set the floating state
+  error = thread_set_state(thread_port, x86_FLOAT_STATE,
+                           (thread_state_t)&fstate, x86_FLOAT_STATE_COUNT);
+  if (error != KERN_SUCCESS)
+    return error;
+
+  // set the debug state
+  error = thread_set_state(thread_port, x86_DEBUG_STATE,
+                           (thread_state_t)&dstate, x86_DEBUG_STATE_COUNT);
+  if (error != KERN_SUCCESS)
+    return error;
+
+  return 0;
+}
+
 // gets thread registers for all threads in the process
 // return: number of threads if > 0
 // return: < 0 if error
 // the states must be free()'d when no longer required.
-int VMGetThreadRegisters(pid_t process, VMThreadState** states) {
+int VMGetProcessRegisters(pid_t process, VMThreadState** states) {
 
   // get the task port
   vm_map_t task = _VMTaskFromPID(process);
@@ -546,70 +647,25 @@ int VMGetThreadRegisters(pid_t process, VMThreadState** states) {
   // alloc the thread info list
   int error = 0;
   *states = (VMThreadState*)malloc(sizeof(VMThreadState) * thread_count);
-  if (!*states) {
+  if (!*states)
     error = -3;
-    goto VMGetThreadRegisters_cleanup;
-  }
+  else {
 
-  // for each thread...
-  int x;
-  for (x = 0; x < thread_count; x++) {
+    // for each thread...
+    int x;
+    for (x = 0; x < thread_count; x++) {
 
-    // get the thread state
-    x86_thread_state_t state;
-    x86_float_state_t fstate;
-    x86_debug_state_t dstate;
-
-    mach_msg_type_number_t sc = x86_THREAD_STATE_COUNT;
-    if (thread_get_state(thread_list[x], x86_THREAD_STATE,
-                         (thread_state_t)&state, &sc) != KERN_SUCCESS) {
-      free(*states);
-      error = -4;
-      goto VMGetThreadRegisters_cleanup;
-    }
-    (*states)[x].count = state.tsh.count;
-
-    sc = x86_FLOAT_STATE_COUNT;
-    if (thread_get_state(thread_list[x], x86_FLOAT_STATE,
-                         (thread_state_t)&fstate, &sc) != KERN_SUCCESS) {
-      free(*states);
-      error = -5;
-      goto VMGetThreadRegisters_cleanup;
-    }
-    (*states)[x].fcount = fstate.fsh.count;
-
-    sc = x86_THREAD_STATE_COUNT;
-    if (thread_get_state(thread_list[x], x86_DEBUG_STATE,
-                         (thread_state_t)&dstate, &sc) != KERN_SUCCESS) {
-      free(*states);
-      error = -6;
-      goto VMGetThreadRegisters_cleanup;
-    }
-    (*states)[x].dcount = dstate.dsh.count;
-
-    // add the thread state to our list
-    if (state.tsh.flavor == x86_THREAD_STATE32 &&
-        fstate.fsh.flavor == x86_FLOAT_STATE32 &&
-        dstate.dsh.flavor == x86_DEBUG_STATE32) {
-      (*states)[x].is64 = 0;
-      memcpy(&(*states)[x].st32, &state.uts.ts32, sizeof(x86_thread_state32_t));
-      memcpy(&(*states)[x].fl32, &fstate.ufs.fs32, sizeof(x86_float_state32_t));
-      memcpy(&(*states)[x].db32, &dstate.uds.ds32, sizeof(x86_debug_state32_t));
-    } else if (state.tsh.flavor == x86_THREAD_STATE64 &&
-               fstate.fsh.flavor == x86_FLOAT_STATE64 &&
-               dstate.dsh.flavor == x86_DEBUG_STATE64) {
-      (*states)[x].is64 = 1;
-      memcpy(&(*states)[x].st64, &state.uts.ts64, sizeof(x86_thread_state64_t));
-      memcpy(&(*states)[x].fl64, &fstate.ufs.fs64, sizeof(x86_float_state64_t));
-      memcpy(&(*states)[x].db64, &dstate.uds.ds64, sizeof(x86_debug_state64_t));
-    } else {
-      free(*states);
-      error = -7;
-      goto VMGetThreadRegisters_cleanup;
+      int error = VMGetThreadRegisters(thread_list[x], (*states) + x);
+      if (error) {
+        free(*states);
+        *states = NULL;
+        error = -7;
+        break;
+      }
     }
   }
 
-VMGetThreadRegisters_cleanup:
+  // clean up
   if (error)
     vm_deallocate(mach_task_self(), (vm_address_t)thread_list,
                   (thread_count * sizeof (int)));
@@ -620,19 +676,10 @@ VMGetThreadRegisters_cleanup:
   return thread_count;
 }
 
-/*int VMSetThreadRegisters(pid_t process, const VMThreadState* state) {
-
-  // use set_thread_state, like this:
-  thread_set_state(thread_list[thread], PPC_THREAD_STATE,
-                   (thread_state_t)&ppc_state, sc);
-  return 0;
-} */
-
 // sets thread registers for all threads in the process
 // return: number of threads if > 0
 // return: < 0 if error
-// the states must be free()'d when no longer required.
-int VMSetThreadRegisters(pid_t process, const VMThreadState* states, int num) {
+int VMSetProcessRegisters(pid_t process, const VMThreadState* states, int num) {
 
   // get the task port
   vm_map_t task = _VMTaskFromPID(process);
@@ -651,51 +698,13 @@ int VMSetThreadRegisters(pid_t process, const VMThreadState* states, int num) {
   
   // for each thread...
   int x, error = 0;
-  x86_thread_state_t state;
-  x86_float_state_t fstate;
-  x86_debug_state_t dstate;
   for (x = 0; x < thread_count; x++) {
-
-    // prepare the thread state
-    state.tsh.count = states[x].count;
-    fstate.fsh.count = states[x].fcount;
-    dstate.dsh.count = states[x].dcount;
-    if (states[x].is64) {
-      state.tsh.flavor = x86_THREAD_STATE64;
-      fstate.fsh.flavor = x86_FLOAT_STATE64;
-      dstate.dsh.flavor = x86_DEBUG_STATE64;
-      memcpy(&state.uts.ts64, &states[x].st64, sizeof(x86_thread_state64_t));
-      memcpy(&fstate.ufs.fs64, &states[x].fl64, sizeof(x86_float_state64_t));
-      memcpy(&dstate.uds.ds64, &states[x].db64, sizeof(x86_debug_state64_t));
-    } else {
-      state.tsh.flavor = x86_THREAD_STATE32;
-      fstate.fsh.flavor = x86_FLOAT_STATE32;
-      dstate.dsh.flavor = x86_DEBUG_STATE32;
-      memcpy(&state.uts.ts32, &states[x].st32, sizeof(x86_thread_state32_t));
-      memcpy(&fstate.ufs.fs32, &states[x].fl32, sizeof(x86_float_state32_t));
-      memcpy(&dstate.uds.ds32, &states[x].db32, sizeof(x86_debug_state32_t));
-    }
-
-    // set the thread state
-    error = thread_set_state(thread_list[x], x86_THREAD_STATE,
-        (thread_state_t)&state, x86_THREAD_STATE_COUNT);
-    if (error != KERN_SUCCESS)
-      goto VMSetThreadRegisters_cleanup;
-
-    // set the floating state
-    error = thread_set_state(thread_list[x], x86_FLOAT_STATE,
-        (thread_state_t)&fstate, x86_FLOAT_STATE_COUNT);
-    if (error != KERN_SUCCESS)
-      goto VMSetThreadRegisters_cleanup;
-
-    // set the debug state
-    error = thread_set_state(thread_list[x], x86_DEBUG_STATE,
-        (thread_state_t)&dstate, x86_DEBUG_STATE_COUNT);
-    if (error != KERN_SUCCESS)
-      goto VMSetThreadRegisters_cleanup;
+    error = VMSetThreadRegisters(thread_list[x], &states[x]);
+    if (error)
+      break;
   }
 
-VMSetThreadRegisters_cleanup:
+  // clean up
   if (error)
     vm_deallocate(mach_task_self(), (vm_address_t)thread_list,
                   (thread_count * sizeof (int)));
@@ -703,4 +712,108 @@ VMSetThreadRegisters_cleanup:
     error = vm_deallocate(mach_task_self(), (vm_address_t)thread_list,
                           (thread_count * sizeof (int)));
   return 0;
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// breakpoint handling facilities
+
+extern boolean_t exc_server(mach_msg_header_t *,mach_msg_header_t *);
+
+static int (*_breakpoint_handler)(mach_port_t, int, VMThreadState*);
+
+kern_return_t catch_exception_raise(mach_port_t exception_port,
+    mach_port_t thread, mach_port_t task, exception_type_t exception,
+    exception_data_t code, mach_msg_type_number_t code_count) {
+  printf("internal error: catch_exception_raise called erroneously\n");
+  return KERN_SUCCESS;
+}
+
+kern_return_t catch_exception_raise_state(mach_port_t exception_port,
+    exception_type_t exception, exception_data_t code,
+    mach_msg_type_number_t code_count, int* flavor, thread_state_t in_state,
+    mach_msg_type_number_t in_state_count, thread_state_t out_state,
+    mach_msg_type_number_t* out_state_count) {
+  printf("internal error: catch_exception_raise_state called erroneously\n");
+  return KERN_SUCCESS;
+}
+
+kern_return_t catch_exception_raise_state_identity(mach_port_t exception_port,
+    mach_port_t thread, mach_port_t task, exception_type_t exception,
+    exception_data_t code, mach_msg_type_number_t code_count, int* flavor,
+    thread_state_t in_state, mach_msg_type_number_t in_state_count,
+    thread_state_t out_state, mach_msg_type_number_t* out_state_count) {
+
+  VMThreadState state;
+  VMGetThreadRegisters(thread, &state);
+
+  if (_breakpoint_handler(thread, exception, &state))
+    return KERN_SUCCESS;
+  return MIG_NO_REPLY;
+}
+
+// sets the task's exception port, resumes it, and waits for an exception. when
+// one occurs, calls the callback function. if the callback returns 0, leaves
+// the process suspended and returns to the caller. if the callback returns 1,
+// resumes the process and continues waiting.
+int VMWaitForBreakpoint(pid_t pid,
+                        int (*handler)(mach_port_t, int, VMThreadState*)) {
+
+  // who is responsible for this terrible design? :(
+  // mach_msg_server should take an aux parameter!
+  _breakpoint_handler = handler;
+
+  // create the exception port
+  int x;
+  mach_port_t exc_port;
+  int error = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE,
+                                 &exc_port);
+  if (error != KERN_SUCCESS)
+    goto VMWaitForBreakpoint_cleanup;
+  error = mach_port_insert_right(mach_task_self(), exc_port, exc_port,
+                                 MACH_MSG_TYPE_MAKE_SEND);
+  if (error != KERN_SUCCESS)
+    goto VMWaitForBreakpoint_cleanup;
+
+  // set the exception port, saving the old ones in the process
+  exception_mask_t old_masks[4];
+  exception_port_t old_ports[4];
+  exception_behavior_t old_behaviors[4];
+  thread_state_flavor_t old_flavors[4];
+  unsigned int num_old = 4;
+  error = task_swap_exception_ports(_VMTaskFromPID(pid), EXC_MASK_BAD_ACCESS |
+      EXC_MASK_BAD_INSTRUCTION | EXC_MASK_EMULATION | EXC_MASK_BREAKPOINT,
+      exc_port, EXCEPTION_STATE_IDENTITY, x86_THREAD_STATE, old_masks, &num_old,
+      old_ports, old_behaviors, old_flavors);
+  if (error != KERN_SUCCESS) {
+    printf("failed to swap exception ports\n");
+    goto VMWaitForBreakpoint_cleanup;
+	}
+
+  // resume the process!
+  VMResumeProcess(pid);
+  VMResumeProcess(pid);
+
+  // listen for messages
+  error = mach_msg_server_once(exc_server, 0x4000, exc_port, 0);
+  if (error != KERN_SUCCESS) {
+    printf("failed to listen for messages\n");
+    goto VMWaitForBreakpoint_cleanup;
+	}
+
+  // restore original exception ports
+  for (x = 0; x < num_old; x++) {
+    error = task_set_exception_ports(_VMTaskFromPID(pid), old_masks[x],
+        old_ports[x], old_behaviors[x], old_flavors[x]);
+    if (error != KERN_SUCCESS)
+      printf("warning: failed to restore exception port %d\n", x);
+  }
+
+VMWaitForBreakpoint_cleanup:
+  // deallocate the exception port
+  if (exc_port)
+    error = mach_port_deallocate(mach_task_self(), exc_port);
+
+  return error;
 }

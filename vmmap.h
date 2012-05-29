@@ -136,7 +136,12 @@ typedef struct {
 void VMPrintThreadRegisters(VMThreadState* state);
 int VMSetRegisterValueByName(VMThreadState* state, const char* name,
                              uint64_t value);
-int VMGetThreadRegisters(pid_t process, VMThreadState** state);
-int VMSetThreadRegisters(pid_t process, const VMThreadState* state, int num);
+int VMGetThreadRegisters(mach_port_t thread_port, VMThreadState* _state);
+int VMSetThreadRegisters(mach_port_t thread_port, const VMThreadState* _state);
+int VMGetProcessRegisters(pid_t process, VMThreadState** state);
+int VMSetProcessRegisters(pid_t process, const VMThreadState* state, int num);
+
+int VMWaitForBreakpoint(pid_t pid,
+                        int (*handler)(mach_port_t, int, VMThreadState*));
 
 #endif // VMMAP_H
