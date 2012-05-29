@@ -49,6 +49,17 @@ static inline void bswap_int64_t(void* a) {
 #define bswap_uint64_t bswap_int64_t
 #define bswap_double bswap_int64_t
 
+void bswap(void* a, int size) {
+  if (size == 1)
+    bswap_int8_t(a);
+  if (size == 2)
+    bswap_int16_t(a);
+  if (size == 4)
+    bswap_int32_t(a);
+  if (size == 8)
+    bswap_int64_t(a);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // operator declarations
 
@@ -609,4 +620,51 @@ int GetPredicateByName(const char* name) {
 // returns 1 if the given type is an integral search type
 int IsIntegerSearchType(int type) {
   return (type >= 0) && (type < SEARCHTYPE_FLOAT);
+}
+
+// returns 1 if the given type is a reverse-endian search type
+int IsReverseEndianSearchType(int type) {
+  return (type == SEARCHTYPE_UINT16_LE) ||
+         (type == SEARCHTYPE_UINT32_LE) ||
+         (type == SEARCHTYPE_UINT64_LE) ||
+         (type == SEARCHTYPE_INT16_LE) ||
+         (type == SEARCHTYPE_INT32_LE) ||
+         (type == SEARCHTYPE_INT64_LE) ||
+         (type == SEARCHTYPE_FLOAT_LE) ||
+         (type == SEARCHTYPE_DOUBLE_LE);
+}
+
+// returns the size, in bytes, of the search data type
+// 0 for arbitrary data searches
+int SearchDataSize(int type) {
+
+  switch (type) {
+    case SEARCHTYPE_UINT8:
+    case SEARCHTYPE_INT8:
+      return 1;
+
+    case SEARCHTYPE_UINT16:
+    case SEARCHTYPE_UINT16_LE:
+    case SEARCHTYPE_INT16:
+    case SEARCHTYPE_INT16_LE:
+      return 2;
+
+    case SEARCHTYPE_UINT32:
+    case SEARCHTYPE_UINT32_LE:
+    case SEARCHTYPE_INT32:
+    case SEARCHTYPE_INT32_LE:
+    case SEARCHTYPE_FLOAT:
+    case SEARCHTYPE_FLOAT_LE:
+      return 4;
+
+    case SEARCHTYPE_UINT64:
+    case SEARCHTYPE_UINT64_LE:
+    case SEARCHTYPE_INT64:
+    case SEARCHTYPE_INT64_LE:
+    case SEARCHTYPE_DOUBLE:
+    case SEARCHTYPE_DOUBLE_LE:
+      return 8;
+  }
+
+  return 0;
 }

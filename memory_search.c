@@ -60,6 +60,7 @@ static int command_help(struct state* st, const char* command) {
 "  [c]lose <name>            delete search by name\n"
 "  [s]earch <oper> [value]   search for a changed value\n"
 "  [res]ults (or x)          print current search results\n"
+"  set <value>               write <value> to all current result locations\n"
 "  [del]ete <addr1> [addr2]  delete result at addr1, or between addr1 and addr2\n"
 "freeze commands:\n"
 "  [f]reeze <addr> <data>    freeze data in memory\n"
@@ -530,6 +531,64 @@ static int command_search(struct state* st, const char* command) {
   return 0;
 }
 
+static int command_set(struct state* st, const char* command) {
+
+  if (!st->search) {
+    printf("no search currently open\n");
+    return 0;
+  }
+  if (!st->search->memory) {
+    printf("no initial search performed\n");
+    return 0;
+  }
+
+  int64_t ivalue;
+  double dvalue;
+  float fvalue;
+  void* datavalue = NULL;
+
+  void* data;
+  unsigned int size;
+  if (IsIntegerSearchType(st->search->type)) {
+    sscanf(command, "%lld", &ivalue);
+    data = &ivalue;
+    size = SearchDataSize(st->search->type);
+  } else if ((st->search->type == SEARCHTYPE_FLOAT) ||
+             (st->search->type == SEARCHTYPE_FLOAT_LE)) {
+    sscanf(command, "%g", &fvalue);
+    data = &fvalue;
+    size = SearchDataSize(st->search->type);
+  } else if ((st->search->type == SEARCHTYPE_DOUBLE) ||
+             (st->search->type == SEARCHTYPE_DOUBLE_LE)) {
+    sscanf(command, "%lg", &dvalue);
+    data = &dvalue;
+    size = SearchDataSize(st->search->type);
+  } else if (st->search->type == SEARCHTYPE_DATA) {
+    size = read_string_data(command, &datavalue);
+    data = datavalue;
+  } else {
+    printf("error: unknown search type\n");
+    return 0;
+  }
+
+  if (IsReverseEndianSearchType(st->search->type))
+    bswap(data, size);
+
+  int x, error;
+  for (x = 0; x < st->search->numResults; x++) {
+    uint64_t addr = st->search->results[x];
+    if ((error = VMWriteBytes(st->pid, addr, data, size)))
+      printf("%016llX: wrote %u (0x%X) bytes\n", addr, size, size);
+    else
+      printf("%016llX: failed to write data to process\n", addr);
+  }
+
+  if (datavalue)
+    free(datavalue);
+
+  return 0;
+}
+
 static int command_close(struct state* st, const char* command) {
 
   // no name present? then we're deleting the current search
@@ -803,6 +862,7 @@ static const struct {
   {"res", command_results},
   {"r", command_read},
   {"search", command_search},
+  {"set", command_set},
   {"signal", command_signal},
   {"sig", command_signal},
   {"s", command_search},

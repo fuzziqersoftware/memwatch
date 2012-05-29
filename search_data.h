@@ -75,6 +75,11 @@ const char* GetSearchTypeName(int type);
 int GetSearchTypeByName(const char* name);
 const char* GetPredicateName(int pred);
 int GetPredicateByName(const char* name);
+
 int IsIntegerSearchType(int type);
+int IsReverseEndianSearchType(int type);
+int SearchDataSize(int type);
+
+void bswap(void* a, int size);
 
 #endif // SEARCH_DATA_H
