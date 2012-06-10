@@ -36,5 +36,7 @@ __geteip:
   test rbx, rbx
   je 1b // hurr
 
+  mov al, [rdx]
+
   // return
   ret

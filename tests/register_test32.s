@@ -35,5 +35,7 @@ __geteip:
   test ebx, ebx
   je 1b // hurr
 
+  mov al, [edx]
+
   // return
   ret
