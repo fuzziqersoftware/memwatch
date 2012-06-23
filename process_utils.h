@@ -24,7 +24,7 @@ int enumprocesses(int callback(pid_t pid, const char* proc, void* param),
 
 void print_region_map(VMRegionDataMap* map);
 void print_process_data(const char* processname, unsigned long long addr,
-                        void* read_data, unsigned long long size);
+    void* read_data, void* diff_data, unsigned long long size);
 int write_file_to_process(const char* filename, unsigned long long size,
                           pid_t pid, unsigned long long addr);
 

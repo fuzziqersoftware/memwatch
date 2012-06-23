@@ -186,9 +186,11 @@ void PrintFrozenRegions(int printData) {
     printf("frozen regions:\n");
     for (x = 0; x < _numFrozenRegions; x++) {
       printf("%3d: %6u %016llX:%016llX [%d] %s\n", x, _frozen[x].pid,
-             _frozen[x].addr, _frozen[x].size, _frozen[x].error, _frozen[x].name);
+             _frozen[x].addr, _frozen[x].size, _frozen[x].error,
+             _frozen[x].name);
       if (printData)
-        CRYPT_PrintData(_frozen[x].addr, _frozen[x].data, _frozen[x].size, 0);
+        CRYPT_PrintData(_frozen[x].addr, _frozen[x].data, NULL, _frozen[x].size,
+                        0);
     }
   } else
     printf("no regions frozen\n");

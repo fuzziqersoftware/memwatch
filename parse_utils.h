@@ -8,13 +8,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define FORMAT_END         (-1)
+#define FORMAT_NORMAL      0
+#define FORMAT_BOLD        1
+#define FORMAT_UNDERLINE   4
+#define FORMAT_BLINK       5
+#define FORMAT_INVERSE     7
+#define FORMAT_FG_BLACK    30
+#define FORMAT_FG_RED      31
+#define FORMAT_FG_GREEN    32
+#define FORMAT_FG_YELLOW   33
+#define FORMAT_FG_BLUE     34
+#define FORMAT_FG_MAGENTA  35
+#define FORMAT_FG_CYAN     36
+#define FORMAT_FG_GRAY     37
+#define FORMAT_FG_WHITE    38
+#define FORMAT_BG_BLACK    40
+#define FORMAT_BG_RED      41
+#define FORMAT_BG_GREEN    42
+#define FORMAT_BG_YELLOW   43
+#define FORMAT_BG_BLUE     44
+#define FORMAT_BG_MAGENTA  45
+#define FORMAT_BG_CYAN     46
+#define FORMAT_BG_GRAY     47
+#define FORMAT_BG_WHITE    48
+
 #define FLAG_SHOW_WORDS    1
 #define FLAG_SHOW_DWORDS   2
 #define FLAG_SHOW_QWORDS   4
 #define FLAG_SHOW_OWORDS   8
 
+void change_color(int color, ...);
+
 void CRYPT_PrintData(unsigned long long address, const void* ds,
-                     unsigned long long data_size, int flags);
+                     const void* diff, unsigned long long data_size, int flags);
 
 unsigned long long read_stream_data(FILE* in, void** vdata);
 unsigned long long read_string_data(const char* in_buffer, void** vdata);

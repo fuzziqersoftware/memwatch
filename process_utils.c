@@ -138,7 +138,7 @@ void print_region_map(VMRegionDataMap* map) {
 
 // prints a chunk of data, along with the process' name and the current time
 void print_process_data(const char* processname, unsigned long long addr,
-                        void* read_data, unsigned long long size) {
+    void* read_data, void* diff_data, unsigned long long size) {
 
   // get the current time
   struct timeval rawtime;
@@ -157,7 +157,7 @@ void print_process_data(const char* processname, unsigned long long addr,
          rawtime.tv_usec / 1000);
 
   // and print the data
-  CRYPT_PrintData(addr, read_data, size, 0);
+  CRYPT_PrintData(addr, read_data, diff_data, size, 0);
   printf("\n");
 }
 

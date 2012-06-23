@@ -3,19 +3,50 @@
 
 #include <sys/time.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
 #include "parse_utils.h"
 
+extern int use_color;
+
+void change_color(int color, ...) {
+
+  char fmt[0x40] = "\033";
+  int fmt_len = strlen(fmt);
+
+  va_list va;
+  va_start(va, color);
+  do {
+    fmt[fmt_len] = (fmt[fmt_len - 1] == '\033') ? '[' : ';';
+    fmt_len++;
+    fmt_len += sprintf(&fmt[fmt_len], "%d", color);
+    color = va_arg(va, int);
+  } while (color != FORMAT_END);
+  va_end(va);
+
+  fmt[fmt_len] = 'm';
+  fmt[fmt_len + 1] = 0;
+
+  printf("%s", fmt);
+}
+
 // prints data! wheeee
 void CRYPT_PrintData(unsigned long long address, const void* ds,
-                     unsigned long long data_size, int flags) {
+    const void* diff, unsigned long long data_size, int flags) {
 
   unsigned char* data_source = (unsigned char*)ds;
+  unsigned char* diff_source = (unsigned char*)diff;
   unsigned long x, y, off = 0;
   char buffer[17] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  int space_factor = (flags & FLAG_SHOW_OWORDS) ? 15 :
+                     (flags & FLAG_SHOW_QWORDS) ? 7 :
+                     (flags & FLAG_SHOW_DWORDS) ? 3 :
+                     (flags & FLAG_SHOW_WORDS) ? 1 :
+                     0;
+
   printf("%016llX | ", address);
   for (x = 0; x < data_size; x++) {
     if (off == 16) {
@@ -28,29 +59,15 @@ void CRYPT_PrintData(unsigned long long address, const void* ds,
       printf("| %s\n%016llX | ", buffer, address + x);
       off = 0;
     }
-    if (flags & FLAG_SHOW_OWORDS) {
-      if (off == 15)
-        printf("%02X ", data_source[x]);
-      else
-        printf("%02X", data_source[x]);
-    } else if (flags & FLAG_SHOW_QWORDS) {
-      if (!((off + 1) & 7))
-        printf("%02X ", data_source[x]);
-      else
-        printf("%02X", data_source[x]);
-    } else if (flags & FLAG_SHOW_DWORDS) {
-      if (!((off + 1) & 3))
-        printf("%02X ", data_source[x]);
-      else
-        printf("%02X", data_source[x]);
-    } else if (flags & FLAG_SHOW_WORDS) {
-      if (!((off + 1) & 1))
-        printf("%02X ", data_source[x]);
-      else
-        printf("%02X", data_source[x]);
-    } else
-      printf("%02X ", data_source[x]);
     off++;
+    if (use_color && diff_source && (diff_source[x] != data_source[x]))
+      change_color(FORMAT_BOLD, FORMAT_FG_RED, FORMAT_END);
+    if (!(off & space_factor))
+      printf("%02X ", data_source[x]);
+    else
+      printf("%02X", data_source[x]);
+    if (use_color && diff_source && (diff_source[x] != data_source[x]))
+      change_color(FORMAT_NORMAL, FORMAT_END);
   }
   buffer[off] = 0;
   for (y = 0; y < off; y++)

@@ -259,23 +259,37 @@ static int command_read(struct state* st, const char* command) {
 
   // alloc local read buffer
   void* read_data = malloc(size);
-  if (!read_data) {
+  void* read_data_prev = cont ? malloc(size) : NULL;
+  if (!read_data || (cont && !read_data_prev)) {
     printf("failed to allocate memory for reading\n");
+    if (read_data)
+      free(read_data);
+    if (read_data_prev)
+      free(read_data_prev);
     return 0;
   }
 
   // go ahead and read
-  int error;
+  int error, times = 0;
   cancel_var = &cont;
   do {
     if ((error = VMReadBytes(st->pid, addr, read_data, &size)))
-      print_process_data(st->processname, addr, read_data, size);
+      print_process_data(st->processname, addr, read_data,
+                         times ? read_data_prev : NULL, size);
     else
       printf("failed to read data from process\n");
     if (cont)
       usleep(1000000);
+
+    void* tmp = read_data_prev;
+    read_data_prev = read_data;
+    read_data = tmp;
+    times++;
   } while (cont);
-  free(read_data);
+  if (read_data)
+    free(read_data);
+  if (read_data_prev)
+    free(read_data_prev);
   cancel_var = NULL;
 
   return 0;
@@ -462,7 +476,7 @@ static int command_search(struct state* st, const char* command) {
 
   // make sure a search is opened
   if (!st->search) {
-    printf("no search is currently open; use the S command to open a "
+    printf("no search is currently open; use the o command to open a "
            "search\n");
     return 0;
   }

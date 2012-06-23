@@ -16,6 +16,7 @@
 // cancel, then quit
 
 int* cancel_var = NULL;
+int use_color = 1;
 
 int recent_cancel = 0;
 int recent_cancel_count = 0;
@@ -156,6 +157,10 @@ int main(int argc, char* argv[]) {
     // -g, --once-only: don't loop
     if (!strcmp(argv[x], "-g") || !strcmp(argv[x], "--once-only"))
       loop = 0;
+
+    // -c, --no-color: don't use colors in terminal
+    else if (!strcmp(argv[x], "-c") || !strcmp(argv[x], "--no-color"))
+      use_color = 0;
 
     // -s, --showflags: determine how to display data
     else if (!strncmp(argv[x], "-s", 2))
@@ -320,7 +325,7 @@ int main(int argc, char* argv[]) {
   cancel_var = &cont;
   do {
     if ((error = VMReadBytes(pid, addr, read_data, &size)))
-      print_process_data(processname, addr, read_data, size);
+      print_process_data(processname, addr, read_data, NULL, size);
     else
       printf("failed to read data from process\n");
     if (write_data) {
