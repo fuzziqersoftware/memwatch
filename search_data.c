@@ -379,33 +379,42 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
     // for each search result, run comparison and if it fails, delete the result
     // by setting its address to 0
     int x;
-    int currentRegion = 0;
+    int currentRegionS = 0;
+    int currentRegionN = 0;
     int cont = 1;
     cancel_var = &cont;
     for (x = 0; cont && (x < n->numResults); x++) {
 
-      // move the current region until we're inside it
-      while (currentRegion < n->memory->numRegions &&
-             n->memory->regions[currentRegion].region._address <= n->results[x] &&
-             !VMAddressInRegion(n->memory->regions[currentRegion].region,
-                                n->results[x]))
-        currentRegion++;
+      // move the current region until we're inside it, for both maps
+      while (currentRegionN < n->memory->numRegions &&
+             n->memory->regions[currentRegionN].region._address <= n->results[x]
+             && !VMAddressInRegion(n->memory->regions[currentRegionN].region,
+                                   n->results[x]))
+        currentRegionN++;
+      if (s->memory)
+        while (currentRegionS < s->memory->numRegions &&
+               s->memory->regions[currentRegionS].region._address <= n->results[x]
+               && !VMAddressInRegion(s->memory->regions[currentRegionS].region,
+                                     n->results[x]))
+          currentRegionS++;
 
       // if there are no regions left or the current region is after the current
       // result, then the current result is invalid - get rid of it
-      if (currentRegion >= n->memory->numRegions ||
-          n->memory->regions[currentRegion].region._address > n->results[x]) {
+      if (currentRegionN >= n->memory->numRegions ||
+          n->memory->regions[currentRegionN].region._address > n->results[x] ||
+          currentRegionS >= s->memory->numRegions ||
+          s->memory->regions[currentRegionS].region._address > n->results[x]) {
         n->results[x] = 0;
         continue;
       }
 
       // compare the current result and delete it if necessary
       void* current_data =
-        (void*)(n->results[x] - n->memory->regions[currentRegion].region._address +
-         (unsigned long long)n->memory->regions[currentRegion].data);
+        (void*)(n->results[x] - n->memory->regions[currentRegionN].region._address +
+         (unsigned long long)n->memory->regions[currentRegionN].data);
       void* target_data = (value && s->memory) ? value :
-        (void*)(n->results[x] - s->memory->regions[currentRegion].region._address +
-         (unsigned long long)s->memory->regions[currentRegion].data);
+        (void*)(n->results[x] - s->memory->regions[currentRegionS].region._address +
+         (unsigned long long)s->memory->regions[currentRegionS].data);
       if (!(typeConfigs[n->type].funcs[pred](current_data, target_data,
                                              size ? size : n->prev_size)))
         n->results[x] = 0;
