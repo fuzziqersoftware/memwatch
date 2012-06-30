@@ -934,7 +934,7 @@ static const struct {
 
 
 // memory searching user interface!
-int memory_search(pid_t pid) {
+int prompt_for_commands(pid_t pid) {
 
   // construct the initial state
   struct state st;
@@ -983,7 +983,7 @@ int memory_search(pid_t pid) {
       add_history(command);
     free(prompt);
 
-    // find the entry in the command table
+    // find the entry in the command table and run the command
     int command_id, error;
     for (command_id = 0; command_handlers[command_id].word; command_id++)
       if (!strncmp(command_handlers[command_id].word, command,

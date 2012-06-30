@@ -83,53 +83,6 @@ int find_pid_for_process_name(pid_t pid, const char* proc, void* param) {
   return 0;
 }
 
-// prints the usage for this program
-void print_usage() {
-  printf(
-"usage: sudo memwatch [options] pidname address <size>\n"
-"yes, sudo is probably required.\n"
-"pidname represents a process id or process name. the process name may be a\n"
-"  partial name, in which case memwatch will search the running processes.\n"
-"address and size may be in hexadecimal, prefixed with 0x.\n"
-"\n"
-"options:\n"
-"    -l          show a list of running processes, executable name only\n"
-"    -L          show a list of running processes, including commands\n"
-"    -w<file>    write file to memory\n"
-"    -d<data>    write given data to memory\n"
-"    -g          do not loop; read/write once and exit\n"
-"    -s<flag>    set display flags\n"
-"    -i<time>    set update interval, in microseconds (default 1 second)\n"
-"\n"
-"if no options are specified and no address/size given, memwatch will enter the\n"
-"  interactive memory searching interface.\n"
-"\n"
-"size is necessary only if -w and -d are not specified. if -w is given without\n"
-"  a size, then the file size is used.\n"
-"if size and -w are specified, the smaller of the file size and the given size\n"
-"will be used; if -d is specified, the size is inferred from the given data.\n"
-"\n"
-"data is specified in immediate format. every pair of hexadecimal digits\n"
-"  represents one byte, a 32-bit integer may be specified by preceding it with\n"
-"  a #, ascii strings must be enclosed in \"double quotes\", and unicode strings\n"
-"  in \'single quotes\'. any non-recognized characters are ignored. the\n"
-"  endian-ness of the output depends on the endian-ness of the host machine: in\n"
-"  this example, the machine is little-endian (x86).\n"
-"example data string: 0304\"dark\"#-1_\'cold\'\n"
-"resulting data: 03 04 64 61 72 6B FF FF FF FF 63 00 6F 00 6C 00 64 00\n"
-"\n"
-"example: read 32 bytes from 0x000FDB40 in process 498 every 5 seconds\n"
-"    sudo memwatch 498 0x000FDB40 32 -i5000000\n"
-"example: write 08000800 to 0x1058EA9C in process 7698 once\n"
-"    sudo memwatch 7698 0x1058EA9C -d08000800 -g\n"
-"example: write \"hello\" (with trailing \\0) to 0x1058EA9C in process 7698 once\n"
-"    sudo memwatch 7698 0x1058EA9C -d\"hello\"00 -g\n"
-"example: write data.bin to 0xF1096820 in process 933 every second\n"
-"    sudo memwatch 933 0xF1096820 -wdata.bin\n"
-"example: use interactive interface on Firefox\n"
-"    sudo memwatch firefox\n");
-}
-
 // entry point
 int main(int argc, char* argv[]) {
 
@@ -137,29 +90,22 @@ int main(int argc, char* argv[]) {
   printf("fuzziqer software memwatch\n\n");
   signal(SIGINT, sigint);
 
-  // omg tons of variables
-  mach_vm_address_t addr = 0;
-  mach_vm_size_t size = 0;
+  // only a few variables
   pid_t pid = 0;
-  int loop = 1;
   int list_procs = 0;
   int list_commands = 0;
   int showflags = 0;
-  int interval = 1000000;
-  char* write_filename = NULL;
-  void* write_data = NULL;
   char processname[PROCESS_NAME_LENGTH] = {0};
+
+  /*int num_commands = 0;
+  char** commands = NULL; */
 
   // parse command line args
   int x;
   for (x = 1; x < argc; x++) {
 
-    // -g, --once-only: don't loop
-    if (!strcmp(argv[x], "-g") || !strcmp(argv[x], "--once-only"))
-      loop = 0;
-
     // -c, --no-color: don't use colors in terminal
-    else if (!strcmp(argv[x], "-c") || !strcmp(argv[x], "--no-color"))
+    if (!strcmp(argv[x], "-c") || !strcmp(argv[x], "--no-color"))
       use_color = 0;
 
     // -s, --showflags: determine how to display data
@@ -167,12 +113,6 @@ int main(int argc, char* argv[]) {
       showflags = atoi(&argv[x][2]);
     else if (!strncmp(argv[x], "--showflags=", 12))
       showflags = atoi(&argv[x][12]);
-
-    // -i, --interval: determine how long to wait between repeated actions
-    else if (!strncmp(argv[x], "-i", 2))
-      interval = atoi(&argv[x][2]);
-    else if (!strncmp(argv[x], "--interval=", 11))
-      interval = atoi(&argv[x][11]);
 
     // -l, --list-processes: display a list of running processes
     else if (!strcmp(argv[x], "-l") || !strcmp(argv[x], "--list-processes"))
@@ -182,53 +122,17 @@ int main(int argc, char* argv[]) {
     else if (!strcmp(argv[x], "-L") || !strcmp(argv[x], "--list-commands"))
       list_commands = 1;
 
-    // -w: write a file to memory
-    else if (!strcmp(argv[x], "-w")) {
-      if (write_data) {
-        printf("can\'t use both -w and -d simultaneously\n");
-        return (-2);
-      }
-      write_filename = &argv[x][2];
-
-    // -d: write data to memory
-    } else if (!strcmp(argv[x], "-d")) {
-      if (write_filename) {
-        printf("can\'t use both -d and -w simultaneously\n");
-        return (-2);
-      }
-      if (size) {
-        printf("can\'t use -d with a given size\n");
-        return (-2);
-      }
-      size = read_string_data(&argv[x][2], &write_data);
-
     // first non-dash param: a process name or pid
-    } else if (!pid && !processname[0]) {
+    else if (!pid && !processname[0]) {
       pid = atoi(argv[x]);
       if (!pid)
         strcpy(processname, argv[x]);
 
-    // second non-dash param: an address
-    } else if (!addr) {
-      if ((argv[x][0] == '0') && ((argv[x][1] == 'x') || (argv[x][1] == 'X')))
-        sscanf(&argv[x][2], "%lx", (unsigned long*)&addr);
-      else
-        sscanf(argv[x], "%lu", (unsigned long*)&addr);
-
-    // third non-dash param: a size
-    } else if (!size) {
-      if (write_data) {
-        printf("can\'t use -d with a given size\n");
-        return (-2);
-      }
-      if ((argv[x][0] == '0') && ((argv[x][1] == 'x') || (argv[x][1] == 'X')))
-        sscanf(&argv[x][2], "%lx", (unsigned long*)&size);
-      else
-        sscanf(argv[x], "%lu", (unsigned long*)&size);
-
-    // any more non-dash params: error
-    } else
-      printf("unrecognized or unnecessary command line argument: %s\n", argv[x]);
+    // all subsequent non-dash params: unnecessary parameters
+    } else {
+      // TODO: maybe someday we could take commands on the command line
+      printf("warning: ignored excess argument: %s\n", argv[x]);
+    }
   }
 
   // are we working on the kernel? (WOO DANGEROUS)
@@ -236,7 +140,6 @@ int main(int argc, char* argv[]) {
   if (!strcmp(processname, "KERNEL")) {
     pid = 0;
     operate_on_kernel = 1;
-    printf("warning: operating on operating system kernel\n");
   }
 
   // find pid for process name
@@ -276,70 +179,16 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  // some arguments missing? show usage
+  // pid missing?
   if (!pid && !operate_on_kernel) {
-    print_usage();
-    return 0;
+    printf("error: no process id or process name given\n");
+    return (-2);
   }
 
-  if (!addr && !size && !write_filename) {
-    if (!pid && !operate_on_kernel) {
-      printf("memory search mode requires a process id or name\n");
-      return (-2);
-    }
-    if (getuid())
-      printf("warning: memwatch likely will not work if not run as root\n");
-    return memory_search(pid);
-  }
-
+  // warn user if not running as root
   if (getuid())
     printf("warning: memwatch likely will not work if not run as root\n");
 
-  // writing a file? then read its data
-  if (write_filename) {
-    FILE* write_file = fopen(write_filename, "rb");
-    if (!write_file) {
-      printf("failed to open file: %s\n", write_filename);
-      return (-1);
-    }
-    fseek(write_file, 0, SEEK_END);
-    unsigned long long file_size = ftell(write_file);
-    fseek(write_file, 0, SEEK_SET);
-    if (!size) {
-      printf("given size is zero; using file size of %016llX\n", file_size);
-      size = file_size;
-    }
-    if (file_size < size) {
-      printf("file is shorter than given size; truncating size to %016llX\n", file_size);
-      size = file_size;
-    }
-    write_data = malloc((unsigned int)size);
-    fread(write_data, size, 1, write_file);
-    fclose(write_file);
-  }
-
-  // repeatedly read & write data
-  int error, cont = 1;
-  void* read_data = malloc((unsigned int)size);
-  getpidname(pid, processname, 0x40);
-  cancel_var = &cont;
-  do {
-    if ((error = VMReadBytes(pid, addr, read_data, &size)))
-      print_process_data(processname, addr, read_data, NULL, size);
-    else
-      printf("failed to read data from process\n");
-    if (write_data) {
-      if (!VMWriteBytes(pid, addr, write_data, size))
-        printf("failed to write data to process\n");
-    }
-    if (!loop)
-      break;
-    printf("\n");
-    usleep(interval);
-  } while (error && cont);
-  free(read_data);
-  if (write_data)
-    free(write_data);
-
-  return 0;
+  // finally, enter interactive interface
+  return prompt_for_commands(pid);
 }

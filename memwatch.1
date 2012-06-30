@@ -3,21 +3,21 @@
 memwatch \- find and modify variables in other processes
 .SH SYNOPSIS
 .B memwatch
-[
-.I options
-] [
+[ -c ] [ -l | -L ]
 .I pid_or_name
-]
 .SH DESCRIPTION
 .B memwatch
 provides an interactive interface to find and modify variables in the memory of a target process. sudo will be required if memwatch is used by a user that is not a member of the procmod group.
 .SH OPTIONS
 The following options are supported:
 .TP
-.B \-l
+.B \-c, --no-color
+Do not use color escape sequences when printing to the terminal (e.g. when highlighting differences between data in repeated reads).
+.TP
+.B \-l, --list-processes
 Display a list of running processes (without arguments) and their PIDs, and exit.
 .TP
-.B \-L
+.B \-L, --list-commands
 Display a list of running processes (with arguments) and their PIDs, and exit.
 .TP
 .B pid_or_name
