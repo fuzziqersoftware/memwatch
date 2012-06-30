@@ -185,6 +185,10 @@ int main(int argc, char* argv[]) {
     return (-2);
   }
 
+  // warn user if pid is memwatch itself
+  if (pid == getpid())
+    printf("warning: memwatch is operating on itself\n");
+
   // warn user if not running as root
   if (getuid())
     printf("warning: memwatch likely will not work if not run as root\n");

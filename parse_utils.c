@@ -41,6 +41,7 @@ void CRYPT_PrintData(unsigned long long address, const void* ds,
   unsigned char* diff_source = (unsigned char*)diff;
   unsigned long x, y, off = 0;
   char buffer[17] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  char diff_buffer[16];
   int space_factor = (flags & FLAG_SHOW_OWORDS) ? 15 :
                      (flags & FLAG_SHOW_QWORDS) ? 7 :
                      (flags & FLAG_SHOW_DWORDS) ? 3 :
@@ -49,35 +50,56 @@ void CRYPT_PrintData(unsigned long long address, const void* ds,
 
   printf("%016llX | ", address);
   for (x = 0; x < data_size; x++) {
+
     if (off == 16) {
+      printf("| ");
       for (y = 0; y < 16; y++) {
-        if (data_source[x + y - 16] < 0x20)
-          buffer[y] = ' ';
-        else
-          buffer[y] = data_source[x + y - 16];
+        if (diff_buffer[y])
+          change_color(FORMAT_FG_RED, FORMAT_END);
+        if (buffer[y] < 0x20 || buffer[y] == 0x7F) {
+          change_color(FORMAT_INVERSE, FORMAT_END);
+          putc(' ', stdout);
+          change_color(FORMAT_NORMAL, FORMAT_END);
+        } else
+          putc(buffer[y], stdout);
+        if (diff_buffer[y])
+          change_color(FORMAT_NORMAL, FORMAT_END);
       }
-      printf("| %s\n%016llX | ", buffer, address + x);
+      printf("\n%016llX | ", address + x);
       off = 0;
     }
-    off++;
-    if (use_color && diff_source && (diff_source[x] != data_source[x]))
+
+    buffer[off] = data_source[x];
+    diff_buffer[off] = use_color && diff_source &&
+                       (diff_source[x] != data_source[x]);
+    if (diff_buffer[off])
       change_color(FORMAT_BOLD, FORMAT_FG_RED, FORMAT_END);
     if (!(off & space_factor))
       printf("%02X ", data_source[x]);
     else
       printf("%02X", data_source[x]);
-    if (use_color && diff_source && (diff_source[x] != data_source[x]))
+    if (diff_buffer[off])
       change_color(FORMAT_NORMAL, FORMAT_END);
+
+    off++;
   }
   buffer[off] = 0;
-  for (y = 0; y < off; y++)
-    buffer[y] = data_source[x - off + y];
-  for (y = 0; y < off; y++)
-    if (buffer[y] < 0x20)
-      buffer[y] = ' ';
   for (y = 0; y < 16 - off; y++)
     printf("   ");
-  printf("| %s\n",buffer);
+  printf("| ");
+  for (y = 0; y < off; y++) {
+    if (diff_buffer[y])
+      change_color(FORMAT_FG_RED, FORMAT_END);
+    if (buffer[y] < 0x20 || buffer[y] == 0x7F) {
+      change_color(FORMAT_INVERSE, FORMAT_END);
+      putc(' ', stdout);
+      change_color(FORMAT_NORMAL, FORMAT_END);
+    } else
+      putc(buffer[y], stdout);
+    if (diff_buffer[y])
+      change_color(FORMAT_NORMAL, FORMAT_END);
+  }
+  printf("\n");
 }
 
 // macros used by read_stream_data to append to a buffer
