@@ -78,6 +78,7 @@ static int command_help(struct state* st, const char* command) {
 "  wregs <value> <reg>       modify register contents on all threads\n"
 "  [b]reak <sizetype> <addr> set breakpoint on addr\n"
 "general commands:\n"
+"  [at]tach <pid_or_name>    attach to a new process, keeping freezes & searches\n"
 "  [h]elp                    display help message\n"
 "  [q]uit                    exit memwatch\n"
 "\n"
@@ -848,10 +849,9 @@ static int command_resume(struct state* st, const char* command) {
 }
 
 static int command_terminate(struct state* st, const char* command) {
-  if (VMTerminateProcess(st->pid)) {
+  if (VMTerminateProcess(st->pid))
     printf("process terminated\n");
-    st->run = 0;
-  } else
+  else
     printf("failed to terminate process\n");
   return 0;
 }
@@ -862,6 +862,48 @@ static int command_signal(struct state* st, const char* command) {
   if (sig == SIGKILL)
     st->run = 0;
   printf("signal %d sent to process\n", sig);
+  return 0;
+}
+
+static int command_attach(struct state* st, const char* command) {
+
+  // if no command given, use the current process name
+  // (i.e. if program was quit & restarted)
+  if (!command[0])
+    command = st->processname;
+
+  // try to read new pid
+  pid_t new_pid = atoi(command);
+  if (!new_pid) {
+    // no number? then it's a process name
+    int num_results = getnamepid(command, &new_pid, 0);
+    if (num_results == 0) {
+      printf("warning: no processes found by name; searching commands\n");
+      num_results = getnamepid(command, &new_pid, 0);
+    }
+    if (num_results == 0) {
+      printf("error: no processes found\n");
+      return 0;
+    }
+    if (num_results > 1) {
+      printf("error: multiple processes found\n");
+      return 0;
+    }
+  }
+
+  // if we can get its name, we're fine
+  char new_processname[PROCESS_NAME_LENGTH] = "";
+  getpidname(new_pid, new_processname, PROCESS_NAME_LENGTH);
+  if (new_processname[0]) {
+    st->pid = new_pid;
+    strcpy(st->processname, new_processname);
+    MoveFrozenRegionsToProcess(st->pid);
+
+    // warn user if pid is memwatch itself
+    if (st->pid == getpid())
+      printf("warning: memwatch is operating on itself\n");
+    printf("switched to new process %u/%s\n", st->pid, st->processname);
+  }
   return 0;
 }
 
@@ -880,6 +922,8 @@ static const struct {
   command_handler func;
 } command_handlers[] = {
   {"access", command_access},
+  {"attach", command_attach},
+  {"at", command_attach},
   {"a", command_access},
   {"break", command_breakpoint},
   {"b", command_breakpoint},

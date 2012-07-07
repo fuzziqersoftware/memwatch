@@ -176,6 +176,13 @@ int UnfreezeRegionByName(const char* name) {
   return rv;
 }
 
+// moves all frozen regions to a new process id
+void MoveFrozenRegionsToProcess(pid_t pid) {
+  int x;
+  for (x = 0; x < _numFrozenRegions; x++)
+    _frozen[x].pid = pid;
+}
+
 // prints the list of frozen regions
 void PrintFrozenRegions(int printData) {
 

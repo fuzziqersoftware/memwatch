@@ -19,6 +19,7 @@
 #define PROCESS_NAME_LENGTH 0x100
 
 int getpidname(pid_t pid, char* name, int namelen);
+int getnamepid(const char* name, pid_t* pid, int commands);
 int enumprocesses(int callback(pid_t pid, const char* proc, void* param),
                   void* param, int commands);
 

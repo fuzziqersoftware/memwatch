@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <ctype.h>
 
 #include "vmmap.h"
 #include "process_utils.h"
@@ -20,6 +19,8 @@ int use_color = 1;
 
 int recent_cancel = 0;
 int recent_cancel_count = 0;
+
+extern int ignore_match;
 
 void sigint(int signum) {
   if (cancel_var) {
@@ -45,41 +46,6 @@ void sigint(int signum) {
 // prints the process pid and name
 int print_process(pid_t pid, const char* proc, void* param) {
   printf("%6u - %s\n", pid, proc);
-  return 0;
-}
-
-// searches the process list for a given process
-int ignore_match = -1;
-
-typedef struct _find_pid_data {
-  char name[PROCESS_NAME_LENGTH];
-  pid_t pid;
-  int matches_found;
-} find_pid_data;
-
-int find_pid_for_process_name(pid_t pid, const char* proc, void* param) {
-  if (pid == ignore_match)
-    return 0;
-
-  int x;
-  char compare_name[PROCESS_NAME_LENGTH];
-  find_pid_data* data = (find_pid_data*)param;
-
-  strcpy(compare_name, proc);
-  for (x = 0; compare_name[x]; x++)
-    compare_name[x] = tolower(compare_name[x]);
-  int comp_len = strlen(compare_name) - strlen(data->name);
-  if (comp_len < 0)
-    return 0;
-
-  for (x = 0; x <= comp_len; x++) {
-    if (!strncmp(&compare_name[x], data->name, strlen(data->name))) {
-      data->pid = pid;
-      data->matches_found++;
-      break;
-    }
-  }
-
   return 0;
 }
 
@@ -144,26 +110,18 @@ int main(int argc, char* argv[]) {
 
   // find pid for process name
   if (processname[0] && !pid && !operate_on_kernel) {
-    find_pid_data d;
-    strcpy(d.name, processname);
-    for (x = 0; d.name[x]; x++)
-      d.name[x] = tolower(d.name[x]);
-    d.pid = 0;
-    d.matches_found = 0;
-    enumprocesses(find_pid_for_process_name, &d, 0);
-    pid = d.pid;
-    if (d.matches_found == 0) {
-      printf("warning: no processes found by executable name; searching commands\n");
-      d.matches_found = 0;
+
+    int num_found = getnamepid(processname, &pid, 0);
+    if (num_found == 0) {
+      printf("warning: no processes found by name; searching commands\n");
       ignore_match = getpid(); // don't match this process by command
-      enumprocesses(find_pid_for_process_name, &d, 1);
-      pid = d.pid;
+      num_found = getnamepid(processname, &pid, 1);
     }
-    if (d.matches_found == 0) {
+    if (num_found == 0) {
       printf("no processes found\n");
       return 0;
     }
-    if (d.matches_found > 1) {
+    if (num_found > 1) {
       printf("multiple processes found\n");
       return 0;
     }

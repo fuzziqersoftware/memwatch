@@ -27,6 +27,8 @@ int UnfreezeRegionByIndex(int index);
 int UnfreezeRegionByAddr(mach_vm_address_t addr);
 int UnfreezeRegionByName(const char* name);
 
+void MoveFrozenRegionsToProcess(pid_t pid);
+
 void GetFrozenRegions(const FrozenRegion** regions, int* numRegions);
 void PrintFrozenRegions(int printData);
 

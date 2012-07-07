@@ -4,6 +4,7 @@
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "vmmap.h"
 #include "vmmap_data.h"
@@ -37,6 +38,57 @@ int getpidname(pid_t pid, char* name, int namelen) {
   }
 
   return 0;
+}
+
+// searches the process list for a given process
+int ignore_match = -1;
+
+typedef struct _find_pid_data {
+  char name[PROCESS_NAME_LENGTH];
+  pid_t pid;
+  int matches_found;
+} find_pid_data;
+
+int find_pid_for_process_name(pid_t pid, const char* proc, void* param) {
+  if (pid == ignore_match)
+    return 0;
+  
+  int x;
+  char compare_name[PROCESS_NAME_LENGTH];
+  find_pid_data* data = (find_pid_data*)param;
+  
+  strcpy(compare_name, proc);
+  for (x = 0; compare_name[x]; x++)
+    compare_name[x] = tolower(compare_name[x]);
+  int comp_len = strlen(compare_name) - strlen(data->name);
+  if (comp_len < 0)
+    return 0;
+  
+  for (x = 0; x <= comp_len; x++) {
+    if (!strncmp(&compare_name[x], data->name, strlen(data->name))) {
+      data->pid = pid;
+      data->matches_found++;
+      break;
+    }
+  }
+  
+  return 0;
+}
+
+// gets the pid of the process specified by name, optionally searching commands
+// return: number of processes found (if not 1, then pid can't be trusted)
+int getnamepid(const char* name, pid_t* pid, int commands) {
+
+  int x;
+  find_pid_data d;
+  strcpy(d.name, name);
+  for (x = 0; d.name[x]; x++)
+    d.name[x] = tolower(d.name[x]);
+  d.pid = 0;
+  d.matches_found = 0;
+  enumprocesses(find_pid_for_process_name, &d, commands);
+  *pid = d.pid;
+  return d.matches_found;
 }
 
 // calls the specified callback once for each process
