@@ -115,6 +115,9 @@ void CRYPT_PrintData(unsigned long long address, const void* ds,
   (*data)[size - 1] = y; }
 
 // like read_string_data, but reads from a given stream, ending on a \n
+/* TODO: this function doesn't implement the #/##/###/#### convention used by
+ * read_string_data. if uncommenting, implement this functionality!
+
 unsigned long long read_stream_data(FILE* in, void** vdata) {
 
   *vdata = NULL;
@@ -163,7 +166,7 @@ unsigned long long read_stream_data(FILE* in, void** vdata) {
     }
   }
   return size;
-}
+} */
 
 // like read_stream_data, but stops at the end of the string
 unsigned long long read_string_data(const char* in, void** vdata) {
@@ -184,10 +187,30 @@ unsigned long long read_string_data(const char* in, void** vdata) {
       if (in[0] == '\'') unicodestring = 0;
       else write_2byte(in[0], 0);
       in++;
-    } else if (in[0] == '#') {
-      expand(4);
+    } else if (in[0] == '#') { // 8-bit
       in++;
-      sscanf(in, "%ld", (long*)(&((*data)[size - 4])));
+      if (in[0] == '#') { // 16-bit
+        in++;
+        if (in[0] == '#') { // 32-bit
+          in++;
+          if (in[0] == '#') { // 64-bit
+            in++;
+            expand(8);
+            sscanf(in, "%lld", (long long*)(&((*data)[size - 8])));
+          } else {
+            expand(4);
+            sscanf(in, "%ld", (long*)(&((*data)[size - 4])));
+          }
+        } else {
+          expand(2);
+          sscanf(in, "%hd", (short*)(&((*data)[size - 2])));
+        }
+      } else {
+        expand(1);
+        sscanf(in, "%hhd", (char*)(&((*data)[size - 1])));
+      }
+      if (in[0] == '-')
+        in++;
       while (isdigit(in[0]))
         in++;
     } else {

@@ -113,11 +113,11 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 .RI "Set a " type " breakpoint on " address ". " type " may contain the characters x (break on execute), r (break on read), w (break on read/write), or i (break on I/O), as well as 1, 2, 4, or 8 (specifying the size of the region to watch)."
 
 .SH "DATA FORMAT"
-Data is specified in "immediate" format. Every pair of hexadecimal digits represents one byte; a 32-bit integer may be specified by preceding it with a #; ASCII strings must be enclosed in "double quotes", and unicode strings in 'single quotes'. Any non-recognized characters are ignored. The endian-ness of the output depends on the endian-ness of the host machine: on an Intel machine, the resulting data would be little-endian.
+Data is specified in "immediate" format. Every pair of hexadecimal digits represents one byte; a decimal integer may be specified by preceding it with # signs (# for a single byte, ## for a 16-bit int, ### for a 32-bit int, or #### for a 64-bit int); ASCII strings must be enclosed in "double quotes", and unicode strings in 'single quotes'. Any non-recognized characters are ignored. The endian-ness of the output depends on the endian-ness of the host machine: on an Intel machine, the resulting data would be little-endian.
 
-Example data string: 03 04 "dark" #-1 'cold'
+Example data string: 03 04 #30 #127 "dark" ###-1 'cold'
 
-Resulting data (little-endian): 03 04 64 61 72 6B FF FF FF FF 63 00 6F 00 6C 00 64 00
+Resulting data (little-endian): 03 04 1E 7F 64 61 72 6B FF FF FF FF 63 00 6F 00 6C 00 64 00
 
 .SH "AUTHOR"
 Martin Michelsen <mjem@wildblue.net> is the original author and current maintainer of memwatch.
