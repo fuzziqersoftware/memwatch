@@ -63,6 +63,12 @@ void bswap(void* a, int size) {
 ////////////////////////////////////////////////////////////////////////////////
 // operator declarations
 
+// this section uses the C preprocessor to declare 122 functions, one for each
+// pair of (operation, datatype), as well as the null predicate (which is always
+// true).
+
+static int null_pred(void* a, void* b, int size) { return 1; }
+
 #define DECLARE_OP_FUNCTION(type, op, name) \
   static int name(type* a, type* b, int size) { \
     return op; \
@@ -76,8 +82,6 @@ void bswap(void* a, int size) {
     bswap_##type(b); \
     return rv; \
   }
-
-static int null_pred(void* a, void* b, int size) { return 1; }
 
 #define FLAG_OP   (*a ^ *b) && !((*a ^ *b) & ((*a ^ *b) - 1))
 
@@ -132,7 +136,8 @@ DECLARE_LE_OPS_FOR_TYPE(int64_t)
 DECLARE_LE_OPS_FOR_TYPE_NOFLAG(float)
 DECLARE_LE_OPS_FOR_TYPE_NOFLAG(double)
 
-// comparators for arbitrary data type
+// comparators for arbitrary data type. these aren't as simple as the above
+// since items of the 'data' type can be an arbitrary size.
 static int data_lt(void* a, void* b, int size) { return (memcmp(a, b, size) < 0); }
 static int data_gt(void* a, void* b, int size) { return (memcmp(a, b, size) > 0); }
 static int data_le(void* a, void* b, int size) { return (memcmp(a, b, size) <= 0); }
@@ -151,6 +156,8 @@ static int data_flag(void* a, void* b, int size) {
   return (bit_found == 1);
 }
 
+// these macros allow us to more easily specify the list of function pointers
+// for each type, to evaluate predicates on that type
 #define INFIX_FUNCTION_POINTERS_FOR_TYPE(type) \
   {(int (*)(void*, void*, int))type##_lt, \
    (int (*)(void*, void*, int))type##_gt, \
@@ -188,6 +195,7 @@ static int data_flag(void* a, void* b, int size) {
    NULL, \
    (int (*)(void*, void*, int))null_pred}
 
+// here thay are: the search predicate evaluator functions.
 struct _SearchTypeConfig {
   int (*funcs[8])(void* a, void* b, int size);
   int field_size;
@@ -223,6 +231,7 @@ MemorySearchData* CreateNewSearch(int type, const char* name, long flags) {
   if (!s)
     return NULL;
 
+  // fill in the fields
   strncpy(s->name, name, 0x80);
   s->searchflags = flags;
   s->prev_size = 0;

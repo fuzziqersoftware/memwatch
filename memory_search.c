@@ -24,19 +24,22 @@
 // TODO: fix file writing to memory
 // TODO: show nice memory sizes also in list/dump views
 
+// this variable is set to 1 by the main thread when the user presses CTRL+C;
+// if this happens, the current operation should cancel itself
 extern int* cancel_var;
 
+// struct to contain all of the mutable state of the memory search utility
 struct state {
-  pid_t pid;
-  char processname[PROCESS_NAME_LENGTH];
-  int run;
-  MemorySearchDataList* searches;
+  pid_t pid; // process id of the process that's being operated on
+  char processname[PROCESS_NAME_LENGTH]; // name of that process
+  int run; // set to 0 to exit the memory search interface
+  MemorySearchDataList* searches; // list of open searches
   MemorySearchData* search; // the current search
 };
 
 
 
-
+// print out a help message
 static int command_help(struct state* st, const char* command) {
   printf(
 "memwatch memory search utility\n"
@@ -128,6 +131,7 @@ static int command_help(struct state* st, const char* command) {
   return 0;
 }
 
+// list regions of memory in the target process
 static int command_list(struct state* st, const char* command) {
 
   // get the list
@@ -137,12 +141,13 @@ static int command_list(struct state* st, const char* command) {
     return 0;
   }
 
-  // print it out and delete it
+  // print it out and delete it, then return
   print_region_map(map);
   DestroyDataMap(map);
   return 0;
 }
 
+// take a snapshot of the target process' memory and save it to disk
 static int command_dump(struct state* st, const char* command) {
 
   // dump memory
@@ -152,13 +157,17 @@ static int command_dump(struct state* st, const char* command) {
     return 0;
   }
 
-  // save each piece with the given filename
+  // save each region's data with the given filename prefix
   if (command[0]) {
+
+    // allocate space for the chunk filename
     char* filename_piece = (char*)malloc(strlen(command) + 64);
 
+    // for each region...
     unsigned long x;
     for (x = 0; x < map->numRegions; x++) {
 
+      // build the filename: prefix_address
       sprintf(filename_piece, "%s_%016llX", command,
               map->regions[x].region._address);
 
@@ -178,40 +187,44 @@ static int command_dump(struct state* st, const char* command) {
         fclose(f);
       }
     }
+
+    // free the allocated filename space
     free(filename_piece);
-  } else {
-    // no filename? then don't save it
+
+  // no filename prefix given? then don't save the data
+  } else
     print_region_map(map);
-  }
 
   // delete the data map
   DestroyDataMap(map);
   return 0;
 }
 
+// find the given data in the target's memory
 static int command_find(struct state* st, const char* command) {
 
-  // dump memory
+  // take a snapshot of the target's memory
   VMRegionDataMap* map = DumpProcessMemory(st->pid, 0);
   if (!map) {
     printf("memory dump failed\n");
     return 0;
   }
 
-  // read the string
+  // read the «search string from the command
   void* data;
   uint64_t size = read_string_data(command, &data);
 
-  // find the string in a region somewhere
+  // loop through the regions, searching for the string
   unsigned long long num_results = 0;
   int x, cont = 1;
-  cancel_var = &cont;
+  cancel_var = &cont; // this operation can be canceled
   for (x = 0; cont && (x < map->numRegions); x++) {
 
     // skip regions with no data
     if (!map->regions[x].data)
       continue;
 
+    // search through this region's data for the string
     int y;
     for (y = 0; y <= map->regions[x].region._size - size; y++) {
       if (!memcmp(&map->regions[x].s8_data[y], data, size)) {
@@ -222,20 +235,22 @@ static int command_find(struct state* st, const char* command) {
     }
   }
   cancel_var = NULL;
-  printf("results: %llu\n", num_results);
 
+  // print the result count, clean up and return
+  printf("results: %llu\n", num_results);
   free(data);
   DestroyDataMap(map);
   return 0;
 }
 
+// set a region's permissions to all access
 static int command_access(struct state* st, const char* command) {
 
   // read the address
   uint64_t addr;
   sscanf(command, "%llX", &addr);
 
-  // attempt to make it all-access
+  // attempt to change the access permissions
   if (VMSetRegionProtection(st->pid, addr, 1, VMREGION_ALL, VMREGION_ALL))
     printf("region protection set to all access\n");
   else
@@ -244,23 +259,26 @@ static int command_access(struct state* st, const char* command) {
   return 0;
 }
 
+// read data from targer memory
 static int command_read(struct state* st, const char* command) {
 
-  // if a ! is given, make the read repeat
+  // if a ! is given in the command, make the read repeat
   int cont = (command[0] == '!');
   if (cont)
     command++;
 
-  // read addr/size
+  // read addr/size from the command
   uint64_t addr, size;
   if (!read_addr_size(command, &addr, &size)) {
     printf("invalid command format\n");
     return 0;
   }
 
-  // alloc local read buffer
+  // allocate a local read buffer, and a buffer for the previous data if we're
+  // repeating the read
   void* read_data = malloc(size);
   void* read_data_prev = cont ? malloc(size) : NULL;
+  // if either allocation failed, report the failure, clean up & return
   if (!read_data || (cont && !read_data_prev)) {
     printf("failed to allocate memory for reading\n");
     if (read_data)
@@ -270,7 +288,7 @@ static int command_read(struct state* st, const char* command) {
     return 0;
   }
 
-  // go ahead and read
+  // go ahead and read the target's memory
   int error, times = 0;
   cancel_var = &cont;
   do {
@@ -280,44 +298,49 @@ static int command_read(struct state* st, const char* command) {
     else
       printf("failed to read data from process\n");
     if (cont)
-      usleep(1000000);
+      usleep(1000000); // wait a second, if the read is repeating
 
+    // swap the current & previous read buffers
     void* tmp = read_data_prev;
     read_data_prev = read_data;
     read_data = tmp;
     times++;
   } while (cont);
+
+  // clean up & return
   if (read_data)
     free(read_data);
   if (read_data_prev)
     free(read_data_prev);
   cancel_var = NULL;
-
   return 0;
 }
 
+// write data to target's memory
 static int command_write(struct state* st, const char* command) {
 
-  // read the address and data
+  // read the address and data from the command string
   uint64_t addr, size;
   void* data;
   sscanf(command, "%llX", &addr);
   size = read_string_data(skip_word(command, ' '), &data);
 
-  // and write it
+  // write the data to the target's memory
   int error;
   if ((error = VMWriteBytes(st->pid, addr, data, size)))
     printf("wrote %llu (0x%llX) bytes\n", size, size);
   else
     printf("failed to write data to process\n");
-  free(data);
 
+  // clean up & return
+  free(data);
   return 0;
 }
 
+// write a file to the target's memory
 static int command_write_file(struct state* st, const char* command) {
 
-  // read the parameters
+  // read the address
   uint64_t addr;
   sscanf(command, "%llX", &addr);
 
@@ -327,6 +350,7 @@ static int command_write_file(struct state* st, const char* command) {
   return 0;
 }
 
+// add a region to the frozen-list with the given data
 static int command_freeze(struct state* st, const char* command) {
 
   // if a quote is given, read the name
@@ -345,35 +369,42 @@ static int command_freeze(struct state* st, const char* command) {
   void* data;
   size = read_string_data(command, &data);
 
-  // and freeze it
+  // add it to the frozen-list
   char* use_name = freeze_name ? freeze_name :
                    (st->search ? st->search->name : "[no associated search]");
   if (FreezeRegion(st->pid, addr, size, data, use_name))
     printf("failed to freeze region\n");
   else
     printf("region frozen\n");
+
+  // clean up & return
   free(data);
   if (freeze_name)
     free(freeze_name);
-
   return 0;
 }
 
+// remove a region from the frozen-list
 static int command_unfreeze(struct state* st, const char* command) {
 
-  // index given? unfreeze it
+  // index given? unfreeze a region
   if (command[0]) {
+    // first try to unfreeze by name
     int num_by_name = UnfreezeRegionByName(command);
     if (num_by_name == 1) {
       printf("region unfrozen\n");
     } else if (num_by_name > 1) {
       printf("%d regions unfrozen\n", num_by_name);
     } else {
+
+      // if unfreezing by name didn't match any regions, unfreeze by address
       uint64_t addr;
       sscanf(command, "%llX", &addr);
       if (!UnfreezeRegionByAddr(addr))
         printf("region unfrozen\n");
       else {
+
+        // if that didn't work either, try to unfreeze by index
         sscanf(command, "%llu", &addr);
         if (!UnfreezeRegionByIndex(addr))
           printf("region unfrozen\n");
@@ -382,42 +413,47 @@ static int command_unfreeze(struct state* st, const char* command) {
       }
     }
 
-    // else, print frozen regions
+  // else, print frozen regions
   } else
     PrintFrozenRegions(0);
 
   return 0;
 }
 
+// open a new search
 static int command_open(struct state* st, const char* command) {
 
-  // read the type. if no type, show the list of searches
+  // if no argument given, just show the list of searches
   if (!command[0]) {
     PrintSearches(st->searches);
     return 0;
   }
 
-  // check if a search by this name exists or not
-  st->search = GetSearchByName(st->searches, command);
-  if (st->search) {
+  // check if a search by the given name exists or not
+  MemorySearchData* s = GetSearchByName(st->searches, command);
+  if (s) {
+    st->search = s;
     printf("switched to search %s\n", st->search->name);
     return 0;
   }
 
-  // check if a name followed the type
-  const char* name = skip_word(command, ' ');
-
-  // if it's S!, we'll search read-only as well (don't know why anyone
-  // would want to do this though... :/)
+  // if a ! is given, we'll search read-only as well. don't know why anyone
+  // would want to do this though... :/
   int search_flags = 0;
   if (command[0] == '!') {
     command++;
     search_flags = SEARCHFLAG_ALLMEMORY;
   }
 
+  // check if a name followed the type
+  const char* name = skip_word(command, ' ');
+
   // make a new search
-  st->search = CreateNewSearchByTypeName(command, name, search_flags);
-  if (st->search) {
+  s = CreateNewSearchByTypeName(command, name, search_flags);
+  if (s) {
+    st->search = s;
+
+    // add this search to the list of open searches
     AddSearchToList(st->searches, st->search);
     if (st->search->name[0])
       printf("opened new %s search named %s\n",
@@ -425,14 +461,19 @@ static int command_open(struct state* st, const char* command) {
     else
       printf("opened new %s search (unnamed)\n",
              GetSearchTypeName(st->search->type));
+
+  // report failure if none of the above happened
   } else
     printf("failed to open new search - did you use a valid typename?\n");
 
   return 0;
 }
 
+// print list of results for current search
 static int command_results(struct state* st, const char* command) {
-  
+
+  // can't do this if there isn't a current search, or if the current search
+  // object has no memory associated with it (and therefore no valid results)
   if (!st->search) {
     printf("no search currently open\n");
     return 0;
@@ -441,16 +482,21 @@ static int command_results(struct state* st, const char* command) {
     printf("no initial search performed\n");
     return 0;
   }
+
+  // print the results!
   int x;
   for (x = 0; x < st->search->numResults; x++)
     printf("%016llX\n", st->search->results[x]);
   printf("results: %lld\n", st->search->numResults);
-  
+
   return 0;
 }
 
+// delete specific results from a search
 static int command_delete(struct state* st, const char* command) {
 
+  // can't do this if there isn't a current search, or if the current search
+  // object has no memory associated with it (and therefore no valid results)
   if (!st->search) {
     printf("no search currently open\n");
     return 0;
@@ -460,19 +506,27 @@ static int command_delete(struct state* st, const char* command) {
     return 0;
   }
 
+  // read the addresses
   uint64_t addr1 = 0, addr2 = 0;
   sscanf(command, "%llX %llX", &addr1, &addr2);
 
+  // if only 1 address given, addr2 will be 0, so just make a 1-byte range
   if (addr2 < addr1)
     addr2 = addr1 + 1;
+
+  // delete search results in the given range
   DeleteResults(st->search, addr1, addr2);
 
+  // if there aren't many results left, print them out... otherwise, just print
+  // the number of remaining results
   if (st->search->numResults < 20)
     return command_results(st, "");
   printf("results: %lld\n", st->search->numResults);
+
   return 0;
 }
 
+// execute a search using the current search object
 static int command_search(struct state* st, const char* command) {
 
   // make sure a search is opened
@@ -487,15 +541,14 @@ static int command_search(struct state* st, const char* command) {
 
   // check if a value followed the predicate
   void *value = NULL, *data = NULL;
+  unsigned long long ivalue;
+  float fvalue;
+  double dvalue;
   uint64_t size = 0;
   const char* value_text = skip_word(command, ' ');
   if (*value_text) {
 
-    // we have a value... blargh
-    unsigned long long ivalue;
-    float fvalue;
-    double dvalue;
-
+    // we have a value... read it in
     if (IsIntegerSearchType(st->search->type)) {
       sscanf(value_text, "%lld", &ivalue);
       value = &ivalue;
@@ -513,7 +566,7 @@ static int command_search(struct state* st, const char* command) {
     }
   }
 
-  // stop the process if necessary, dump memory, and resume the process
+  // take a snapshot of the target's memory
   VMRegionDataMap* map = DumpProcessMemory(st->pid,
       st->search->searchflags & SEARCHFLAG_ALLMEMORY ? 0 : VMREGION_WRITABLE);
   if (!map) {
@@ -521,7 +574,7 @@ static int command_search(struct state* st, const char* command) {
     return 0;
   }
 
-  // run the search
+  // run the search, then delete the data (if allocated)
   MemorySearchData* search_result = ApplyMapToSearch(st->search, map, pred,
                                                      value, size);
   if (data)
@@ -533,9 +586,8 @@ static int command_search(struct state* st, const char* command) {
     return 0;
   }
 
-  // add this search to the list
-  // don't need to delete the old one - it'll be deleted by AddSearchToList if
-  // it's getting replaced
+  // add this search to the list. don't need to delete the old one here - it'll
+  // be deleted by AddSearchToList if it gets replaced by the new one
   st->search = search_result;
   AddSearchToList(st->searches, st->search);
 
@@ -546,8 +598,10 @@ static int command_search(struct state* st, const char* command) {
   return 0;
 }
 
+// write a value to all current search results
 static int command_set(struct state* st, const char* command) {
 
+  // need an open search with valid results to do this
   if (!st->search) {
     printf("no search currently open\n");
     return 0;
@@ -557,11 +611,11 @@ static int command_set(struct state* st, const char* command) {
     return 0;
   }
 
+  // read the value, matching the search type
   int64_t ivalue;
   double dvalue;
   float fvalue;
   void* datavalue = NULL;
-
   void* data;
   unsigned int size;
   if (IsIntegerSearchType(st->search->type)) {
@@ -586,9 +640,11 @@ static int command_set(struct state* st, const char* command) {
     return 0;
   }
 
+  // byteswap the value if the search is a reverse-endian type
   if (IsReverseEndianSearchType(st->search->type))
     bswap(data, size);
 
+  // write the data to each result address
   int x, error;
   for (x = 0; x < st->search->numResults; x++) {
     uint64_t addr = st->search->results[x];
@@ -598,15 +654,16 @@ static int command_set(struct state* st, const char* command) {
       printf("%016llX: failed to write data to process\n", addr);
   }
 
+  // free the data, if allocated
   if (datavalue)
     free(datavalue);
-
   return 0;
 }
 
+// close the current search or a search specified by name
 static int command_close(struct state* st, const char* command) {
 
-  // no name present? then we're deleting the current search
+  // no name present? then we're closing the current search
   if (!command[0]) {
 
     // check if there's a current search
@@ -615,14 +672,16 @@ static int command_close(struct state* st, const char* command) {
       return 0;
     }
 
-    // delete the search
+    // delete the search. if it has a name, delete it from the searches list;
+    // if not, just delete it directly (unnamed searches shouldn't be added to
+    // the searches list)
     if (st->search->name[0])
       DeleteSearchByName(st->searches, st->search->name);
     else
       DeleteSearch(st->search);
     st->search = NULL;
 
-    // name present? then delete the search by name
+  // name present? then delete the search by name
   } else {
     // if the search we're deleting is the current search, then the
     // current search should become NULL
@@ -636,8 +695,10 @@ static int command_close(struct state* st, const char* command) {
   return 0;
 }
 
+// read registers for all threads in the target process
 static int command_read_regs(struct state* st, const char* command) {
 
+  // get registers for target threads
   VMThreadState* thread_state;
   int x, error = VMGetProcessRegisters(st->pid, &thread_state);
   if (error < 0)
@@ -645,6 +706,8 @@ static int command_read_regs(struct state* st, const char* command) {
   else if (error == 0)
     printf("no threads in process\n");
   else {
+
+    // success? then print the regs for each thread
     for (x = 0; x < error; x++)
       VMPrintThreadRegisters(&thread_state[x]);
     free(thread_state);
@@ -653,6 +716,7 @@ static int command_read_regs(struct state* st, const char* command) {
   return 0;
 }
 
+// set a register value for all threads in the target process
 static int command_write_regs(struct state* st, const char* command) {
 
   // read the value and regname
@@ -679,22 +743,24 @@ static int command_write_regs(struct state* st, const char* command) {
       return 0;
     }
 
-    // print regs to write
-    for (x = 0; x < error; x++)
-      VMPrintThreadRegisters(&thread_state[x]);
-
-    // write the reg contents back to the process
+    // write the reg contents back to the process, and print the regs if\
+    // successful
     error = VMSetProcessRegisters(st->pid, thread_state, error);
     if (error)
       printf("failed to set registers; error %d\n", error);
     else
-      printf("modified thread registers\n");
+      for (x = 0; x < error; x++)
+        VMPrintThreadRegisters(&thread_state[x]);
+
+    // clean up
     free(thread_state);
   }
 
   return 0;
 }
 
+// handler for breakpoint exceptions in the target process
+// for now, just prints out the breakpoint info
 static int _breakpoint_handler(mach_port_t thread, int exception,
                                VMThreadState* state) {
 
@@ -724,9 +790,10 @@ static int _breakpoint_handler(mach_port_t thread, int exception,
   return 1; // resume
 }
 
+// set a breakpoint on a specific address
 static int command_breakpoint(struct state* st, const char* command) {
 
-  // read the value and regname
+  // read the type and size of the breakpoint
   uint64_t addr;
   int x, type = 0;
   int size = 0;
@@ -748,6 +815,8 @@ static int command_breakpoint(struct state* st, const char* command) {
     if (*command == '8')
       size = 2;
   }
+
+  // read the bp address
   sscanf(command, "%llX", &addr);
 
   // stop the task
@@ -755,15 +824,15 @@ static int command_breakpoint(struct state* st, const char* command) {
   if (!paused)
     printf("warning: failed to stop process while setting breakpoint\n");
 
-  // read the thread regs on each thread
+  // read the regs for each thread
   VMThreadState* thread_state = NULL;
   int error = VMGetProcessRegisters(st->pid, &thread_state);
   if (error <= 0) {
-    printf("failed to get dr0\n");
+    printf("failed to get target registers\n");
     goto command_breakpoint_error;
   }
 
-  // change the reg in each thread
+  // change the breakpoint address register in each thread
   for (x = 0; x < error; x++) {
     if (thread_state[x].is64)
       thread_state[x].db64.__dr0 = addr;
@@ -787,7 +856,7 @@ static int command_breakpoint(struct state* st, const char* command) {
     goto command_breakpoint_error;
   }
 
-  // change the reg in each thread
+  // change the breakpoint control reg in each thread
   // DR7 format: 33332222 11110000 -------- 33221100
   //             ^ sizetype                 ^ enable
   // sizetype = SSTT
@@ -827,11 +896,13 @@ command_breakpoint_error:
   if (thread_state)
     free(thread_state);
 
+  // resume process if it was originally paused
   if (paused)
     VMResumeProcess(st->pid);
   return 0;
 }
 
+// pause the target process
 static int command_pause(struct state* st, const char* command) {
   if (VMPauseProcess(st->pid))
     printf("process suspended\n");
@@ -840,6 +911,7 @@ static int command_pause(struct state* st, const char* command) {
   return 0;
 }
 
+// resume the target process
 static int command_resume(struct state* st, const char* command) {
   if (VMResumeProcess(st->pid))
     printf("process resumed\n");
@@ -848,6 +920,7 @@ static int command_resume(struct state* st, const char* command) {
   return 0;
 }
 
+// terminate the target process
 static int command_terminate(struct state* st, const char* command) {
   if (VMTerminateProcess(st->pid))
     printf("process terminated\n");
@@ -856,6 +929,7 @@ static int command_terminate(struct state* st, const char* command) {
   return 0;
 }
 
+// send a signal the target process
 static int command_signal(struct state* st, const char* command) {
   int sig = atoi(command);
   kill(st->pid, sig);
@@ -865,21 +939,23 @@ static int command_signal(struct state* st, const char* command) {
   return 0;
 }
 
+// attach to a different process
 static int command_attach(struct state* st, const char* command) {
 
   // if no command given, use the current process name
-  // (i.e. if program was quit & restarted)
+  // (i.e. if program was quit & restarted, its pid will probably change)
   if (!command[0])
     command = st->processname;
 
   // try to read new pid
   pid_t new_pid = atoi(command);
   if (!new_pid) {
+
     // no number? then it's a process name
     int num_results = getnamepid(command, &new_pid, 0);
     if (num_results == 0) {
       printf("warning: no processes found by name; searching commands\n");
-      num_results = getnamepid(command, &new_pid, 0);
+      num_results = getnamepid(command, &new_pid, 1);
     }
     if (num_results == 0) {
       printf("error: no processes found\n");
@@ -891,7 +967,7 @@ static int command_attach(struct state* st, const char* command) {
     }
   }
 
-  // if we can get its name, we're fine
+  // if we can get its name, we're fine - the process exists
   char new_processname[PROCESS_NAME_LENGTH] = "";
   getpidname(new_pid, new_processname, PROCESS_NAME_LENGTH);
   if (new_processname[0]) {
@@ -907,6 +983,7 @@ static int command_attach(struct state* st, const char* command) {
   return 0;
 }
 
+// exit memwatch
 static int command_quit(struct state* st, const char* command) {
   st->run = 0;
   return 0;
@@ -914,7 +991,7 @@ static int command_quit(struct state* st, const char* command) {
 
 
 
-
+// list of pointers to functions for each command
 typedef int (*command_handler)(struct state* st, const char* command);
 
 static const struct {
@@ -987,7 +1064,7 @@ int prompt_for_commands(pid_t pid) {
   st.run = 1;
   st.searches = CreateSearchList();
 
-  // first get the process name
+  // get the process name
   if (!st.pid)
     strcpy(st.processname, "KERNEL");
   else
@@ -1006,7 +1083,10 @@ int prompt_for_commands(pid_t pid) {
   char* command = NULL;
   while (st.run) {
 
-    // decide what to prompt the user with
+    // decide what to prompt the user with (include the seearch name if a search
+    // is currently open)
+    // prompt is (memwatch:<pid>/<processname>#<searchname>)
+    // or (memwatch:<pid>/<processname>)
     char* prompt;
     if (st.search) {
       prompt = (char*)malloc(30 + strlen(st.processname) +
@@ -1021,6 +1101,8 @@ int prompt_for_commands(pid_t pid) {
     // delete the old command, if present
     if (command)
       free(command);
+
+    // read a command and add it to the command history
     command = readline(prompt);
     trim_spaces(command);
     if (command && command[0])

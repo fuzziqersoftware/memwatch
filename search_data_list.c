@@ -5,7 +5,10 @@
 #include <stdio.h>
 #include "search_data_list.h"
 
+// create a list of searches
 MemorySearchDataList* CreateSearchList() {
+
+  // allocate space for the list struct and fill in initial values
   MemorySearchDataList* list = (MemorySearchDataList*)malloc(
       sizeof(MemorySearchDataList));
   if (!list)
@@ -16,6 +19,7 @@ MemorySearchDataList* CreateSearchList() {
   return list;
 }
 
+// delete a search list and all contained searches
 void DeleteSearchList(MemorySearchDataList* list) {
   int x;
   if (list->searches) {
@@ -26,11 +30,15 @@ void DeleteSearchList(MemorySearchDataList* list) {
   free(list);
 }
 
+// add a search to this list. any existing search with the same name will be
+// deleted and replaced with the new search
 int AddSearchToList(MemorySearchDataList* list, MemorySearchData* data) {
 
+  // no name? can't add it to the list
   if (!data->name || !data->name[0])
     return 0;
 
+  // see if there's a search with the same name; if so, replace it
   int x;
   for (x = 0; x < list->numSearches; x++) {
     if (!strcmp(data->name, list->searches[x]->name)) {
@@ -40,6 +48,7 @@ int AddSearchToList(MemorySearchDataList* list, MemorySearchData* data) {
     }
   }
 
+  // make room for this search in the searches list and add it to the list
   list->searches = (MemorySearchData**)realloc(list->searches,
       sizeof(MemorySearchData*) * (list->numSearches + 1));
   if (!list->searches) {
@@ -52,16 +61,20 @@ int AddSearchToList(MemorySearchDataList* list, MemorySearchData* data) {
   return 1;
 }
 
+// delete a search by name
 int DeleteSearchByName(MemorySearchDataList* list, const char* name) {
 
+  // find this search in the list by name
   int x;
   for (x = 0; x < list->numSearches; x++)
     if (!strcmp(name, list->searches[x]->name))
       break;
 
+  // not found? just return
   if (x >= list->numSearches)
     return 0;
 
+  // delete the search and remove its spot in the list
   DeleteSearch(list->searches[x]);
   list->numSearches--;
   memcpy(&list->searches[x], &list->searches[x + 1], sizeof(MemorySearchData*) *
@@ -76,6 +89,7 @@ int DeleteSearchByName(MemorySearchDataList* list, const char* name) {
   return 1;
 }
 
+// find a search by name
 MemorySearchData* GetSearchByName(MemorySearchDataList* list,
                                   const char* name) {
 
@@ -87,6 +101,7 @@ MemorySearchData* GetSearchByName(MemorySearchDataList* list,
   return NULL;
 }
 
+// print a list of the searches in this list
 void PrintSearches(MemorySearchDataList* list) {
 
   int x;

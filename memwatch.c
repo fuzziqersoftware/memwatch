@@ -11,12 +11,12 @@
 #include "memory_search.h"
 #include "parse_utils.h"
 
+int use_color = 1;
+
 // signal handler for ctrl+c: cancel operations first; if there are none to
 // cancel, then quit
 
 int* cancel_var = NULL;
-int use_color = 1;
-
 int recent_cancel = 0;
 int recent_cancel_count = 0;
 
@@ -41,9 +41,8 @@ void sigint(int signum) {
   }
 }
 
-// callbacks for process enumaration
-
 // prints the process pid and name
+// called bu enumprocesses, where invoked below
 int print_process(pid_t pid, const char* proc, void* param) {
   printf("%6u - %s\n", pid, proc);
   return 0;
@@ -54,6 +53,8 @@ int main(int argc, char* argv[]) {
 
   // hello there
   printf("fuzziqer software memwatch\n\n");
+
+  // install our ctrl+c handler
   signal(SIGINT, sigint);
 
   // only a few variables
@@ -70,7 +71,7 @@ int main(int argc, char* argv[]) {
   int x;
   for (x = 1; x < argc; x++) {
 
-    // -c, --no-color: don't use colors in terminal
+    // -c, --no-color: don't use colors in terminal output
     if (!strcmp(argv[x], "-c") || !strcmp(argv[x], "--no-color"))
       use_color = 0;
 
@@ -96,7 +97,8 @@ int main(int argc, char* argv[]) {
 
     // all subsequent non-dash params: unnecessary parameters
     } else {
-      // TODO: maybe someday we could take commands on the command line
+      // TODO: maybe someday we could take commands on the command line, then
+      // run them immediately
       printf("warning: ignored excess argument: %s\n", argv[x]);
     }
   }
@@ -106,6 +108,16 @@ int main(int argc, char* argv[]) {
   if (!strcmp(processname, "KERNEL")) {
     pid = 0;
     operate_on_kernel = 1;
+  }
+
+  // listing processes or commands?
+  if (list_procs) {
+    enumprocesses(print_process, NULL, 0);
+    return 0;
+  }
+  if (list_commands) {
+    enumprocesses(print_process, NULL, 1);
+    return 0;
   }
 
   // find pid for process name
@@ -125,16 +137,6 @@ int main(int argc, char* argv[]) {
       printf("multiple processes found\n");
       return 0;
     }
-  }
-
-  // listing processes or commands?
-  if (list_procs) {
-    enumprocesses(print_process, NULL, 0);
-    return 0;
-  }
-  if (list_commands) {
-    enumprocesses(print_process, NULL, 1);
-    return 0;
   }
 
   // pid missing?

@@ -10,12 +10,21 @@
 #include "freeze_region.h"
 #include "parse_utils.h"
 
+// thread object for the freezer thread
 static pthread_t _freezeThread;
+
+// lock that protects the list of frozen regions
 static pthread_mutex_t _mutex;
+
+// set to 1 when freezer is shutting down
 static int _freezerClosing = 0;
+
+// list of frozen regions
 static int _numFrozenRegions = 0;
 static FrozenRegion* _frozen = NULL;
 
+// freezer routine. repeatedly writes data to processes based on the frozen
+// region list, until told to stop via _freezerClosing.
 static void* _freeze_thread_routine(void* data) {
 
   int x;
@@ -39,7 +48,7 @@ int InitRegionFreezer() {
   // create the frozen-region mutex
   pthread_mutex_init(&_mutex, NULL);
 
-  // create the writer thread
+  // create the freezer thread
   if (pthread_create(&_freezeThread, NULL, _freeze_thread_routine, NULL))
     return 3;
 
@@ -143,16 +152,23 @@ int UnfreezeRegionByIndex(int index) {
 // returns an error code, or 0 on success
 int UnfreezeRegionByAddr(mach_vm_address_t addr) {
 
-  // lock, find region by addr, delete, and unlock
+  // lock the region list
   int x, rv = 0;
   pthread_mutex_lock(&_mutex);
+
+  // find region by address
   for (x = 0; x < _numFrozenRegions; x++)
     if (_frozen[x].addr == addr)
       break;
+
+  // found it? then delete it from the list
+  // didn't find it? return 1
   if (x < _numFrozenRegions)
     rv = _UnfreezeRegionByIndexUnlocked(x);
   else
     rv = 1; // no such region
+
+  // unlock the region list & return
   pthread_mutex_unlock(&_mutex);
   return rv;
 }
@@ -161,9 +177,12 @@ int UnfreezeRegionByAddr(mach_vm_address_t addr) {
 // returns the number of regions unfrozen
 int UnfreezeRegionByName(const char* name) {
 
-  // lock, find region by name, delete, and unlock
+  // lock the region list
   int x, rv = 0;
   pthread_mutex_lock(&_mutex);
+
+  // find and unlock regions by name. unlike other unlock functions, return the
+  // number of regions unfrozen
   for (x = 0; x < _numFrozenRegions; x++) {
     if (!strcmp(_frozen[x].name, name)) {
       if (!_UnfreezeRegionByIndexUnlocked(x)) {
@@ -172,6 +191,8 @@ int UnfreezeRegionByName(const char* name) {
       }
     }
   }
+
+  // unlock the region list and return
   pthread_mutex_unlock(&_mutex);
   return rv;
 }
@@ -186,9 +207,11 @@ void MoveFrozenRegionsToProcess(pid_t pid) {
 // prints the list of frozen regions
 void PrintFrozenRegions(int printData) {
 
-  // lock, print, unlock
+  // lock the region list
   int x;
   pthread_mutex_lock(&_mutex);
+
+  // if there are any frozen regions, print a list of them
   if (_numFrozenRegions > 0) {
     printf("frozen regions:\n");
     for (x = 0; x < _numFrozenRegions; x++) {
@@ -199,7 +222,10 @@ void PrintFrozenRegions(int printData) {
         CRYPT_PrintData(_frozen[x].addr, _frozen[x].data, NULL, _frozen[x].size,
                         0);
     }
+  // if there are no frozen regions, too bad :(
   } else
     printf("no regions frozen\n");
+
+  // unlock the region list
   pthread_mutex_unlock(&_mutex);  
 }

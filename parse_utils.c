@@ -12,6 +12,7 @@
 
 extern int use_color;
 
+// outputs control characters to the console to change color/formatting
 void change_color(int color, ...) {
 
   char fmt[0x40] = "\033";
@@ -33,7 +34,7 @@ void change_color(int color, ...) {
   printf("%s", fmt);
 }
 
-// prints data! wheeee
+// prints data in a hex/ascii view to the console
 void CRYPT_PrintData(unsigned long long address, const void* ds,
     const void* diff, unsigned long long data_size, int flags) {
 
@@ -100,6 +101,26 @@ void CRYPT_PrintData(unsigned long long address, const void* ds,
       change_color(FORMAT_NORMAL, FORMAT_END);
   }
   printf("\n");
+}
+
+// reads an unsigned long long from the input string. defaults to decimal, but
+// reads hex if the number is prefixed with "0x".
+// reads binary  if the number is prefixed with "0b".
+// returns 0 if an error occurred
+int parse_ull(const char* in, unsigned long long* value, int default_hex) {
+  if ((in[0] == '0') && ((in[1] == 'x') || (in[1] == 'X')))
+    return sscanf(&in[2], "%llx", value);
+  if ((in[0] == '0') && ((in[1] == 'b') || (in[1] == 'B'))) {
+    *value = 0;
+    in += 2;
+    while (in[0] == '1' || in[0] == '2') {
+      *value <<= 1;
+      if (in[0] == 1)
+        *value |= 1;
+    }
+    return 1;
+  }
+  return sscanf(in, default_hex ? "%llx" : "%llu", value);
 }
 
 // macros used by read_stream_data to append to a buffer
@@ -188,6 +209,7 @@ unsigned long long read_string_data(const char* in, void** vdata) {
       else write_2byte(in[0], 0);
       in++;
     } else if (in[0] == '#') { // 8-bit
+      unsigned long long value;
       in++;
       if (in[0] == '#') { // 16-bit
         in++;
@@ -196,18 +218,21 @@ unsigned long long read_string_data(const char* in, void** vdata) {
           if (in[0] == '#') { // 64-bit
             in++;
             expand(8);
-            sscanf(in, "%lld", (long long*)(&((*data)[size - 8])));
+            parse_ull(in, (unsigned long long*)(&((*data)[size - 8])), 0);
           } else {
             expand(4);
-            sscanf(in, "%ld", (long*)(&((*data)[size - 4])));
+            parse_ull(in, &value, 0);
+            *(int32_t*)(&((*data)[size - 4])) = value;
           }
         } else {
           expand(2);
-          sscanf(in, "%hd", (short*)(&((*data)[size - 2])));
+          parse_ull(in, &value, 0);
+          *(int16_t*)(&((*data)[size - 2])) = value;
         }
       } else {
         expand(1);
-        sscanf(in, "%hhd", (char*)(&((*data)[size - 1])));
+        parse_ull(in, &value, 0);
+        *(int8_t*)(&((*data)[size - 1])) = value;
       }
       if (in[0] == '-')
         in++;
@@ -242,15 +267,7 @@ unsigned long long read_string_data(const char* in, void** vdata) {
   return size;
 }
 
-// reads an unsigned long long from the input file
-// returns 0 if an error occurred
-int parse_ull(const char* in, unsigned long long* value, int default_hex) {
-  if ((in[0] == '0') && ((in[1] == 'x') || (in[1] == 'X')))
-    return sscanf(&in[2], "%llx", value);
-  return sscanf(in, default_hex ? "%llx" : "%llu", value);
-}
-
-// reads a string from the given stream. return value must be free'd later
+// reads a string from the given stream. return value must be free'd later.
 char* read_string_delimited(FILE* in, char delimiter, int consume_delim) {
   char* string = NULL;
   int len = 0;
@@ -274,7 +291,7 @@ void trim_spaces(char* string) {
   strcpy(string, &string[x]);
 }
 
-// finds the end of the word, returns a pointer to the first word after
+// finds the end of the word, returns a pointer to the first word after it
 const char* skip_word(const char* in, char delim) {
   if (!in)
     return NULL;

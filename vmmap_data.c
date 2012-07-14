@@ -37,7 +37,7 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
 
     // alloc space for this region's metadata in the map
     map = (VMRegionDataMap*)realloc(map, sizeof(VMRegionDataMap) +
-                                    sizeof(VMRegionData) * (map->numRegions + 1));
+                                  sizeof(VMRegionData) * (map->numRegions + 1));
     if (!map) {
       cancel_var = NULL;
       return NULL;
