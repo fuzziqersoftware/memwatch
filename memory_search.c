@@ -67,7 +67,7 @@ static int command_help(struct state* st, const char* command) {
 "  [del]ete <addr1> [addr2]  delete result at addr1, or between addr1 and addr2\n"
 "freeze commands:\n"
 "  [f]reeze <addr> <data>    freeze data in memory\n"
-"  [f]reeze \"<nm>\" <ad> <dt> freeze data in memory, with given name\n"
+"  [f]reeze \"<name>\" <addr> <data> freeze data in memory, with given name\n"
 "  [u]nfreeze                list frozen regions\n"
 "  [u]nfreeze <index>        unfreeze frozen region by index\n"
 "  [u]nfreeze <address>      unfreeze frozen region by address\n"
@@ -743,7 +743,7 @@ static int command_write_regs(struct state* st, const char* command) {
       return 0;
     }
 
-    // write the reg contents back to the process, and print the regs if\
+    // write the reg contents back to the process, and print the regs if
     // successful
     error = VMSetProcessRegisters(st->pid, thread_state, error);
     if (error)

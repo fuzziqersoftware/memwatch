@@ -9,6 +9,7 @@
 #include <ctype.h>
 
 #include "parse_utils.h"
+#include "search_data.h" // TODO: move bswap somewhere more accessible
 
 extern int use_color;
 
@@ -198,17 +199,27 @@ unsigned long long read_string_data(const char* in, void** vdata) {
   int chr = 0;
   int read, string = 0, unicodestring = 0, high = 1;
   unsigned long size = 0;
+  int endian = 0;
   while (in[0]) {
     read = 0;
     if (string) {
-      if (in[0] == '\"') string = 0;
-      else write_byte(in[0]);
+      if (in[0] == '\"')
+        string = 0;
+      else
+        write_byte(in[0]);
       in++;
     } else if (unicodestring) {
-      if (in[0] == '\'') unicodestring = 0;
-      else write_2byte(in[0], 0);
+      if (in[0] == '\'')
+        unicodestring = 0;
+      else {
+        write_2byte(in[0], 0);
+        if (endian)
+          bswap(&(*data)[size - 2], 2);
+      }
       in++;
-    } else if (in[0] == '#') { // 8-bit
+    } else if (in[0] == '$')
+      endian = !endian;
+    else if (in[0] == '#') { // 8-bit
       unsigned long long value;
       in++;
       if (in[0] == '#') { // 16-bit
@@ -219,14 +230,20 @@ unsigned long long read_string_data(const char* in, void** vdata) {
             in++;
             expand(8);
             parse_ull(in, (unsigned long long*)(&((*data)[size - 8])), 0);
+            if (endian)
+              bswap(&((*data)[size - 8]), 8);
           } else {
             expand(4);
             parse_ull(in, &value, 0);
+            if (endian)
+              bswap(&value, 4);
             *(int32_t*)(&((*data)[size - 4])) = value;
           }
         } else {
           expand(2);
           parse_ull(in, &value, 0);
+          if (endian)
+            bswap(&value, 2);
           *(int16_t*)(&((*data)[size - 2])) = value;
         }
       } else {
@@ -251,8 +268,10 @@ unsigned long long read_string_data(const char* in, void** vdata) {
         read = 1;
         chr |= (in[0] - 'a' + 0x0A);
       }
-      if (in[0] == '\"') string = 1;
-      if (in[0] == '\'') unicodestring = 1;
+      if (in[0] == '\"')
+        string = 1;
+      if (in[0] == '\'')
+        unicodestring = 1;
       in++;
     }
     if (read) {
