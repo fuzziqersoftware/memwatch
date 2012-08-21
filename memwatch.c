@@ -62,6 +62,7 @@ int main(int argc, char* argv[]) {
   int list_procs = 0;
   int list_commands = 0;
   int showflags = 0;
+  int freeze_while_operating = 0;
   char processname[PROCESS_NAME_LENGTH] = {0};
 
   /*int num_commands = 0;
@@ -74,6 +75,10 @@ int main(int argc, char* argv[]) {
     // -c, --no-color: don't use colors in terminal output
     if (!strcmp(argv[x], "-c") || !strcmp(argv[x], "--no-color"))
       use_color = 0;
+
+    // -f, --freeze-while-operating: freeze target while operating on it
+    if (!strcmp(argv[x], "-f") || !strcmp(argv[x], "--freeze-while-operating"))
+      freeze_while_operating = 1;
 
     // -s, --showflags: determine how to display data
     else if (!strncmp(argv[x], "-s", 2))
@@ -154,5 +159,5 @@ int main(int argc, char* argv[]) {
     printf("warning: memwatch likely will not work if not run as root\n");
 
   // finally, enter interactive interface
-  return prompt_for_commands(pid);
+  return prompt_for_commands(pid, freeze_while_operating);
 }

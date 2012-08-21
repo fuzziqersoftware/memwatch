@@ -10,6 +10,6 @@
 
 #include "vmmap.h"
 
-int prompt_for_commands(pid_t pid);
+int prompt_for_commands(pid_t pid, int freeze_while_operating);
 
 #endif // MEMORY_SEARCH_H

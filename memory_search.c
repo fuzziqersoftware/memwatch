@@ -32,6 +32,7 @@ extern int* cancel_var;
 struct state {
   pid_t pid; // process id of the process that's being operated on
   char processname[PROCESS_NAME_LENGTH]; // name of that process
+  int freeze_while_operating;
   int run; // set to 0 to exit the memory search interface
   MemorySearchDataList* searches; // list of open searches
   MemorySearchData* search; // the current search
@@ -134,12 +135,18 @@ static int command_help(struct state* st, const char* command) {
 // list regions of memory in the target process
 static int command_list(struct state* st, const char* command) {
 
+  if (st->freeze_while_operating)
+    VMPauseProcess(st->pid);
+
   // get the list
   VMRegionDataMap* map = GetProcessRegionList(st->pid, 0);
   if (!map) {
     printf("get process region list failed\n");
     return 0;
   }
+
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
 
   // print it out and delete it, then return
   print_region_map(map);
@@ -150,12 +157,18 @@ static int command_list(struct state* st, const char* command) {
 // take a snapshot of the target process' memory and save it to disk
 static int command_dump(struct state* st, const char* command) {
 
+  if (st->freeze_while_operating)
+    VMPauseProcess(st->pid);
+
   // dump memory
   VMRegionDataMap* map = DumpProcessMemory(st->pid, 0);
   if (!map) {
     printf("memory dump failed\n");
     return 0;
   }
+
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
 
   // save each region's data with the given filename prefix
   if (command[0]) {
@@ -203,12 +216,18 @@ static int command_dump(struct state* st, const char* command) {
 // find the given data in the target's memory
 static int command_find(struct state* st, const char* command) {
 
+  if (st->freeze_while_operating)
+    VMPauseProcess(st->pid);
+
   // take a snapshot of the target's memory
   VMRegionDataMap* map = DumpProcessMemory(st->pid, 0);
   if (!map) {
     printf("memory dump failed\n");
     return 0;
   }
+
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
 
   // read the «search string from the command
   void* data;
@@ -292,11 +311,18 @@ static int command_read(struct state* st, const char* command) {
   int error, times = 0;
   cancel_var = &cont;
   do {
+    if (st->freeze_while_operating)
+      VMPauseProcess(st->pid);
+
     if ((error = VMReadBytes(st->pid, addr, read_data, &size)))
       print_process_data(st->processname, addr, read_data,
                          times ? read_data_prev : NULL, size);
     else
       printf("failed to read data from process\n");
+
+    if (st->freeze_while_operating)
+      VMResumeProcess(st->pid);
+
     if (cont)
       usleep(1000000); // wait a second, if the read is repeating
 
@@ -325,12 +351,18 @@ static int command_write(struct state* st, const char* command) {
   sscanf(command, "%llX", &addr);
   size = read_string_data(skip_word(command, ' '), &data);
 
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
+
   // write the data to the target's memory
   int error;
   if ((error = VMWriteBytes(st->pid, addr, data, size)))
     printf("wrote %llu (0x%llX) bytes\n", size, size);
   else
     printf("failed to write data to process\n");
+
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
 
   // clean up & return
   free(data);
@@ -344,8 +376,14 @@ static int command_write_file(struct state* st, const char* command) {
   uint64_t addr;
   sscanf(command, "%llX", &addr);
 
+  if (st->freeze_while_operating)
+    VMPauseProcess(st->pid);
+
   // write the file
   write_file_to_process(skip_word(command, ' '), 0, st->pid, addr);
+
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
 
   return 0;
 }
@@ -566,6 +604,9 @@ static int command_search(struct state* st, const char* command) {
     }
   }
 
+  if (st->freeze_while_operating)
+    VMPauseProcess(st->pid);
+
   // take a snapshot of the target's memory
   VMRegionDataMap* map = DumpProcessMemory(st->pid,
       st->search->searchflags & SEARCHFLAG_ALLMEMORY ? 0 : VMREGION_WRITABLE);
@@ -573,6 +614,9 @@ static int command_search(struct state* st, const char* command) {
     printf("memory dump failed\n");
     return 0;
   }
+
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
 
   // run the search, then delete the data (if allocated)
   MemorySearchData* search_result = ApplyMapToSearch(st->search, map, pred,
@@ -644,6 +688,9 @@ static int command_set(struct state* st, const char* command) {
   if (IsReverseEndianSearchType(st->search->type))
     bswap(data, size);
 
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
+
   // write the data to each result address
   int x, error;
   for (x = 0; x < st->search->numResults; x++) {
@@ -653,6 +700,9 @@ static int command_set(struct state* st, const char* command) {
     else
       printf("%016llX: failed to write data to process\n", addr);
   }
+
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
 
   // free the data, if allocated
   if (datavalue)
@@ -698,6 +748,9 @@ static int command_close(struct state* st, const char* command) {
 // read registers for all threads in the target process
 static int command_read_regs(struct state* st, const char* command) {
 
+  if (st->freeze_while_operating)
+    VMPauseProcess(st->pid);
+
   // get registers for target threads
   VMThreadState* thread_state;
   int x, error = VMGetProcessRegisters(st->pid, &thread_state);
@@ -713,6 +766,9 @@ static int command_read_regs(struct state* st, const char* command) {
     free(thread_state);
   }
 
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
+
   return 0;
 }
 
@@ -723,6 +779,9 @@ static int command_write_regs(struct state* st, const char* command) {
   uint64_t regvalue = 0;
   sscanf(command, "%llX", &regvalue);
   command = skip_word(command, ' ');
+
+  if (st->freeze_while_operating)
+    VMPauseProcess(st->pid);
 
   // read the thread regs on each thread
   VMThreadState* thread_state;
@@ -740,6 +799,8 @@ static int command_write_regs(struct state* st, const char* command) {
     if (x < error) {
       free(thread_state);
       printf("invalid register name\n");
+      if (st->freeze_while_operating)
+        VMResumeProcess(st->pid);
       return 0;
     }
 
@@ -755,6 +816,9 @@ static int command_write_regs(struct state* st, const char* command) {
     // clean up
     free(thread_state);
   }
+
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
 
   return 0;
 }
@@ -1055,7 +1119,7 @@ static const struct {
 
 
 // memory searching user interface!
-int prompt_for_commands(pid_t pid) {
+int prompt_for_commands(pid_t pid, int freeze_while_operating) {
 
   // construct the initial state
   struct state st;
@@ -1063,6 +1127,7 @@ int prompt_for_commands(pid_t pid) {
   st.pid = pid;
   st.run = 1;
   st.searches = CreateSearchList();
+  st.freeze_while_operating = freeze_while_operating;
 
   // get the process name
   if (!st.pid)
