@@ -391,6 +391,7 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
     int currentRegionS = 0;
     int currentRegionN = 0;
     int cont = 1;
+    int numOutsideRegions = 0, numInsideBadRegions = 0;
     cancel_var = &cont;
     for (x = 0; cont && (x < n->numResults); x++) {
 
@@ -414,6 +415,16 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
           currentRegionS >= s->memory->numRegions ||
           s->memory->regions[currentRegionS].region._address > n->results[x]) {
         n->results[x] = 0;
+        numOutsideRegions++;
+        continue;
+      }
+
+      // now the current result is within the current region - but if the
+      // current region has no data (couldn't be read for some reason?) then
+      // we'll have to delete this result
+      if (!n->memory->regions[currentRegionN].data) {
+        n->results[x] = 0;
+        numInsideBadRegions++;
         continue;
       }
 
@@ -445,7 +456,11 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
       DeleteSearch(n);
       return NULL;
     }
-    
+
+    // if there were problems, print them out
+    if (numOutsideRegions || numInsideBadRegions)
+      printf("warning: some results (%d) deleted due to memory read errors\n",
+             numOutsideRegions + numInsideBadRegions);
   }
 
   // save the prev size and return
