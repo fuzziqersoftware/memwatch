@@ -824,7 +824,7 @@ static int command_write_regs(struct state* st, const char* command) {
 }
 
 // handler for breakpoint exceptions in the target process
-// for now, just prints out the breakpoint info
+// for now, just prints out the breakpoint info and clears dr7
 static int _breakpoint_handler(mach_port_t thread, int exception,
                                VMThreadState* state) {
 
@@ -850,6 +850,28 @@ static int _breakpoint_handler(mach_port_t thread, int exception,
   printf("  type: %s\n", type);
 
   VMPrintThreadRegisters(state);
+
+  // read the regs for each thread
+  VMThreadState* thread_state = NULL;
+  int error = VMGetProcessRegisters(st->pid, &thread_state);
+  if (error <= 0)
+    printf("warning: failed to get target registers\n");
+  else {
+
+    // change the breakpoint address register in each thread
+    for (x = 0; x < error; x++) {
+      if (thread_state[x].is64)
+        thread_state[x].db64.__dr7 &= 0xFFFFFFFFFFF0FFFC;
+      else
+        thread_state[x].db32.__dr7 &= 0xFFF0FFFC;
+    }
+
+    // write the reg contents back to the process
+    error = VMSetProcessRegisters(st->pid, thread_state, error);
+    if (error)
+      printf("warning: failed to clear dr7\n");
+    free(thread_state);
+  }
 
   return 1; // resume
 }
@@ -943,6 +965,8 @@ static int command_breakpoint(struct state* st, const char* command) {
     goto command_breakpoint_error;
   }
 
+  printf("waiting for breakpoint\n");
+
   // wait for the breakpoint
   error = VMWaitForBreakpoint(st->pid, _breakpoint_handler);
   if (error) {
@@ -954,8 +978,6 @@ static int command_breakpoint(struct state* st, const char* command) {
   if (0) {
 command_breakpoint_error:
     printf("failed to set breakpoint; error %d\n", error);
-  } else {
-    printf("breakpoint set\n");
   }
   if (thread_state)
     free(thread_state);
