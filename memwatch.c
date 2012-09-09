@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
   int list_procs = 0;
   int list_commands = 0;
   int showflags = 0;
-  int freeze_while_operating = 0;
+  int freeze_while_operating = 1;
   char processname[PROCESS_NAME_LENGTH] = {0};
 
   /*int num_commands = 0;
@@ -76,9 +76,9 @@ int main(int argc, char* argv[]) {
     if (!strcmp(argv[x], "-c") || !strcmp(argv[x], "--no-color"))
       use_color = 0;
 
-    // -f, --freeze-while-operating: freeze target while operating on it
-    if (!strcmp(argv[x], "-f") || !strcmp(argv[x], "--freeze-while-operating"))
-      freeze_while_operating = 1;
+    // -f, --no-freeze: don't freeze target while operating on it
+    if (!strcmp(argv[x], "-f") || !strcmp(argv[x], "--no-freeze"))
+      freeze_while_operating = 0;
 
     // -s, --showflags: determine how to display data
     else if (!strncmp(argv[x], "-s", 2))
