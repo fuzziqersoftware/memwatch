@@ -523,8 +523,64 @@ static int command_results(struct state* st, const char* command) {
 
   // print the results!
   int x;
-  for (x = 0; x < st->search->numResults; x++)
-    printf("%016llX\n", st->search->results[x]);
+  if (st->search->type == SEARCHTYPE_DATA) {
+    for (x = 0; x < st->search->numResults; x++)
+      printf("%016llX\n", st->search->results[x]);
+  } else {
+    mach_vm_size_t size = SearchDataSize(st->search->type);
+    void* data = malloc(size);
+    for (x = 0; x < st->search->numResults; x++) {
+      printf("%016llX ", st->search->results[x]);
+      if (!VMReadBytes(st->pid, st->search->results[x], data, &size))
+        printf("<< memory not readable >>\n");
+      else {
+        if (IsReverseEndianSearchType(st->search->type))
+          bswap(data, size);
+        switch (st->search->type) {
+          case SEARCHTYPE_UINT8:
+            printf("%hhu (0x%02hhX)\n", *(uint8_t*)data, *(uint8_t*)data);
+            break;
+          case SEARCHTYPE_UINT16:
+          case SEARCHTYPE_UINT16_LE:
+            printf("%hu (0x%04hX)\n", *(uint16_t*)data, *(uint16_t*)data);
+            break;
+          case SEARCHTYPE_UINT32:
+          case SEARCHTYPE_UINT32_LE:
+            printf("%u (0x%08X)\n", *(uint32_t*)data, *(uint32_t*)data);
+            break;
+          case SEARCHTYPE_UINT64:
+          case SEARCHTYPE_UINT64_LE:
+            printf("%llu (0x%016llX)\n", *(uint64_t*)data, *(uint64_t*)data);
+            break;
+          case SEARCHTYPE_INT8:
+            printf("%hhd (0x%02hhX)\n", *(int8_t*)data, *(uint8_t*)data);
+            break;
+          case SEARCHTYPE_INT16:
+          case SEARCHTYPE_INT16_LE:
+            printf("%hd (0x%04hX)\n", *(int16_t*)data, *(uint16_t*)data);
+            break;
+          case SEARCHTYPE_INT32:
+          case SEARCHTYPE_INT32_LE:
+            printf("%d (0x%08X)\n", *(int32_t*)data, *(uint32_t*)data);
+            break;
+          case SEARCHTYPE_INT64:
+          case SEARCHTYPE_INT64_LE:
+            printf("%lld (0x%016llX)\n", *(int64_t*)data, *(uint64_t*)data);
+            break;
+          case SEARCHTYPE_FLOAT:
+          case SEARCHTYPE_FLOAT_LE:
+            printf("%f (0x%08X)\n", *(float*)data, *(uint32_t*)data);
+            break;
+          case SEARCHTYPE_DOUBLE:
+          case SEARCHTYPE_DOUBLE_LE:
+            printf("%lf (0x%016llX)\n", *(double*)data, *(uint64_t*)data);
+            break;
+        }
+      }
+    }
+    if (data)
+      free(data);
+  }
   printf("results: %lld\n", st->search->numResults);
 
   return 0;
