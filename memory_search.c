@@ -908,7 +908,7 @@ static int _breakpoint_handler(mach_port_t thread, int exception,
   VMPrintThreadRegisters(state);
 
   // read the regs for each thread
-  VMThreadState* thread_state = NULL;
+  /*VMThreadState* thread_state = NULL;
   int error = VMGetProcessRegisters(st->pid, &thread_state);
   if (error <= 0)
     printf("warning: failed to get target registers\n");
@@ -927,7 +927,7 @@ static int _breakpoint_handler(mach_port_t thread, int exception,
     if (error)
       printf("warning: failed to clear dr7\n");
     free(thread_state);
-  }
+  } */
 
   return 1; // resume
 }
