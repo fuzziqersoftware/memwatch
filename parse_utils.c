@@ -131,64 +131,9 @@ int parse_ull(const char* in, unsigned long long* value, int default_hex) {
 #define write_byte(x) \
   { expand(1); \
   (*data)[size - 1] = x; }
-#define write_2byte(x, y) \
+#define write_short(x) \
   { expand(2); \
-  (*data)[size - 2] = x; \
-  (*data)[size - 1] = y; }
-
-// like read_string_data, but reads from a given stream, ending on a \n
-/* TODO: this function doesn't implement the #/##/###/#### convention used by
- * read_string_data. if uncommenting, implement this functionality!
-
-unsigned long long read_stream_data(FILE* in, void** vdata) {
-
-  *vdata = NULL;
-  unsigned char** data = (unsigned char**)vdata;
-
-  int in_ch, chr = 0;
-  int read, string = 0, unicodestring = 0, high = 1;
-  unsigned long size = 0;
-  while ((in_ch = fgetc(in)) != EOF) {
-    read = 0;
-    if (string) {
-      if (in_ch == '\"') string = 0;
-      else write_byte(in_ch);
-    } else if (unicodestring) {
-      if (in_ch == '\'') unicodestring = 0;
-      else write_2byte(in_ch, 0);
-    } else if (in_ch == '\n') {
-      ungetc('\n', stdin);
-      break;
-    } else if (in_ch == '#') {
-      expand(4);
-      fscanf(in, "%ld", (long*)(&((*data)[size - 4])));
-    } else {
-      if ((in_ch >= '0') && (in_ch <= '9')) {
-        read = 1;
-        chr |= (in_ch - '0');
-      }
-      if ((in_ch >= 'A') && (in_ch <= 'F')) {
-        read = 1;
-        chr |= (in_ch - 'A' + 0x0A);
-      }
-      if ((in_ch >= 'a') && (in_ch <= 'f')) {
-        read = 1;
-        chr |= (in_ch - 'a' + 0x0A);
-      }
-      if (in_ch == '\"') string = 1;
-      if (in_ch == '\'') unicodestring = 1;
-    }
-    if (read) {
-      if (high) chr = chr << 4;
-      else {
-        write_byte(chr);
-        chr = 0;
-      }
-      high = !high;
-    }
-  }
-  return size;
-} */
+  *(uint16_t*)(*data + size - 2) = x; }
 
 // like read_stream_data, but stops at the end of the string
 unsigned long long read_string_data(const char* in, void** vdata) {
@@ -196,29 +141,91 @@ unsigned long long read_string_data(const char* in, void** vdata) {
   *vdata = NULL;
   unsigned char** data = (unsigned char**)vdata;
   
-  int chr = 0;
-  int read, string = 0, unicodestring = 0, high = 1;
+  int read, chr = 0;
+  int string = 0, unicodestring = 0, high = 1;
+  int filename = 0, filename_start, filesize;
   unsigned long size = 0;
   int endian = 0;
   while (in[0]) {
     read = 0;
+
+    // if between quotes, read bytes to output buffer, unescaping
     if (string) {
       if (in[0] == '\"')
         string = 0;
-      else
+      else if (in[0] == '\\') { // unescape char after a backslash
+        if (!in[1])
+          return size;
+        if (in[1] == 'n') {
+          write_byte('\n');
+        } else if (in[1] == 'r') {
+          write_byte('\r');
+        } else if (in[1] == 't') {
+          write_byte('\t');
+        } else {
+          write_byte(in[1]);
+        }
+        in++;
+      } else
         write_byte(in[0]);
       in++;
+
+    // if between single quotes, word-expand bytes to output buffer, unescaping
     } else if (unicodestring) {
       if (in[0] == '\'')
         unicodestring = 0;
-      else {
-        write_2byte(in[0], 0);
+      else if (in[0] == '\\') { // unescape char after a backslash
+        if (!in[1])
+          return size;
+        if (in[1] == 'n') {
+          write_short('\n');
+        } else if (in[1] == 'r') {
+          write_short('\r');
+        } else if (in[1] == 't') {
+          write_short('\t');
+        } else {
+          write_short(in[1]);
+        }
+        if (endian)
+          bswap(&(*data)[size - 2], 2);
+        in++;
+      } else {
+        write_short(in[0]);
         if (endian)
           bswap(&(*data)[size - 2], 2);
       }
       in++;
+
+    // if between <>, read a file name, then stick that file into the buffer
+    } else if (filename) {
+      if (in[0] == '>') {
+        filename = 0;
+        write_byte(0); // null-terminate the filename
+        // TODO: support <filename@offset> syntax
+
+        // open the file, read it into the buffer, close the file
+        FILE* f = fopen((char*)(*data + filename_start), "rb");
+        if (!f) {
+          if (data)
+            free(data);
+          return 0;
+        }
+        fseek(f, 0, SEEK_END);
+        filesize = ftell(f);
+        size = filename_start + filesize;
+        *data = realloc(*data, size);
+        fseek(f, 0, SEEK_SET);
+        fread((*data + filename_start), 1, filesize, f);
+        fclose(f);
+      } else
+        write_byte(in[0]);
+      in++;
+
+    // $ changes the endian-ness
     } else if (in[0] == '$')
       endian = !endian;
+
+    // # signifies a decimal number
     else if (in[0] == '#') { // 8-bit
       unsigned long long value;
       in++;
@@ -255,6 +262,8 @@ unsigned long long read_string_data(const char* in, void** vdata) {
         in++;
       while (isdigit(in[0]))
         in++;
+
+    // anything else is a hex digit
     } else {
       if ((in[0] >= '0') && (in[0] <= '9')) {
         read = 1;
@@ -272,10 +281,16 @@ unsigned long long read_string_data(const char* in, void** vdata) {
         string = 1;
       if (in[0] == '\'')
         unicodestring = 1;
+      if (in[0] == '<') {
+        filename = 1;
+        filename_start = size;
+      }
       in++;
     }
+
     if (read) {
-      if (high) chr = chr << 4;
+      if (high)
+        chr = chr << 4;
       else {
         write_byte(chr);
         chr = 0;

@@ -21,7 +21,6 @@
 #include "memory_search.h"
 
 // TODO: undoing searches
-// TODO: fix file writing to memory
 
 // this variable is set to 1 by the main thread when the user presses CTRL+C;
 // if this happens, the current operation should cancel itself
@@ -49,10 +48,9 @@ static int command_help(struct state* st, const char* command) {
 "  [l]ist                    list memory regions\n"
 "  [d]ump                    dump memory\n"
 "  [d]ump <filename>         dump memory regions to <filename>_<addr> files\n"
-"  [r]ead <addr+size>        read from memory\n"
+"  [r]ead <addr+size> [file] read from memory\n"
 "  [r]ead !<addr+size>       read from memory every second (ctrl+c to stop)\n"
 "  [w]rite <addr> <data>     write to memory\n"
-"  wfile <addr> <filename>   write file to memory\n"
 "search commands:\n"
 "  [fi]nd <data>             find occurrences of data\n"
 "  [o]pen                    show previous named searches\n"
@@ -287,10 +285,12 @@ static int command_read(struct state* st, const char* command) {
 
   // read addr/size from the command
   uint64_t addr, size;
-  if (!read_addr_size(command, &addr, &size)) {
+  int addrsize_read_result = read_addr_size(command, &addr, &size);
+  if (!addrsize_read_result) {
     printf("invalid command format\n");
     return 0;
   }
+  command += addrsize_read_result;
 
   // allocate a local read buffer, and a buffer for the previous data if we're
   // repeating the read
@@ -313,11 +313,21 @@ static int command_read(struct state* st, const char* command) {
     if (st->freeze_while_operating)
       VMPauseProcess(st->pid);
 
-    if ((error = VMReadBytes(st->pid, addr, read_data, &size)))
-      print_process_data(st->processname, addr, read_data,
-                         times ? read_data_prev : NULL, size);
-    else
+    if (!(error = VMReadBytes(st->pid, addr, read_data, &size)))
       printf("failed to read data from process\n");
+    else {
+      if (command[0]) {
+        FILE* f = fopen(command, "wb");
+        if (f) {
+          printf("wrote %lu bytes to file\n", fwrite(read_data, 1, size, f));
+          fclose(f);
+        } else
+          printf("failed to open file\n");
+      } else {
+        print_process_data(st->processname, addr, read_data,
+                           times ? read_data_prev : NULL, size);
+      }
+    }
 
     if (st->freeze_while_operating)
       VMResumeProcess(st->pid);
@@ -365,25 +375,6 @@ static int command_write(struct state* st, const char* command) {
 
   // clean up & return
   free(data);
-  return 0;
-}
-
-// write a file to the target's memory
-static int command_write_file(struct state* st, const char* command) {
-
-  // read the address
-  uint64_t addr;
-  sscanf(command, "%llX", &addr);
-
-  if (st->freeze_while_operating)
-    VMPauseProcess(st->pid);
-
-  // write the file
-  write_file_to_process(skip_word(command, ' '), 0, st->pid, addr);
-
-  if (st->freeze_while_operating)
-    VMResumeProcess(st->pid);
-
   return 0;
 }
 
@@ -1181,12 +1172,10 @@ static const struct {
   {"s", command_search},
   {"unfreeze", command_unfreeze},
   {"u", command_unfreeze},
-  {"wfile", command_write_file},
   {"wregs", command_write_regs},
   {"write", command_write},
   {"wr", command_write},
   {"w", command_write},
-  {"W", command_write_file},
   {"x", command_results},
   {"-", command_pause},
   {"+", command_resume},
@@ -1250,6 +1239,12 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating) {
     if (command && command[0])
       add_history(command);
     free(prompt);
+
+    // command can be NULL if ctrl+d was pressed - just exit in that case
+    if (!command) {
+      printf(" -- exit\n");
+      break;
+    }
 
     // find the entry in the command table and run the command
     int command_id, error;

@@ -1,4 +1,4 @@
-.TH MEMWATCH 1 "14 May 2012"
+.TH MEMWATCH 1 "16 Sep 2012"
 .SH NAME
 memwatch \- find and modify variables in other processes
 .SH SYNOPSIS
@@ -14,8 +14,8 @@ The following options are supported:
 .B \-c, --no-color
 Do not use color escape sequences when printing to the terminal (e.g. when highlighting differences between data in repeated reads).
 .TP
-.B \-f, --freeze-while-operating
-Pause the target process while interacting with it in any way.
+.B \-f, --no-freeze
+By default, the target will be suspended while its memory is being read or written. If this flag is specified, the target will not be paused during these operations. This can result in instability for some targets.
 .TP
 .B \-l, --list-processes
 Display a list of running processes (without arguments) and their PIDs, and exit.
@@ -27,6 +27,7 @@ Display a list of running processes (with arguments) and their PIDs, and exit.
 The process ID or partial name (case-insensitive) of a process to target. In the case of a partial name, first search the list of running processes. If no matching process is found, search the list of processes with arguments.
 
 .SH "GENERAL COMMANDS"
+.BR memwatch "\'s interactive interface implements the following general commands:"
 .TP
 .BR "attach [pid_or_name]"
 .RI "Attach to a new process by PID or by name. If no PID given, attach to the process with the same name as the current process."
@@ -49,14 +50,11 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 .BI "dump " "filename"
 .RI "If " filename " is given, dump all readable memory in the target process to files named " filename "_address. If " filename " is not given, only determine which regions are readable."
 .TP
-.BI "read " "address" " " "size"
-.RI "Read a block of " size " bytes from " address " in the target process\'s memory. " address " is specified in hexadecimal, and " size " is specified in decimal. To specify " size " in hex, use " "address:size" " instead of " "address size" ". In addition, " address " may be prepended with a ! to repeat the read every second until Ctrl+C is pressed."
+.BI "read " "address" " " "size" " " "[filename]"
+.RI "Read a block of " size " bytes from " address " in the target process\'s memory. " address " is specified in hexadecimal, and " size " is specified in decimal. To specify " size " in hex, use " "address:size" " instead of " "address size" ". If a filename is given, write the data to the given file instead of printing to the console. In addition, " address " may be prepended with a ! to repeat the read every second until Ctrl+C is pressed."
 .TP
 .BI "write " "address data"
 .RI "Write " data " to " address " in the target process\'s memory. See below for the data format."
-.TP
-.BI "wfile " "address file"
-.RI "Write the contents of " file " to " address " in the target process\'s memory.
 
 .SH "MEMORY SEARCH COMMANDS"
 .BR memwatch "\'s interactive interface implements the following commands for searching a process\'s memory for variables:"
@@ -116,11 +114,26 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 .RI "Set a " type " breakpoint on " address ". " type " may contain the characters x (break on execute), r (break on read), w (break on read/write), or i (break on I/O), as well as 1, 2, 4, or 8 (specifying the size of the region to watch)."
 
 .SH "DATA FORMAT"
-Data is specified in "immediate" format. Every pair of hexadecimal digits represents one byte; a decimal integer may be specified by preceding it with # signs (# for a single byte, ## for a 16-bit int, ### for a 32-bit int, or #### for a 64-bit int); ASCII strings must be enclosed in "double quotes", and unicode strings in 'single quotes'. A dollar sign ($) inverts the endian-ness of the data following it. Any non-recognized characters are ignored. The initial endian-ness of the output depends on the endian-ness of the host machine: on an Intel machine, the resulting data would be little-endian.
+Data is specified in "immediate" format. Every pair of hexadecimal digits represents one byte, with special control sequences as follows:
+.TP
+.B Decimal integers
+A decimal integer may be specified by preceding it with # signs (# for a single byte, ## for a 16-bit int, ### for a 32-bit int, or #### for a 64-bit int).
+.TP
+.B String literals
+ASCII strings must be enclosed in double quotes, and unicode strings in single quotes. Within a string, the escape sequences \\n, \\r, \\t, and \\\\ will be replaced with a newline, a carriage return, a tab character, and a single backslash respectively.
+.TP
+.B File contents
+A string enclosed in < > will be treated as a filename, and will be replaced with the contents of the file in the output data.
+.TP
+.B Change of endianness
+A dollar sign ($) inverts the endianness of the data following it.
+
+.RS n
+Any non-recognized characters are ignored. The initial endian-ness of the output depends on the endian-ness of the host machine: on an Intel machine, the resulting data would be little-endian.
 
 Example data string: 03 04 $ ##30 $ ##127 "dark" ###-1 'cold'
 
-Resulting data (little-endian): 03 04 00 1E 7F 00 64 61 72 6B FF FF FF FF 63 00 6F 00 6C 00 64 00
+Resulting data (Intel): 03 04 00 1E 7F 00 64 61 72 6B FF FF FF FF 63 00 6F 00 6C 00 64 00
 
 .SH "AUTHOR"
 Martin Michelsen <mjem@wildblue.net> is the original author and current maintainer of memwatch.
