@@ -12,6 +12,17 @@
 
 #include "parse_utils.h"
 
+// used by size_to_human_readable
+#define KB_SIZE 1024ULL
+#define MB_SIZE (KB_SIZE * 1024ULL)
+#define GB_SIZE (MB_SIZE * 1024ULL)
+#define TB_SIZE (GB_SIZE * 1024ULL)
+#define PB_SIZE (TB_SIZE * 1024ULL)
+#define EB_SIZE (PB_SIZE * 1024ULL)
+#define ZB_SIZE (EB_SIZE * 1024ULL)
+#define YB_SIZE (ZB_SIZE * 1024ULL)
+#define HB_SIZE (YB_SIZE * 1024ULL)
+
 // gets the name for the specified process
 int getpidname(pid_t pid, char* name, int namelen) {
   char command[0x80];
@@ -124,6 +135,27 @@ int enumprocesses(int callback(pid_t pid, const char* proc, void* param),
   return 0;
 }
 
+char* size_to_human_readable(uint64_t size, char* out) {
+
+  if (size < KB_SIZE)
+    sprintf(out, "%llu bytes", size);
+  else if (size < MB_SIZE)
+    sprintf(out, "%llu bytes (%.02f KB)", size, (float)size / KB_SIZE);
+  else if (size < GB_SIZE)
+    sprintf(out, "%llu bytes (%.02f MB)", size, (float)size / MB_SIZE);
+  else if (size < TB_SIZE)
+    sprintf(out, "%llu bytes (%.02f GB)", size, (float)size / GB_SIZE);
+  else if (size < PB_SIZE)
+    sprintf(out, "%llu bytes (%.02f TB)", size, (float)size / TB_SIZE);
+  else if (size < EB_SIZE)
+    sprintf(out, "%llu bytes (%.02f PB)", size, (float)size / PB_SIZE);
+  else
+    sprintf(out, "%llu bytes (%.02f EB)", size, (float)size / EB_SIZE);
+  // a 64-bit int can't actually address a ZB or more
+
+  return out;
+}
+
 void print_region_map(VMRegionDataMap* map) {
 
   // initialize the counters
@@ -175,17 +207,21 @@ void print_region_map(VMRegionDataMap* map) {
   }
 
   // print the counters
-  printf("%5lu regions (%lld bytes) in total\n", map->numRegions, total_bytes);
-  printf("%5lld regions (%lld bytes) unread by memwatch\n", num_error,
-         total_error);
-  printf("%5lld regions (%lld bytes) accessible\n", num_accessible,
-         total_accessible);
-  printf("%5lld regions (%lld bytes) readable\n", num_readable, total_readable);
-  printf("%5lld regions (%lld bytes) writable\n", num_writable, total_writable);
-  printf("%5lld regions (%lld bytes) executable\n", num_executable,
-         total_executable);
-  printf("%5lld regions (%lld bytes) inaccessible\n", num_inaccessible,
-         total_inaccessible);
+  char sizebuffer[0x40]; // doesn't need to be long...
+  printf("%5lu regions, %s in total\n", map->numRegions,
+         size_to_human_readable(total_bytes, sizebuffer));
+  printf("%5lld regions, %s unread by memwatch\n", num_error,
+         size_to_human_readable(total_error, sizebuffer));
+  printf("%5lld regions, %s accessible\n", num_accessible,
+         size_to_human_readable(total_accessible, sizebuffer));
+  printf("%5lld regions, %s readable\n", num_readable,
+         size_to_human_readable(total_readable, sizebuffer));
+  printf("%5lld regions, %s writable\n", num_writable,
+         size_to_human_readable(total_writable, sizebuffer));
+  printf("%5lld regions, %s executable\n", num_executable,
+         size_to_human_readable(total_executable, sizebuffer));
+  printf("%5lld regions, %s inaccessible\n", num_inaccessible,
+         size_to_human_readable(total_inaccessible, sizebuffer));
 }
 
 // prints a chunk of data, along with the process' name and the current time

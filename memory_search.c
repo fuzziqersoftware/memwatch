@@ -22,7 +22,6 @@
 
 // TODO: undoing searches
 // TODO: fix file writing to memory
-// TODO: show nice memory sizes also in list/dump views
 
 // this variable is set to 1 by the main thread when the user presses CTRL+C;
 // if this happens, the current operation should cancel itself
