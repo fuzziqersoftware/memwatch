@@ -48,6 +48,12 @@ int print_process(pid_t pid, const char* proc, void* param) {
   return 0;
 }
 
+void print_usage() {
+  printf("usage: memwatch [ -l | -L ]\n");
+  printf("       memwatch [ -c ] [ -f ] pid_or_name\n");
+  printf("see `man memwatch` for more information\n");
+}
+
 // entry point
 int main(int argc, char* argv[]) {
 
@@ -147,6 +153,7 @@ int main(int argc, char* argv[]) {
   // pid missing?
   if (!pid && !operate_on_kernel) {
     printf("error: no process id or process name given\n");
+    print_usage();
     return (-2);
   }
 
