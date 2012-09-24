@@ -222,11 +222,12 @@ unsigned long long read_string_data(const char* in, void** vdata) {
       in++;
 
     // $ changes the endian-ness
-    } else if (in[0] == '$')
+    } else if (in[0] == '$') {
       endian = !endian;
+      in++;
 
     // # signifies a decimal number
-    else if (in[0] == '#') { // 8-bit
+    } else if (in[0] == '#') { // 8-bit
       unsigned long long value;
       in++;
       if (in[0] == '#') { // 16-bit
