@@ -39,6 +39,9 @@ void change_color(int color, ...) {
 void CRYPT_PrintData(unsigned long long address, const void* ds,
     const void* diff, unsigned long long data_size, int flags) {
 
+  if (data_size == 0)
+    return;
+
   unsigned char* data_source = (unsigned char*)ds;
   unsigned char* diff_source = (unsigned char*)diff;
   unsigned long x, y, off = 0;
