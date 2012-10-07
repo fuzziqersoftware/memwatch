@@ -55,13 +55,21 @@ static __inline__ vm_map_t _VMTaskFromPID(pid_t process)
 }
 
 static __inline__ VMRegion _VMMakeRegionWithAttributes(pid_t process,
-    mach_vm_address_t address, mach_vm_size_t size, unsigned int attribs)
+    mach_vm_address_t address, mach_vm_size_t size, unsigned int attribs,
+    unsigned int max_attribs, int inherit, int shared, int reserved,
+    vm_behavior_t behavior, unsigned short user_wired_count)
 {
   VMRegion region;
   region._process = process;
   region._address = address;
   region._size = size;
   region._attributes = attribs;
+  region._max_attributes = max_attribs;
+  region._inherit = inherit;
+  region._shared = shared;
+  region._reserved = reserved;
+  region._behavior = behavior;
+  region._user_wired_count = user_wired_count;
   return region;
 }
 
@@ -117,7 +125,7 @@ unsigned int VMCountRegionsWithAttributes(pid_t process, unsigned int attribs)
 VMRegion VMNextRegion(pid_t process, VMRegion previous)
 {
   vm_map_t task = _VMTaskFromPID(process);
-  unsigned int attribs = 0;
+  unsigned int attribs = 0, max_attribs = 0;
 
   mach_vm_address_t address = 0x0;
   mach_vm_size_t size = 0;
@@ -129,9 +137,10 @@ VMRegion VMNextRegion(pid_t process, VMRegion previous)
     address = previous._address + previous._size;
 
   // get the next region
+  memset(&info, 0, sizeof(info));
   kern_return_t result = mach_vm_region(task, &address, &size,
     VM_REGION_BASIC_INFO_64, (vm_region_info_t)(&info), &infoCnt, &object_name);
-
+  
   if (result == KERN_SUCCESS) {
     // get the attributes & return the region
     if (info.protection & VM_PROT_READ)
@@ -140,7 +149,15 @@ VMRegion VMNextRegion(pid_t process, VMRegion previous)
       attribs |= VMREGION_WRITABLE;
     if (info.protection & VM_PROT_EXECUTE)
       attribs |= VMREGION_EXECUTABLE;
-    return _VMMakeRegionWithAttributes(process, address, size, attribs);
+    if (info.max_protection & VM_PROT_READ)
+      max_attribs |= VMREGION_READABLE;
+    if (info.max_protection & VM_PROT_WRITE)
+      max_attribs |= VMREGION_WRITABLE;
+    if (info.max_protection & VM_PROT_EXECUTE)
+      max_attribs |= VMREGION_EXECUTABLE;
+    return _VMMakeRegionWithAttributes(process, address, size, attribs,
+        max_attribs, info.inheritance, info.shared, info.reserved,
+        info.behavior, info.user_wired_count);
   }
 
   return VMNullRegion;

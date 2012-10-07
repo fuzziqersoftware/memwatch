@@ -171,13 +171,18 @@ void print_region_map(VMRegionDataMap* map) {
   for (x = 0; x < map->numRegions; x++) {
 
     // print region info
-    printf("%016llX %016llX %c%c%c%s\n",
+    printf("%016llX %016llX %c%c%c/%c%c%c",
       map->regions[x].region._address,
       map->regions[x].region._size,
       (map->regions[x].region._attributes & VMREGION_READABLE) ? 'r' : '-',
       (map->regions[x].region._attributes & VMREGION_WRITABLE) ? 'w' : '-',
       (map->regions[x].region._attributes & VMREGION_EXECUTABLE) ? 'x' : '-',
-      map->regions[x].data ? "" : " [data not read]");
+      (map->regions[x].region._max_attributes & VMREGION_READABLE) ? 'r' : '-',
+      (map->regions[x].region._max_attributes & VMREGION_WRITABLE) ? 'w' : '-',
+      (map->regions[x].region._max_attributes & VMREGION_EXECUTABLE) ? 'x' : '-');
+    if (!map->regions[x].data)
+      printf(" [data not read]");
+    printf("\n");
 
     // increment the relevant counters
     if (!map->regions[x].data) {

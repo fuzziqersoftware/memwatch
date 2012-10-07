@@ -44,8 +44,8 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 .SH "MEMORY ACCESS COMMANDS"
 .BR memwatch "\'s interactive interface implements the following commands for reading, writing, and manipulating virtual memory:"
 .TP
-.BI "access " "address"
-.RI "Enable all types of access on the region containing " address .
+.BI "access " "mode address"
+.RI "Change the virtual memory protection mode on the region containing " address .
 .TP
 .BI "list"
 .RI "List memory regions allocated in the target process\'s address space."

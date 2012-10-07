@@ -44,7 +44,7 @@ static int command_help(struct state* st, const char* command) {
 "memwatch memory search utility\n"
 "\n"
 "memory commands:\n"
-"  [a]ccess <addr>           enable all access on region containing address\n"
+"  [a]ccess <mode> <addr>    change protection on region containing address\n"
 "  [l]ist                    list memory regions\n"
 "  [d]ump                    dump memory\n"
 "  [d]ump <filename>         dump memory regions to <filename>_<addr> files\n"
@@ -263,12 +263,13 @@ static int command_find(struct state* st, const char* command) {
 static int command_access(struct state* st, const char* command) {
 
   // read the address
+  int mode;
   uint64_t addr;
-  sscanf(command, "%llX", &addr);
+  sscanf(command, "%d %llX", &mode, &addr);
 
   // attempt to change the access permissions
-  if (VMSetRegionProtection(st->pid, addr, 1, VMREGION_ALL, VMREGION_ALL))
-    printf("region protection set to all access\n");
+  if (VMSetRegionProtection(st->pid, addr, 1, mode, VMREGION_ALL))
+    printf("region protection changed\n");
   else
     printf("failed to change region protection\n");
 

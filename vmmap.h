@@ -51,6 +51,12 @@ typedef struct _VMRegion {
   mach_vm_address_t _address;
   mach_vm_size_t _size;
   unsigned int _attributes;
+  unsigned int _max_attributes;
+  int _inherit;
+  int _shared;
+  int _reserved;
+  vm_behavior_t _behavior;
+  unsigned short _user_wired_count;
 } VMRegion;
 
 // common regions
