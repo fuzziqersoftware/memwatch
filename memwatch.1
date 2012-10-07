@@ -110,8 +110,8 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 .BI "regs"
 .RI "Read the register state for all threads in the target process. If the process is not paused, thread registers might not represent an actual overall state of the process at any point in time."
 .TP
-.BI "wregs" " value reg"
-.RI "Write " value " to " reg " in all threads of the target process."
+.BI "wregs" " value reg [thread_id]"
+.RI "Write " value " to " reg " in all threads of the target process. If " thread_id " is given, write only the register in that thread. " thread_id " should match one of the thread indices printed by the regs command."
 .TP
 .BI "break" " type address"
 .RI "Set a " type " breakpoint on " address ". " type " may contain the characters x (break on execute), r (break on read), w (break on read/write), or i (break on I/O), as well as 1, 2, 4, or 8 (specifying the size of the region to watch)."

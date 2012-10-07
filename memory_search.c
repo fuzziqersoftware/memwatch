@@ -76,7 +76,7 @@ static int command_help(struct state* st, const char* command) {
 "  [k]ill                    terminate process\n"
 "  [sig]nal <signal_number>  send unix signal to process\n"
 "  regs                      view register contents on all threads\n"
-"  wregs <value> <reg>       modify register contents on all threads\n"
+"  wregs <value> <reg> [thread] modify register contents on a thread\n"
 "  [b]reak <sizetype> <addr> set breakpoint on addr\n"
 "general commands:\n"
 "  [at]tach <pid_or_name>    attach to a new process, keeping freezes & searches\n"
@@ -809,7 +809,7 @@ static int command_read_regs(struct state* st, const char* command) {
 
     // success? then print the regs for each thread
     for (x = 0; x < error; x++)
-      VMPrintThreadRegisters(&thread_state[x]);
+      VMPrintThreadRegisters(&thread_state[x], x);
     free(thread_state);
   }
 
@@ -823,9 +823,12 @@ static int command_read_regs(struct state* st, const char* command) {
 static int command_write_regs(struct state* st, const char* command) {
 
   // read the value and regname
+  const char* regname = command;
+  command = skip_word(command, ' ');
   uint64_t regvalue = 0;
   sscanf(command, "%llX", &regvalue);
   command = skip_word(command, ' ');
+  int thread_id = command[0] ? atoi(command) : -1;
 
   if (st->freeze_while_operating)
     VMPauseProcess(st->pid);
@@ -840,9 +843,13 @@ static int command_write_regs(struct state* st, const char* command) {
   else {
 
     // change the reg in each thread
-    for (x = 0; x < error; x++)
-      if (VMSetRegisterValueByName(&thread_state[x], command, regvalue))
+    for (x = 0; x < error; x++) {
+      // if a thread_id is given, only write to that thread's regs
+      if (thread_id >= 0 && x != thread_id)
+        continue;
+      if (VMSetRegisterValueByName(&thread_state[x], regname, regvalue))
         break;
+    }
     if (x < error) {
       free(thread_state);
       printf("invalid register name\n");
@@ -858,7 +865,7 @@ static int command_write_regs(struct state* st, const char* command) {
       printf("failed to set registers; error %d\n", error);
     else
       for (x = 0; x < error; x++)
-        VMPrintThreadRegisters(&thread_state[x]);
+        VMPrintThreadRegisters(&thread_state[x], x);
 
     // clean up
     free(thread_state);
@@ -896,7 +903,7 @@ static int _breakpoint_handler(mach_port_t thread, int exception,
     type = "mach syscall";
   printf("  type: %s\n", type);
 
-  VMPrintThreadRegisters(state);
+  VMPrintThreadRegisters(state, -1);
 
   // read the regs for each thread
   /*VMThreadState* thread_state = NULL;

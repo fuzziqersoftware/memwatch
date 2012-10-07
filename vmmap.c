@@ -297,10 +297,10 @@ int VMTerminateProcess(pid_t pid) {
 // register modification facilities
 
 // prints the register contents in a thread state
-void VMPrintThreadRegisters(VMThreadState* state) {
+void VMPrintThreadRegisters(VMThreadState* state, int thread_id) {
   
   if (!state->is64) {
-    printf("[thread 32-bit @ eip:%08X]\n", state->st32.__eip);
+    printf("[%d: thread 32-bit @ eip:%08X]\n", thread_id, state->st32.__eip);
     printf("  eax: %08X  ecx: %08X  edx: %08X  ebx: %08X\n", state->st32.__eax,
            state->st32.__ecx, state->st32.__edx, state->st32.__ebx);
     printf("  ebp: %08X  esp: %08X  esi: %08X  edi: %08X\n", state->st32.__ebp,
@@ -315,7 +315,7 @@ void VMPrintThreadRegisters(VMThreadState* state) {
     printf("  dr4: %08X  dr5: %08X  dr6: %08X  dr7: %08X\n", state->db32.__dr4,
            state->db32.__dr5, state->db32.__dr6, state->db32.__dr7);
   } else {
-    printf("[thread 64-bit @ rip:%016llX]\n", state->st64.__rip);
+    printf("[%d: thread 64-bit @ rip:%016llX]\n", thread_id, state->st64.__rip);
     printf("  rax: %016llX  rcx: %016llX  rdx: %016llX\n", state->st64.__rax,
            state->st64.__rcx, state->st64.__rdx);
     printf("  rbx: %016llX  rbp: %016llX  rsp: %016llX\n", state->st64.__rbx,
@@ -511,7 +511,7 @@ int VMSetRegisterValueByName(VMThreadState* state, const char* name,
   // find the named register
   int x;
   for (x = 0; registers[x].name[0]; x++)
-    if (!strcmp(registers[x].name, name))
+    if (!strncmp(registers[x].name, name, strlen(registers[x].name)))
       break;
   if (!registers[x].name[0])
     return -1;
