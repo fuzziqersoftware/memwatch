@@ -180,6 +180,25 @@ VMRegion VMNextRegionWithAttributes(pid_t process, VMRegion previous,
 
 
 
+int VMAllocateRegion(pid_t process, vm_address_t address,
+                       mach_vm_size_t size) {
+  vm_map_t task = _VMTaskFromPID(process);
+  kern_return_t result = vm_allocate(task, &address, size, 0);
+  printf("%d", result);
+  if (result != KERN_SUCCESS)
+    return 0;
+  return 1;
+}
+
+int VMDeallocateRegion(pid_t process, vm_address_t address,
+                       mach_vm_size_t size) {
+  vm_map_t task = _VMTaskFromPID(process);
+  kern_return_t result = vm_deallocate(task, address, size);
+  if (result != KERN_SUCCESS)
+    return 0;
+  return 1;
+}
+
 int VMSetRegionProtection(pid_t process, mach_vm_address_t address,
                           mach_vm_size_t size, int prot_flags, int prot_mask) {
 

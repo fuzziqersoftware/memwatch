@@ -71,6 +71,10 @@ VMRegion VMNextRegionWithAttributes(pid_t process, VMRegion previous,
                                     unsigned int attribs);
 
 // lower-level reading/writing/protection functions
+int VMAllocateRegion(pid_t process, vm_address_t address,
+                     mach_vm_size_t size);
+int VMDeallocateRegion(pid_t process, vm_address_t address,
+                       mach_vm_size_t size);
 int VMSetRegionProtection(pid_t process, mach_vm_address_t address,
                           mach_vm_size_t size, int prot_flags, int prot_mask);
 int VMReadBytes(pid_t process, mach_vm_address_t address, void *bytes,
