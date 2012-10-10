@@ -268,10 +268,11 @@ static int command_access(struct state* st, const char* command) {
   sscanf(command, "%d %llX", &mode, &addr);
 
   // attempt to change the access permissions
-  if (VMSetRegionProtection(st->pid, addr, 1, mode, VMREGION_ALL))
+  int err = VMSetRegionProtection(st->pid, addr, 1, mode, VMREGION_ALL);
+  if (!err)
     printf("region protection changed\n");
   else
-    printf("failed to change region protection\n");
+    printf("failed to change region protection (error %d)\n", err);
 
   return 0;
 }
@@ -314,8 +315,9 @@ static int command_read(struct state* st, const char* command) {
     if (st->freeze_while_operating)
       VMPauseProcess(st->pid);
 
-    if (!(error = VMReadBytes(st->pid, addr, read_data, &size)))
-      printf("failed to read data from process\n");
+    error = VMReadBytes(st->pid, addr, read_data, &size);
+    if (error)
+      printf("failed to read data from process (error %d)\n", error);
     else {
       if (command[0]) {
         FILE* f = fopen(command, "wb");
@@ -365,11 +367,11 @@ static int command_write(struct state* st, const char* command) {
     VMResumeProcess(st->pid);
 
   // write the data to the target's memory
-  int error;
-  if ((error = VMWriteBytes(st->pid, addr, data, size)))
+  int error = VMWriteBytes(st->pid, addr, data, size);
+  if (!error)
     printf("wrote %llu (0x%llX) bytes\n", size, size);
   else
-    printf("failed to write data to process\n");
+    printf("failed to write data to process (error %d)\n", error);
 
   if (st->freeze_while_operating)
     VMResumeProcess(st->pid);
@@ -522,8 +524,9 @@ static int command_results(struct state* st, const char* command) {
     void* data = malloc(size);
     for (x = 0; x < st->search->numResults; x++) {
       printf("%016llX ", st->search->results[x]);
-      if (!VMReadBytes(st->pid, st->search->results[x], data, &size))
-        printf("<< memory not readable >>\n");
+      int error = VMReadBytes(st->pid, st->search->results[x], data, &size);
+      if (error)
+        printf("<< memory not readable, %d >>\n", error);
       else {
         if (IsReverseEndianSearchType(st->search->type))
           bswap(data, size);
@@ -742,10 +745,12 @@ static int command_set(struct state* st, const char* command) {
   int x, error;
   for (x = 0; x < st->search->numResults; x++) {
     uint64_t addr = st->search->results[x];
-    if ((error = VMWriteBytes(st->pid, addr, data, size)))
+    error = VMWriteBytes(st->pid, addr, data, size);
+    if (!error)
       printf("%016llX: wrote %u (0x%X) bytes\n", addr, size, size);
     else
-      printf("%016llX: failed to write data to process\n", addr);
+      printf("%016llX: failed to write data to process (error %d)\n", addr,
+             error);
   }
 
   if (st->freeze_while_operating)
@@ -1044,28 +1049,31 @@ command_breakpoint_error:
 
 // pause the target process
 static int command_pause(struct state* st, const char* command) {
-  if (VMPauseProcess(st->pid))
+  int error = VMPauseProcess(st->pid);
+  if (!error)
     printf("process suspended\n");
   else
-    printf("failed to pause process\n");
+    printf("failed to pause process (error %d)\n", error);
   return 0;
 }
 
 // resume the target process
 static int command_resume(struct state* st, const char* command) {
-  if (VMResumeProcess(st->pid))
+  int error = VMResumeProcess(st->pid);
+  if (!error)
     printf("process resumed\n");
   else
-    printf("failed to resume process\n");
+    printf("failed to resume process (error %d)\n", error);
   return 0;
 }
 
 // terminate the target process
 static int command_terminate(struct state* st, const char* command) {
-  if (VMTerminateProcess(st->pid))
+  int error = VMTerminateProcess(st->pid);
+  if (!error)
     printf("process terminated\n");
   else
-    printf("failed to terminate process\n");
+    printf("failed to terminate process (error %d)\n", error);
   return 0;
 }
 

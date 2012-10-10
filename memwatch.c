@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "vmmap.h"
 #include "process_utils.h"
 #include "memory_search.h"
 #include "parse_utils.h"

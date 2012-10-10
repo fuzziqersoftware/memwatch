@@ -8,6 +8,7 @@
 
 typedef struct _VMRegionData {
   VMRegion region;
+  int error;
   union {
     void*     data;
     int8_t*   s8_data;

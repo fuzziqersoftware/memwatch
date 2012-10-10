@@ -180,8 +180,12 @@ void print_region_map(VMRegionDataMap* map) {
       (map->regions[x].region._max_attributes & VMREGION_READABLE) ? 'r' : '-',
       (map->regions[x].region._max_attributes & VMREGION_WRITABLE) ? 'w' : '-',
       (map->regions[x].region._max_attributes & VMREGION_EXECUTABLE) ? 'x' : '-');
-    if (!map->regions[x].data)
-      printf(" [data not read]");
+    if (!map->regions[x].data) {
+      if (map->regions[x].error)
+        printf(" [data not read, %d]", map->regions[x].error);
+      else
+        printf(" [data not read]");
+    }
     printf("\n");
 
     // increment the relevant counters
@@ -252,43 +256,4 @@ void print_process_data(const char* processname, unsigned long long addr,
   // and print the data
   CRYPT_PrintData(addr, read_data, diff_data, size, 0);
   printf("\n");
-}
-
-// writes the contents of a file to a process' memory
-int write_file_to_process(const char* filename, unsigned long long size,
-                          pid_t pid, unsigned long long addr) {
-
-  // open the file
-  FILE* write_file = fopen(filename, "rb");
-  if (!write_file) {
-    printf("failed to open file: %s\n", filename);
-    return (-1);
-  }
-  
-  // get the file size and verify it
-  fseek(write_file, 0, SEEK_END);
-  unsigned long long file_size = ftell(write_file);
-  fseek(write_file, 0, SEEK_SET);
-  if (!size) {
-    printf("given size is zero; using file size of %016llX\n", file_size);
-    size = file_size;
-  }
-  if (file_size < size) {
-    printf("file is shorter than given size; truncating size to %016llX\n", file_size);
-    size = file_size;
-  }
-  
-  // load the data from the file
-  void* write_data = malloc((unsigned int)size);
-  fread(write_data, size, 1, write_file);
-  fclose(write_file);
-  
-  // and write it
-  if (VMWriteBytes(pid, addr, write_data, size))
-    printf("failed to write data to process\n");
-  else
-    printf("wrote %llu (%llX) bytes\n", size, size);
-  free(write_data);
-
-  return 0;
 }

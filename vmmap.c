@@ -77,17 +77,6 @@ unsigned int _VMAttributesFromAddress(pid_t process, mach_vm_address_t address);
 
 const VMRegion VMNullRegion = { 0, 0, 0, 0 };
 
-VMRegion VMMakeRegion(pid_t process, mach_vm_address_t address,
-                      mach_vm_size_t size)
-{
-  VMRegion region;
-  region._process = process;
-  region._address = address;
-  region._size = size;
-  region._attributes = _VMAttributesFromAddress(process, address);
-  return region;
-}
-
 int VMRegionSetData(VMRegion region, void* data, mach_vm_size_t size)
 {
   size = (size > region._size) ? region._size : size;
@@ -180,23 +169,25 @@ VMRegion VMNextRegionWithAttributes(pid_t process, VMRegion previous,
 
 
 
+void* VMAlloc(size_t size) {
+  vm_address_t addr;
+  if (vm_allocate(mach_task_self(), &addr, size, 1) != KERN_SUCCESS)
+    return NULL;
+  return (void*)addr;
+}
+
+int VMFree(void* addr, size_t size) {
+  return vm_deallocate(mach_task_self(), (vm_address_t)addr, size);
+}
+
 int VMAllocateRegion(pid_t process, vm_address_t address,
                        mach_vm_size_t size) {
-  vm_map_t task = _VMTaskFromPID(process);
-  kern_return_t result = vm_allocate(task, &address, size, 0);
-  printf("%d", result);
-  if (result != KERN_SUCCESS)
-    return 0;
-  return 1;
+  return vm_allocate(_VMTaskFromPID(process), &address, size, 0);
 }
 
 int VMDeallocateRegion(pid_t process, vm_address_t address,
                        mach_vm_size_t size) {
-  vm_map_t task = _VMTaskFromPID(process);
-  kern_return_t result = vm_deallocate(task, address, size);
-  if (result != KERN_SUCCESS)
-    return 0;
-  return 1;
+  return vm_deallocate(_VMTaskFromPID(process), address, size);
 }
 
 int VMSetRegionProtection(pid_t process, mach_vm_address_t address,
@@ -232,10 +223,7 @@ int VMSetRegionProtection(pid_t process, mach_vm_address_t address,
       info.protection |= VM_PROT_EXECUTE;
   }
 
-  result = mach_vm_protect(task, address, size, 0, info.protection);
-  if (result != KERN_SUCCESS)
-    return 0;
-  return 1;
+  return mach_vm_protect(task, address, size, 0, info.protection);
 }
 
 int VMReadBytes(pid_t process, mach_vm_address_t address, void *bytes,
@@ -245,19 +233,15 @@ int VMReadBytes(pid_t process, mach_vm_address_t address, void *bytes,
   mach_vm_size_t staticsize = *size;
   
   // perform the read
-  kern_return_t result = mach_vm_read_overwrite(task, address, staticsize,
-                                                (vm_offset_t)bytes, size);
-  if (result != KERN_SUCCESS)
-    return 0;
-  return 1;
+  return mach_vm_read_overwrite(task, address, staticsize, (vm_offset_t)bytes,
+                                size);
 }
 
 int VMWriteBytes(pid_t process, mach_vm_address_t address, const void *bytes,
                  mach_vm_size_t size)
 {
   vm_map_t task = _VMTaskFromPID(process);
-  kern_return_t result = mach_vm_write(task, address, (vm_offset_t)bytes, size);
-  return (result == KERN_SUCCESS);
+  return mach_vm_write(task, address, (vm_offset_t)bytes, size);
 }
 
 unsigned int _VMAttributesFromAddress(pid_t process, mach_vm_address_t address)
@@ -291,23 +275,17 @@ unsigned int _VMAttributesFromAddress(pid_t process, mach_vm_address_t address)
 
 // suspends a process using the Mach API
 int VMPauseProcess(pid_t pid) {
-  vm_map_t task = _VMTaskFromPID(pid);
-  kern_return_t result = task_suspend(task);
-  return (result == KERN_SUCCESS);
+  return task_suspend(_VMTaskFromPID(pid));
 }
 
 // resumes a process using the Mach API
 int VMResumeProcess(pid_t pid) {
-  vm_map_t task = _VMTaskFromPID(pid);
-  kern_return_t result = task_resume(task);
-  return (result == KERN_SUCCESS);
+  return task_resume(_VMTaskFromPID(pid));
 }
 
 // kills a process using the Mach API
 int VMTerminateProcess(pid_t pid) {
-  vm_map_t task = _VMTaskFromPID(pid);
-  kern_return_t result = task_terminate(task);
-  return (result == KERN_SUCCESS);
+  return task_terminate(_VMTaskFromPID(pid));
 }
 
 
@@ -649,12 +627,8 @@ int VMSetThreadRegisters(mach_port_t thread_port, const VMThreadState* _state) {
     return error;
 
   // set the debug state
-  error = thread_set_state(thread_port, x86_DEBUG_STATE,
-                           (thread_state_t)&dstate, x86_DEBUG_STATE_COUNT);
-  if (error != KERN_SUCCESS)
-    return error;
-
-  return 0;
+  return thread_set_state(thread_port, x86_DEBUG_STATE,
+                          (thread_state_t)&dstate, x86_DEBUG_STATE_COUNT);
 }
 
 // gets thread registers for all threads in the process

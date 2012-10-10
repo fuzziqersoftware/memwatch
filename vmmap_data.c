@@ -48,6 +48,7 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
     map->regions[map->numRegions].region._address = vmr._address;
     map->regions[map->numRegions].region._size = vmr._size;
     map->regions[map->numRegions].region._attributes = vmr._attributes;
+    map->regions[map->numRegions].error = 0;
     map->regions[map->numRegions].data = NULL;
     map->numRegions++;
   }
@@ -64,7 +65,7 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
 
 VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
 
-  int x, error;
+  int x;
 
   // first get the list of regions
   VMRegionDataMap* map = GetProcessRegionList(pid, modeMask);
@@ -77,7 +78,7 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
   for (x = 0; cont && (x < map->numRegions); x++) {
 
     // alloc space for this region's data
-    map->regions[x].data = malloc(map->regions[x].region._size);
+    map->regions[x].data = VMAlloc(map->regions[x].region._size);
     if (!map->regions[x].data) {
       DestroyDataMap(map);
       cancel_var = NULL;
@@ -86,27 +87,29 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
 
     // make the region readable if we have to
     if (!(map->regions[x].region._attributes & VMREGION_READABLE)) {
-      error = VMSetRegionProtection(pid, map->regions[x].region._address,
-          map->regions[x].region._size, VMREGION_READABLE, VMREGION_READABLE);
+      map->regions[x].error = VMSetRegionProtection(pid,
+          map->regions[x].region._address, map->regions[x].region._size,
+          VMREGION_READABLE, VMREGION_READABLE);
     }
 
     // read the region's contents!
     mach_vm_size_t local_size = map->regions[x].region._size;
-    error = VMReadBytes(map->regions[x].region._process,
+    map->regions[x].error = VMReadBytes(map->regions[x].region._process,
                         map->regions[x].region._address,
                         map->regions[x].data, &local_size);
 
     // if reading failed, don't include the region's data
-    if (!error || (map->regions[x].region._size != local_size)) {
-      free(map->regions[x].data);
+    if (map->regions[x].error ||
+        (map->regions[x].region._size != local_size)) {
+      VMFree(map->regions[x].data, map->regions[x].region._size);
       map->regions[x].data = NULL;
     }
 
     // if we made the region readable, restore its previous protection
     if (!(map->regions[x].region._attributes & VMREGION_READABLE)) {
-      error = VMSetRegionProtection(pid, map->regions[x].region._address,
-          map->regions[x].region._size, map->regions[x].region._attributes,
-          VMREGION_ALL);
+      map->regions[x].error = VMSetRegionProtection(pid,
+          map->regions[x].region._address, map->regions[x].region._size,
+          map->regions[x].region._attributes, VMREGION_ALL);
     }
   }
   cancel_var = NULL;
@@ -124,7 +127,6 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
 int UpdateDataMap(VMRegionDataMap* map) {
 
   unsigned long x;
-  int error;
 
   // for each region...
   int cont = 1;
@@ -133,8 +135,8 @@ int UpdateDataMap(VMRegionDataMap* map) {
 
     // read the data in this section
     mach_vm_size_t newsize = map->regions[x].region._size;
-    error = VMReadBytes(map->process, map->regions[x].region._address,
-                        map->regions[x].data, &newsize);
+    map->regions[x].error = VMReadBytes(map->process,
+        map->regions[x].region._address, map->regions[x].data, &newsize);
 
     // error? do something about it
     // TODO: should delete offending section
@@ -150,34 +152,12 @@ int UpdateDataMap(VMRegionDataMap* map) {
   return 0;
 }
 
-/*VMRegionDataMap* CopyDataMap(VMRegionDataMap* src) {
-  VMRegionDataMap* new = (VMRegionDataMap*)malloc(sizeof(VMRegionDataMap) +
-                  sizeof(VMRegionData) * src->numRegions);
-  if (!new)
-    return NULL;
-
-  memcpy(new, src, sizeof(VMRegionDataMap));
-  memset(new->regions, 0, sizeof(VMRegionData*) * new->numRegions);
-  unsigned long x;
-  for (x = 0; x < new->numRegions; x++) {
-    new->regions[x].data = (VMRegionData*)malloc(src->regions[x].region._size);
-    if (!new->regions[x]) {
-      DestroyDataMap(new);
-      return NULL;
-    }
-    memcpy(&new->regions[x], &src->regions[x], sizeof(VMRegionData) +
-             src->regions[x].region._size);
-  }
-
-  return new;
-} */
-
 void DestroyDataMap(VMRegionDataMap* map) {
   if (map) {
     unsigned long x;
     for (x = 0; x < map->numRegions; x++)
       if (map->regions[x].data)
-        free(map->regions[x].data);
+        VMFree(map->regions[x].data, map->regions[x].region._size);
     free(map);
   }
 }

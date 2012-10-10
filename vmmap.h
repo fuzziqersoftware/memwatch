@@ -71,6 +71,8 @@ VMRegion VMNextRegionWithAttributes(pid_t process, VMRegion previous,
                                     unsigned int attribs);
 
 // lower-level reading/writing/protection functions
+void* VMAlloc(size_t size);
+int VMFree(void* addr, size_t size);
 int VMAllocateRegion(pid_t process, vm_address_t address,
                      mach_vm_size_t size);
 int VMDeallocateRegion(pid_t process, vm_address_t address,
