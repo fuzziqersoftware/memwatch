@@ -229,3 +229,8 @@ void PrintFrozenRegions(int printData) {
   // unlock the region list
   pthread_mutex_unlock(&_mutex);  
 }
+
+// returns the number of frozen regions
+int GetNumFrozenRegions() {
+  return _numFrozenRegions;
+}

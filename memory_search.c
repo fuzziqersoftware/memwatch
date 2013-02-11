@@ -1232,17 +1232,18 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating) {
 
     // decide what to prompt the user with (include the seearch name if a search
     // is currently open)
-    // prompt is (memwatch:<pid>/<processname>#<searchname>)
-    // or (memwatch:<pid>/<processname>)
+    // prompt is memwatch:<pid>/<processname> <num_search>/<num_frozen> <searchname> #
+    // or memwatch:<pid>/<processname> <num_search>/<num_frozen> #
     char* prompt;
     if (st.search) {
       prompt = (char*)malloc(30 + strlen(st.processname) +
                              strlen(st.search->name));
-      sprintf(prompt, "(memwatch:%u/%s#%s) ", st.pid, st.processname,
-              st.search->name);
+      sprintf(prompt, "memwatch:%u/%s %d/%d %s # ", st.pid, st.processname,
+              st.searches->numSearches, GetNumFrozenRegions(), st.search->name);
     } else {
       prompt = (char*)malloc(30 + strlen(st.processname));
-      sprintf(prompt, "(memwatch:%u/%s) ", st.pid, st.processname);
+      sprintf(prompt, "memwatch:%u/%s %d/%d # ", st.pid, st.processname,
+              st.searches->numSearches, GetNumFrozenRegions());
     }
 
     // delete the old command, if present
@@ -1260,6 +1261,11 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating) {
     if (!command) {
       printf(" -- exit\n");
       break;
+    }
+
+    // if no command, do nothing
+    if (!command[0]) {
+      continue;
     }
 
     // find the entry in the command table and run the command

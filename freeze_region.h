@@ -31,5 +31,6 @@ void MoveFrozenRegionsToProcess(pid_t pid);
 
 void GetFrozenRegions(const FrozenRegion** regions, int* numRegions);
 void PrintFrozenRegions(int printData);
+int GetNumFrozenRegions();
 
 #endif // FREEZE_REGION_H
