@@ -65,7 +65,9 @@ static int command_help(struct state* st, const char* command) {
 "  [del]ete <addr1> [addr2]  delete result at addr1, or between addr1 and addr2\n"
 "freeze commands:\n"
 "  [f]reeze <addr> <data>    freeze data in memory\n"
+"  [f]reeze <addr>:<size>    freeze data in memory\n"
 "  [f]reeze \"<name>\" <addr> <data> freeze data in memory, with given name\n"
+"  [f]reeze \"<name>\" <addr>:<size> freeze data in memory, with given name\n"
 "  [u]nfreeze                list frozen regions\n"
 "  [u]nfreeze <index>        unfreeze frozen region by index\n"
 "  [u]nfreeze <address>      unfreeze frozen region by address\n"
@@ -87,7 +89,9 @@ static int command_help(struct state* st, const char* command) {
 "all <data> arguments are in immediate format (see main usage statement).\n"
 "\n"
 "the freeze command is like the write command, but the write is repeated in the\n"
-"  background until canceled by an unfreeze command.\n"
+"  background until canceled by an unfreeze command. giving a size instead of\n"
+"  explicit data instructs memwatch to use the data already in that region of\n"
+"  memory.\n"
 "new freezes will be named with the same name as the current search (if any),\n"
 "  unless a specific name is given\n"
 "\n"
@@ -364,7 +368,7 @@ static int command_write(struct state* st, const char* command) {
   size = read_string_data(skip_word(command, ' '), &data);
 
   if (st->freeze_while_operating)
-    VMResumeProcess(st->pid);
+    VMPauseProcess(st->pid);
 
   // write the data to the target's memory
   int error = VMWriteBytes(st->pid, addr, data, size);
@@ -392,13 +396,37 @@ static int command_freeze(struct state* st, const char* command) {
   }
 
   // read the address
-  uint64_t addr, size;
-  sscanf(command, "%llX", &addr);
-  command = skip_word(command, ' ');
-
-  // read the data
   void* data;
-  size = read_string_data(command, &data);
+  uint64_t addr, size;
+  int num_args = sscanf(command, "%llX:%llX", &addr, &size);
+  if (num_args == 2) {
+
+    // user gave a size... read the data to be frozen from the process
+    data = malloc(size);
+    if (!data) {
+      printf("failed to allocate memory for reading\n");
+      return 0;
+    }
+
+    if (st->freeze_while_operating)
+      VMPauseProcess(st->pid);
+    int error = VMReadBytes(st->pid, addr, data, &size);
+    if (st->freeze_while_operating)
+      VMResumeProcess(st->pid);
+
+    if (!error)
+      printf("read %llu (0x%llX) bytes\n", size, size);
+    else {
+      printf("failed to read data from process (error %d)\n", error);
+      free(data);
+      return 0;
+    }
+
+  } else {
+    // read the data
+    command = skip_word(command, ' ');
+    size = read_string_data(command, &data);
+  }
 
   // add it to the frozen-list
   char* use_name = freeze_name ? freeze_name :
@@ -739,7 +767,7 @@ static int command_set(struct state* st, const char* command) {
     bswap(data, size);
 
   if (st->freeze_while_operating)
-    VMResumeProcess(st->pid);
+    VMPauseProcess(st->pid);
 
   // write the data to each result address
   int x, error;

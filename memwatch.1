@@ -89,6 +89,9 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 .BI "freeze " "[\'name\'] address data"
 .RI "Set a freeze on " address " with the given data. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any). If a previous frozen region has the same address as the new region, the previous region is unfrozen."
 .TP
+.BI "freeze " "[\'name\'] address:size"
+.RI "Identical to the above command, but uses the data already present in the process's memory."
+.TP
 .BI "unfreeze " "id"
 .RI "If " id " is not given, display the list of currently-frozen regions. Otherwise, " id " may be the index, address, or name of the region to unfreeze. If a name is given and multiple regions have the same name, unfreeze all of them."
 
