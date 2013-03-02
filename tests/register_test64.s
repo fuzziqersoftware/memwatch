@@ -1,5 +1,4 @@
-// value_test_float.c, by Martin Michelsen, 2012
-// simple app that sets its regs to a certain value, then sleeps
+// register_rest64.s, by Martin Michelsen, 2012
 
 .intel_syntax noprefix
 
