@@ -3,7 +3,7 @@
 
 CC=gcc
 OBJECTS=memwatch.o vmmap.o memory_search.o search_data.o vmmap_data.o process_utils.o parse_utils.o freeze_region.o search_data_list.o
-CFLAGS=-g -Wall
+CFLAGS=-O3 -s -Wall $(EXTRA_CFLAGS)
 LDFLAGS=-lreadline
 EXECUTABLES=memwatch
 

@@ -1,6 +1,8 @@
 # Makefile for memwatch
 # use this file to build for Apple iOS
 
+EXTRA_CFLAGS=-D__IOS
+
 include Makefile.inc
 
 memwatch: $(OBJECTS)

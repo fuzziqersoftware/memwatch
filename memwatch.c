@@ -161,7 +161,7 @@ int main(int argc, char* argv[]) {
     printf("warning: memwatch is operating on itself\n");
 
   // warn user if not running as root
-  if (getuid())
+  if (geteuid())
     printf("warning: memwatch likely will not work if not run as root\n");
 
   // finally, enter interactive interface
