@@ -1220,6 +1220,7 @@ static const struct {
   {"signal", command_signal},
   {"sig", command_signal},
   {"s", command_search},
+  {"t", command_find},
   {"unfreeze", command_unfreeze},
   {"u", command_unfreeze},
 #ifndef __IOS
