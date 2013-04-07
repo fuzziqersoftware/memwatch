@@ -4,10 +4,8 @@
 #ifndef FREEZE_REGION_H
 #define FREEZE_REGION_H
 
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "vmmap.h"
+#include <mach/mach_vm.h>
+#include <sys/types.h>
 
 typedef struct {
   pid_t pid;

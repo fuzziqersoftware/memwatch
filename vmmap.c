@@ -30,20 +30,11 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#include "vmmap.h"
-
-#include <mach/mach_init.h>
-#include <mach/mach_port.h>
-#include <mach/mach_traps.h>
 #include <mach/mach.h>
-#include <mach/task.h>
-#include <mach/thread_act.h>
-#include <signal.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
+#include <stdlib.h>
 
-#include "parse_utils.h"
+#include "vmmap.h"
 
 static __inline__ vm_map_t _VMTaskFromPID(pid_t process)
 {

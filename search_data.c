@@ -1,10 +1,11 @@
 // search_data.c, by Martin Michelsen, 2012
 // library to support iteratively searching memory snapshots of a process
 
-#include <stdlib.h>
 #include <stdio.h>
-#include "vmmap_data.h"
+#include <stdlib.h>
+
 #include "search_data.h"
+#include "vmmap_data.h"
 
 extern int* cancel_var;
 

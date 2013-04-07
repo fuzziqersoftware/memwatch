@@ -4,11 +4,8 @@
 #ifndef PROCESS_UTILS_H
 #define PROCESS_UTILS_H
 
-#include <sys/time.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <sys/types.h>
 
-#include "vmmap.h"
 #include "vmmap_data.h"
 
 #define FLAG_SHOW_WORDS    1

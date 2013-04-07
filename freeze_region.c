@@ -2,13 +2,12 @@
 // library to freeze memory locations in other processes
 
 #include <pthread.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "vmmap.h"
 #include "freeze_region.h"
 #include "parse_utils.h"
+#include "vmmap.h"
 
 // thread object for the freezer thread
 static pthread_t _freezeThread;

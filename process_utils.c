@@ -1,16 +1,11 @@
 // process_utils.c, by Martin Michelsen, 2012
 // odds and ends used for messing with processes
 
-#include <sys/time.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <ctype.h>
-
-#include "vmmap.h"
-#include "vmmap_data.h"
-#include "process_utils.h"
+#include <sys/time.h>
 
 #include "parse_utils.h"
+#include "process_utils.h"
 
 // used by size_to_human_readable
 #define KB_SIZE 1024ULL

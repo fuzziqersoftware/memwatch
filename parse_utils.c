@@ -1,12 +1,9 @@
 // parse_utils.c, by Martin Michelsen, 2012
 // odds and ends used for messing with text and data
 
-#include <sys/time.h>
-#include <stdio.h>
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
 
 #include "parse_utils.h"
 #include "search_data.h" // TODO: move bswap somewhere more accessible

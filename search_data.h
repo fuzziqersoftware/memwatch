@@ -4,7 +4,8 @@
 #ifndef SEARCH_DATA_H
 #define SEARCH_DATA_H
 
-#include "vmmap.h"
+#include <stdint.h>
+
 #include "vmmap_data.h"
 
 #define SEARCHTYPE_UINT8       0

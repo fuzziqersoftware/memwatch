@@ -1,24 +1,19 @@
 // memory_search.c, by Martin Michelsen, 2012
 // interface for interactive memory search
 
-#include <sys/time.h>
-#include <stdio.h>
+#include <readline/readline.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <readline/readline.h>
-#include <readline/history.h>
-
-#include "vmmap.h"
-#include "vmmap_data.h"
-#include "search_data.h"
-#include "search_data_list.h"
-
+#include "freeze_region.h"
+#include "memory_search.h"
 #include "parse_utils.h"
 #include "process_utils.h"
-#include "freeze_region.h"
-
-#include "memory_search.h"
+#include "search_data.h"
+#include "search_data_list.h"
+#include "vmmap.h"
+#include "vmmap_data.h"
 
 // TODO: undoing searches
 

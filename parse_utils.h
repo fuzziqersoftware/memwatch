@@ -4,9 +4,7 @@
 #ifndef PARSE_UTILS_H
 #define PARSE_UTILS_H
 
-#include <sys/time.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #define FORMAT_END         (-1)
 #define FORMAT_NORMAL      0

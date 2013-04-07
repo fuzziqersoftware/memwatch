@@ -1,14 +1,13 @@
 // memwatch.c, by Martin Michelsen, 2012
 // the main app itself
 
-#include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <unistd.h>
 
-#include "process_utils.h"
 #include "memory_search.h"
-#include "parse_utils.h"
+#include "process_utils.h"
 
 int use_color = 1;
 

@@ -2,7 +2,7 @@
 // process memory state capture functions
 
 #include <stdlib.h>
-#include <stdio.h>
+
 #include "vmmap_data.h"
 
 extern int* cancel_var;

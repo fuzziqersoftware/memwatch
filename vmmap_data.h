@@ -4,6 +4,9 @@
 #ifndef VMMAP_DATA_H
 #define VMMAP_DATA_H
 
+#include <stdint.h>
+#include <sys/types.h>
+
 #include "vmmap.h"
 
 typedef struct _VMRegionData {

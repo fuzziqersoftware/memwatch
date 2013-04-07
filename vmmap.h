@@ -33,10 +33,8 @@
 #ifndef VMMAP_H
 #define VMMAP_H
 
-#include <sys/types.h>
-#include <signal.h>
 #include <mach/mach_vm.h>
-#include <mach/vm_map.h>
+#include <sys/types.h>
 
 // attributes of memory regions
 enum _VMRegionAttributes {
