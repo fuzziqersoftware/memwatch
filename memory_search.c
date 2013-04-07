@@ -1268,13 +1268,19 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating) {
     // or memwatch:<pid>/<processname> <num_search>/<num_frozen> #
     char* prompt;
     if (st.search) {
-      prompt = (char*)malloc(30 + strlen(st.processname) +
+      prompt = (char*)malloc(50 + strlen(st.processname) +
                              strlen(st.search->name));
-      sprintf(prompt, "memwatch:%u/%s %d/%d %s # ", st.pid, st.processname,
-              st.searches->numSearches, GetNumFrozenRegions(), st.search->name);
+      if (!st.search->memory)
+        sprintf(prompt, "memwatch:%u/%s %ds/%df %s # ", st.pid, st.processname,
+                st.searches->numSearches, GetNumFrozenRegions(),
+                st.search->name);
+      else
+        sprintf(prompt, "memwatch:%u/%s %ds/%df %s(%llu) # ", st.pid,
+                st.processname, st.searches->numSearches, GetNumFrozenRegions(),
+                st.search->name, st.search->numResults);
     } else {
       prompt = (char*)malloc(30 + strlen(st.processname));
-      sprintf(prompt, "memwatch:%u/%s %d/%d # ", st.pid, st.processname,
+      sprintf(prompt, "memwatch:%u/%s %ds/%df # ", st.pid, st.processname,
               st.searches->numSearches, GetNumFrozenRegions());
     }
 
