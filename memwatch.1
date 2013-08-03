@@ -1,126 +1,140 @@
-.TH memwatch 1 "1 Oct 2012"
+.TH memwatch 1 "3 Aug 2013"
 .SH NAME
 memwatch \- find and modify variables in other processes
 .SH SYNOPSIS
-.B memwatch
-[ -l | -L ]
-.br
 .B memwatch
 [ -c ] [ -f ]
 .I pid_or_name
 .SH DESCRIPTION
 .B memwatch
-provides an interactive interface to find and modify variables in the memory of a target process. sudo will be required if memwatch is used by a user that is not a member of the procmod group.
+provides an interactive interface to find and modify variables in the memory of a running process. This is done by repeatedly searching the process\' address space for values that follow the rules given by the user, narrowing down the result set until it includes only the desired variable. After finding this variable, memwatch can monitor it, change its value, "freeze" its value, and more. This functionality is similar to that provided by scanmem(1).
+
+sudo will be required if memwatch is used by a user that is not a member of the procmod group.
 .SH OPTIONS
-The following options are supported:
+The following command-line options are accepted:
 .TP
 .B \-c, --no-color
-Do not use color escape sequences when printing to the terminal (e.g. when highlighting differences between data in repeated reads).
+By default, memwatch sometimes uses color escape sequences when printing to the terminal (for example, to highlight differences between data in repeated reads). This option disables that behavior.
 .TP
 .B \-f, --no-freeze
-By default, the target will be suspended while its memory is being read or written. If this flag is specified, the target will not be paused during these operations. This can result in instability for some targets.
-.TP
-.B \-l, --list-processes
-Display a list of running processes (without arguments) and their PIDs, and exit.
-.TP
-.B \-L, --list-commands
-Display a list of running processes (with arguments) and their PIDs, and exit.
+By default, the target process will be suspended while its memory is being read or written. If this flag is specified, the target will not be paused during these operations. This can result in instability or unexpected behavior in the target process.
 .TP
 .B pid_or_name
-The process ID or partial name (case-insensitive) of a process to target. In the case of a partial name, first search the list of running processes. If no matching process is found, search the list of processes with arguments.
+The process ID or partial name (case-insensitive) of a process to target. In the case of a partial name, memwatch first searches the list of running processes. If no matching process is found, it then searches the list of processes with arguments. This list is the same as is given by the command \'ps auxwww\'.
 
 .SH "GENERAL COMMANDS"
 .BR memwatch "\'s interactive interface implements the following general commands:"
 .TP
 .BR "attach [pid_or_name]"
-.RI "Attach to a new process by PID or by name. If no PID given, attach to the process with the same name as the current process."
+.RI "Attaches to a new process by PID or by name. If no argument is given, attaches to a process with the same name as the currently-attached process."
 .TP
 .BR "help"
-.RI "Display a help message detailing usage of the commands."
+.RI "Displays a help message detailing usage of the commands."
 .TP
 .BR "quit"
-.RI "Exit memwatch."
+.RI "Exits memwatch."
 
 .SH "MEMORY ACCESS COMMANDS"
 .BR memwatch "\'s interactive interface implements the following commands for reading, writing, and manipulating virtual memory:"
 .TP
 .BI "access " "mode address"
-.RI "Change the virtual memory protection mode on the region containing " address .
+.RI "Changes the virtual memory protection mode on the region containing " address .
 .TP
 .BI "list"
-.RI "List memory regions allocated in the target process\'s address space."
+.RI "Lists memory regions allocated in the target process\'s address space."
 .TP
 .BI "dump " "filename"
-.RI "If " filename " is given, dump all readable memory in the target process to files named " filename "_address. If " filename " is not given, only determine which regions are readable."
+.RI "If " filename " is given, dumps all readable memory in the target process to files named " filename "_address. If " filename " is not given, only determines which regions are readable."
 .TP
 .BI "read " "address" " " "size" " " "[filename]"
-.RI "Read a block of " size " bytes from " address " in the target process\'s memory. " address " is specified in hexadecimal, and " size " is specified in decimal. To specify " size " in hex, use " "address:size" " instead of " "address size" ". If a filename is given, write the data to the given file instead of printing to the console. In addition, " address " may be prepended with a ! to repeat the read every second until Ctrl+C is pressed."
+.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " is specified in hexadecimal, and " size " is specified in decimal. To specify " size " in hexadecimal, use the syntax " "address:size" " instead of " "address size" ". If a filename is given, writes the data to the given file instead of printing to the console. In addition, " address " may be prepended with \'!\' to repeat the read every second until Ctrl+C is pressed."
 .TP
 .BI "write " "address data"
-.RI "Write " data " to " address " in the target process\'s memory. See below for the data format."
+.RI "Writes " data " to " address " in the target process\'s memory. See the DATA FORMAT section for information on how to specify the data string."
 
 .SH "MEMORY SEARCH COMMANDS"
 .BR memwatch "\'s interactive interface implements the following commands for searching a process\'s memory for variables:"
 .TP
 .BI "find " data
-.RI "Find all occurrences of " data " in readable regions of the target\'s memory. See below for the data format. Searches done with this command to not affect the current search results."
+.RI "Finds all occurrences of " data " in readable regions of the target\'s memory. See the DATA FORMAT section for more information on how to specify the search string. Searches done with this command do not affect the current search results."
 .TP
 .BI "open " "type name"
-.RI "Open a search for a variable of the given type in writable memory regions. " type " may be prepended with a ! to search all readable memory instead. See below for valid search types. If " name " is given, name the search; otherwise, the search will be unnamed and cannot be resumed after another search is opened."
+.RI "Opens a search for a variable of the given type in writable memory regions. " type " may be prepended with a ! to search all readable memory instead of only writable memory. See the SEARCH TYPES section for valid search types. If " name " is not given, the search will be unnamed and cannot be resumed after another search is opened."
 .TP
 .BI "open " name
-.RI "If " name " is given, reopen a previous search. If " name " is not given, list all open searches."
+.RI "If " name " is given, reopens a previous search. If " name " is not given, lists all open searches."
 .TP
 .BI "close " name
-.RI "If " name " is given, close the specified search. If " name " is not given, close the current search."
+.RI "If " name " is given, closes the specified search. If " name " is not given, closes the current search."
 .TP
 .BI "search " "operator value"
-.RI "Read the values of variables in the current list of results, and filter out the results for which (new value " "operator prev value" ") is false. If " value " is not given, use the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
+.RI "Reads the values of variables in the current list of results, and filters out the results for which (new value " "operator prev value" ") is false. If " value " is not given, uses the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
 .TP
 .BI "results"
-.RI "Display the current list of results."
+.RI "Displays the current list of results."
 .TP
-.BI "delete " "addr1 addr2"
-.RI "If " addr2 " is given, delete all results between " addr1 " and " addr2 ". If " addr2 " is not given, delete the search result at " addr1 .
+.BI "delete " "addr1 [addr2]"
+.RI "If " addr2 " is given, deletes all results between " addr1 " and " addr2 ". If " addr2 " is not given, deletes the search result at " addr1 .
+.TP
+.BI "set " value
+.RI "Writes " value " to all addresses in the current result set."
 
 .SH "MEMORY FREEZE COMMANDS"
 .BR memwatch " implements a memory freezer, which repeatedly writes values to the target\'s memory at a very short interval, effectively fixing the variable's value in the target process. The following commands allow manipulation of frozen variables:"
 .TP
 .BI "freeze " "[\'name\'] address data"
-.RI "Set a freeze on " address " with the given data. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any). If a previous frozen region has the same address as the new region, the previous region is unfrozen."
+.RI "Sets a freeze on " address " with the given data. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any). If a previous frozen region has the same address as the new region, the previous region is unfrozen."
 .TP
 .BI "freeze " "[\'name\'] address:size"
-.RI "Identical to the above command, but uses the data already present in the process's memory."
+.RI "Identical to the above command, but uses the data already present in the process's memory. Size must be specified in hexadecimal."
 .TP
 .BI "unfreeze " "id"
-.RI "If " id " is not given, display the list of currently-frozen regions. Otherwise, " id " may be the index, address, or name of the region to unfreeze. If a name is given and multiple regions have the same name, unfreeze all of them."
+.RI "If " id " is not given, displays the list of currently-frozen regions. Otherwise, " id " may be the index, address, or name of the region to unfreeze. If a name is given and multiple regions have the same name, unfreezes all of them."
 
 .SH "EXECUTION STATE MANAGEMENT COMMANDS"
 .BR memwatch " implements experimental support for viewing and modifying execution state in the target process, implemented by the following commands:"
 .TP
 .BR "pause" " (or " - )
-.RI "Pause the target process."
+.RI "Pauses the target process."
 .TP
 .BR "resume" " (or " + )
-.RI "Unpause the target process."
+.RI "Unpauses the target process."
 .TP
 .BR "kill"
-.RI "Kill the target process and exit."
+.RI "Kills the target process and exits memwatch."
 .TP
 .BI "signal " signum
-.RI "Send the Unix signal " signum " to the target process. See " "signal(3)" " for a list of signals."
+.RI "Sends the Unix signal " signum " to the target process. See " "signal(3)" " for a list of signals."
 .TP
 .BI "regs"
-.RI "Read the register state for all threads in the target process. If the process is not paused, thread registers might not represent an actual overall state of the process at any point in time."
+.RI "Reads the register state for all threads in the target process. If the process is not paused, thread registers might not represent an actual overall state of the process at any point in time."
 .TP
 .BI "wregs" " value reg [thread_id]"
-.RI "Write " value " to " reg " in all threads of the target process. If " thread_id " is given, write only the register in that thread. " thread_id " should match one of the thread indices printed by the regs command."
+.RI "Writes " value " to " reg " in all threads of the target process. If " thread_id " is given, writes the register\'s value only in that thread. " thread_id " should match one of the thread indices printed by the regs command."
 .TP
 .BI "break" " type address"
-.RI "Set a " type " breakpoint on " address ". " type " may contain the characters x (break on execute), r (break on read), w (break on read/write), or i (break on I/O), as well as 1, 2, 4, or 8 (specifying the size of the region to watch)."
+.RI "Sets a " type " breakpoint on " address ". " type " may contain the characters x (break on execute), r (break on read), w (break on read/write), or i (break on I/O), as well as 1, 2, 4, or 8 (specifying the size of the region to watch)."
+
+.SH "SEARCH TYPES"
+.BR memwatch " supports searching for the following types of variables. Any type except 'a' may be prefixed by the letter 'l' to perform reverse-endian searches (that is, to search for big-endian values on a little-endian architecture, or vice versa)."
+.TP
+.BR a
+Search for any string. Values are specified in immediate data format (see the DATA FORMAT section for more information).
+.TP
+.BR f
+Search for a 32-bit floating-point value.
+.TP
+.BR d
+Search for a 64-bit floating-point value.
+.TP
+.B u8, u16, u32, u64
+Search for an unsigned 8-bit, 16-bit, 32-bit, or 64-bit value.
+.TP
+.B s8, s16, s32, s64
+Search for a signed 8-bit, 16-bit, 32-bit, or 64-bit value.
 
 .SH "DATA FORMAT"
-Data is specified in "immediate" format. Every pair of hexadecimal digits represents one byte, with special control sequences as follows:
+Input data for raw data searches and the find, write, and freeze commands is specified in "immediate" format. Every pair of hexadecimal digits represents one byte, with special control sequences as follows:
 .TP
 .B Decimal integers
 A decimal integer may be specified by preceding it with # signs (# for a single byte, ## for a 16-bit int, ### for a 32-bit int, or #### for a 64-bit int).
