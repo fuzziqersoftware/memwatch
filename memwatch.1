@@ -67,11 +67,11 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 .BI "close " name
 .RI "If " name " is given, closes the specified search. If " name " is not given, closes the current search."
 .TP
-.BI "search " "operator value"
-.RI "Reads the values of variables in the current list of results, and filters out the results for which (new value " "operator prev value" ") is false. If " value " is not given, uses the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
+.BI "search " "[search_name] operator value"
+.RI "Reads the values of variables in the current list of results (or the named search's results, if a name is given), and filters out the results for which (new value " "operator prev value" ") is false. If " value " is not given, uses the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
 .TP
-.BI "results"
-.RI "Displays the current list of results."
+.BI "results " "[search_name]"
+.RI "Displays the current list of results. If search_name is given, displays the results for that search."
 .TP
 .BI "delete " "addr1 [addr2]"
 .RI "If " addr2 " is given, deletes all results between " addr1 " and " addr2 ". If " addr2 " is not given, deletes the search result at " addr1 .

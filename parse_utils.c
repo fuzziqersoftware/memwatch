@@ -340,6 +340,15 @@ const char* skip_word(const char* in, char delim) {
   return in;
 }
 
+// returns a copy of the first word in the string, which must be free'd later
+char* get_word(const char* in, char delim) {
+  if (!in)
+    return NULL;
+
+  const char* word_end = strchr(in, delim);
+  return word_end ? strndup(in, word_end - in) : strdup(in);
+}
+
 // makes a copy of the quoted string given, taking care of escaped items. the
 // quote character is the first character of in.
 // returns the number of chars consumed in input, or -1 on error

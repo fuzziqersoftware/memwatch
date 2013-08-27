@@ -523,37 +523,34 @@ static int command_open(struct state* st, const char* command) {
   return 0;
 }
 
-// print list of results for current search
-static int command_results(struct state* st, const char* command) {
+// prints a search's result set
+static void print_search_results(struct state* st, MemorySearchData* search,
+    int max_results) {
 
-  // can't do this if there isn't a current search, or if the current search
-  // object has no memory associated with it (and therefore no valid results)
-  if (!st->search) {
-    printf("no search currently open\n");
-    return 0;
-  }
-  if (!st->search->memory) {
-    printf("no initial search performed\n");
-    return 0;
+  // if there's a max given, don't print results if there are more than that
+  // many of them
+  if (max_results && (search->numResults > max_results)) {
+    printf("results: %lld\n", search->numResults);
+    return;
   }
 
   // print the results!
   int x;
-  if (st->search->type == SEARCHTYPE_DATA) {
-    for (x = 0; x < st->search->numResults; x++)
-      printf("%016llX\n", st->search->results[x]);
+  if (search->type == SEARCHTYPE_DATA) {
+    for (x = 0; x < search->numResults; x++)
+      printf("%016llX\n", search->results[x]);
   } else {
-    mach_vm_size_t size = SearchDataSize(st->search->type);
+    mach_vm_size_t size = SearchDataSize(search->type);
     void* data = malloc(size);
-    for (x = 0; x < st->search->numResults; x++) {
-      printf("%016llX ", st->search->results[x]);
-      int error = VMReadBytes(st->pid, st->search->results[x], data, &size);
+    for (x = 0; x < search->numResults; x++) {
+      printf("%016llX ", search->results[x]);
+      int error = VMReadBytes(st->pid, search->results[x], data, &size);
       if (error)
         printf("<< memory not readable, %d >>\n", error);
       else {
-        if (IsReverseEndianSearchType(st->search->type))
+        if (IsReverseEndianSearchType(search->type))
           bswap(data, size);
-        switch (st->search->type) {
+        switch (search->type) {
           case SEARCHTYPE_UINT8:
             printf("%hhu (0x%02hhX)\n", *(uint8_t*)data, *(uint8_t*)data);
             break;
@@ -598,8 +595,29 @@ static int command_results(struct state* st, const char* command) {
     if (data)
       free(data);
   }
-  printf("results: %lld\n", st->search->numResults);
+  printf("results: %lld\n", search->numResults);
+}
 
+// print list of results for current search, or the named search
+static int command_results(struct state* st, const char* command) {
+
+  // if a search name is given, show results for that search
+  MemorySearchData* search = st->search;
+  if (command && command[0])
+    search = GetSearchByName(st->searches, command);
+
+  // can't do this if there isn't a current search, or if the current search
+  // object has no memory associated with it (and therefore no valid results)
+  if (!search) {
+    printf("search not found, or no search currently open\n");
+    return 0;
+  }
+  if (!search->memory) {
+    printf("no initial search performed; results not available\n");
+    return 0;
+  }
+
+  print_search_results(st, search, 0);
   return 0;
 }
 
@@ -630,25 +648,38 @@ static int command_delete(struct state* st, const char* command) {
 
   // if there aren't many results left, print them out... otherwise, just print
   // the number of remaining results
-  if (st->search->numResults < 20)
-    return command_results(st, "");
-  printf("results: %lld\n", st->search->numResults);
-
+  print_search_results(st, st->search, 20);
   return 0;
 }
 
 // execute a search using the current search object
 static int command_search(struct state* st, const char* command) {
 
-  // make sure a search is opened
-  if (!st->search) {
-    printf("no search is currently open; use the o command to open a "
-           "search\n");
-    return 0;
-  }
+  MemorySearchData* search = st->search;
 
   // read the predicate
   int pred = GetPredicateByName(command);
+
+  // if the command doesn't begin with a valid predicate, it may be of the form
+  // "search search_name predicate [value]"
+  if (pred == PRED_UNKNOWN) {
+    char* search_name = get_word(command, ' ');
+    if (!search_name) {
+      printf("invalid predicate type\n");
+      return 0;
+    }
+    search = GetSearchByName(st->searches, search_name);
+    free(search_name);
+
+    command = skip_word(command, ' ');
+    pred = GetPredicateByName(command);
+  }
+
+  // if there's no search, then we can't do anything
+  if (!search) {
+    printf("no search is open and no search was specified by name\n");
+    return 0;
+  }
 
   // check if a value followed the predicate
   void *value = NULL, *data = NULL;
@@ -660,18 +691,18 @@ static int command_search(struct state* st, const char* command) {
   if (*value_text) {
 
     // we have a value... read it in
-    if (IsIntegerSearchType(st->search->type)) {
+    if (IsIntegerSearchType(search->type)) {
       sscanf(value_text, "%lld", &ivalue);
       value = &ivalue;
-    } else if (st->search->type == SEARCHTYPE_FLOAT ||
-               st->search->type == SEARCHTYPE_FLOAT_LE) {
+    } else if (search->type == SEARCHTYPE_FLOAT ||
+               search->type == SEARCHTYPE_FLOAT_LE) {
       sscanf(value_text, "%f", &fvalue);
       value = &fvalue;
-    } else if (st->search->type == SEARCHTYPE_DOUBLE ||
-               st->search->type == SEARCHTYPE_DOUBLE_LE) {
+    } else if (search->type == SEARCHTYPE_DOUBLE ||
+               search->type == SEARCHTYPE_DOUBLE_LE) {
       sscanf(value_text, "%lf", &dvalue);
       value = &dvalue;
-    } else if (st->search->type == SEARCHTYPE_DATA) {
+    } else if (search->type == SEARCHTYPE_DATA) {
       size = read_string_data(value_text, &data);
       value = data;
     }
@@ -682,7 +713,7 @@ static int command_search(struct state* st, const char* command) {
 
   // take a snapshot of the target's memory
   VMRegionDataMap* map = DumpProcessMemory(st->pid,
-      st->search->searchflags & SEARCHFLAG_ALLMEMORY ? 0 : VMREGION_WRITABLE);
+      search->searchflags & SEARCHFLAG_ALLMEMORY ? 0 : VMREGION_WRITABLE);
   if (!map) {
     printf("memory dump failed\n");
     return 0;
@@ -692,8 +723,8 @@ static int command_search(struct state* st, const char* command) {
     VMResumeProcess(st->pid);
 
   // run the search, then delete the data (if allocated)
-  MemorySearchData* search_result = ApplyMapToSearch(st->search, map, pred,
-                                                     value, size);
+  MemorySearchData* search_result = ApplyMapToSearch(search, map, pred, value,
+      size);
   if (data)
     free(data);
 
@@ -705,13 +736,12 @@ static int command_search(struct state* st, const char* command) {
 
   // add this search to the list. don't need to delete the old one here - it'll
   // be deleted by AddSearchToList if it gets replaced by the new one
-  st->search = search_result;
-  AddSearchToList(st->searches, st->search);
+  if (search == st->search)
+    st->search = search_result;
+  AddSearchToList(st->searches, search_result);
 
   // print results if there aren't too many of them
-  if (st->search->numResults < 20)
-    return command_results(st, "");
-  printf("results: %lld\n", st->search->numResults);
+  print_search_results(st, search_result, 20);
   return 0;
 }
 
