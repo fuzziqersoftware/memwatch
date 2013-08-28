@@ -158,8 +158,10 @@ static int command_find(struct state* st, const char* command) {
     int y;
     for (y = 0; y <= map->regions[x].region._size - size; y++) {
       if (!memcmp(&map->regions[x].s8_data[y], data, size)) {
-        printf("data found at %016llX\n",
-              map->regions[x].region._address + y);
+        printf("%016llX (%c%c%c)\n", map->regions[x].region._address + y,
+            (map->regions[x].region._attributes & VMREGION_READABLE) ? 'r' : '-',
+            (map->regions[x].region._attributes & VMREGION_WRITABLE) ? 'w' : '-',
+            (map->regions[x].region._attributes & VMREGION_EXECUTABLE) ? 'x' : '-');
         num_results++;
       }
     }
