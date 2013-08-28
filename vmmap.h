@@ -125,7 +125,6 @@ int VMTerminateProcess(pid_t pid);
 
 
 
-#ifndef __IOS
 typedef struct {
   int is64;
   mach_msg_type_number_t count, fcount, dcount;
@@ -154,6 +153,5 @@ int VMSetProcessRegisters(pid_t process, const VMThreadState* state, int num);
 
 int VMWaitForBreakpoint(pid_t pid,
                         int (*handler)(mach_port_t, int, VMThreadState*));
-#endif // not __IOS
 
 #endif // VMMAP_H

@@ -281,8 +281,6 @@ int VMTerminateProcess(pid_t pid) {
 
 
 
-#ifndef __IOS
-
 ////////////////////////////////////////////////////////////////////////////////
 // register modification facilities
 
@@ -820,5 +818,3 @@ VMWaitForBreakpoint_cleanup:
 
   return error;
 }
-
-#endif // not __IOS

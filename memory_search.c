@@ -765,7 +765,6 @@ static int command_close(struct state* st, const char* command) {
   return 0;
 }
 
-#ifndef __IOS
 // read registers for all threads in the target process
 static int command_read_regs(struct state* st, const char* command) {
 
@@ -1015,7 +1014,6 @@ command_breakpoint_error:
     VMResumeProcess(st->pid);
   return 0;
 }
-#endif // not __IOS
 
 // pause the target process
 static int command_pause(struct state* st, const char* command) {
@@ -1120,10 +1118,8 @@ static const struct {
   {"attach", command_attach},
   {"at", command_attach},
   {"a", command_access},
-#ifndef __IOS
   {"break", command_breakpoint},
   {"b", command_breakpoint},
-#endif
   {"close", command_close},
   {"c", command_close},
   {"delete", command_delete},
@@ -1148,9 +1144,7 @@ static const struct {
   {"q", command_quit},
   {"read", command_read},
   {"rd", command_read},
-#ifndef __IOS
   {"regs", command_read_regs},
-#endif
   {"results", command_results},
   {"resume", command_resume},
   {"res", command_results},
@@ -1163,9 +1157,7 @@ static const struct {
   {"t", command_find},
   {"unfreeze", command_unfreeze},
   {"u", command_unfreeze},
-#ifndef __IOS
   {"wregs", command_write_regs},
-#endif
   {"write", command_write},
   {"wr", command_write},
   {"w", command_write},
