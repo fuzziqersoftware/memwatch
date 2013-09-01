@@ -38,8 +38,8 @@
 
 void change_color(int color, ...);
 
-void CRYPT_PrintData(unsigned long long address, const void* ds,
-                     const void* diff, unsigned long long data_size, int flags);
+void print_data(unsigned long long address, const void* ds, const void* diff,
+		unsigned long long data_size, int flags);
 
 unsigned long long read_stream_data(FILE* in, void** vdata);
 unsigned long long read_string_data(const char* in_buffer, void** vdata);

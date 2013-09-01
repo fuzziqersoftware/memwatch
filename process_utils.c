@@ -249,6 +249,6 @@ void print_process_data(const char* processname, unsigned long long addr,
          rawtime.tv_usec / 1000);
 
   // and print the data
-  CRYPT_PrintData(addr, read_data, diff_data, size, 0);
+  print_data(addr, read_data, diff_data, size, 0);
   printf("\n");
 }

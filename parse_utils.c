@@ -33,8 +33,8 @@ void change_color(int color, ...) {
 }
 
 // prints data in a hex/ascii view to the console
-void CRYPT_PrintData(unsigned long long address, const void* ds,
-    const void* diff, unsigned long long data_size, int flags) {
+void print_data(unsigned long long address, const void* ds, const void* diff,
+    unsigned long long data_size, int flags) {
 
   if (data_size == 0)
     return;

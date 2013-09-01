@@ -218,8 +218,7 @@ void PrintFrozenRegions(int printData) {
              _frozen[x].addr, _frozen[x].size, _frozen[x].error,
              _frozen[x].name);
       if (printData)
-        CRYPT_PrintData(_frozen[x].addr, _frozen[x].data, NULL, _frozen[x].size,
-                        0);
+        print_data(_frozen[x].addr, _frozen[x].data, NULL, _frozen[x].size, 0);
     }
   // if there are no frozen regions, too bad :(
   } else
