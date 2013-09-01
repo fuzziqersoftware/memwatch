@@ -147,6 +147,9 @@ A string enclosed in < > will be treated as a filename, and will be replaced wit
 .TP
 .B Change of endianness
 A dollar sign ($) inverts the endianness of the data following it.
+.TP
+.B Wildcard
+.RB "A question mark (?) will match any byte when searching with the " find " command. This is not yet implemented for the " search " command."
 
 .RS n
 Any non-recognized characters are ignored. The initial endian-ness of the output depends on the endian-ness of the host machine: on an Intel machine, the resulting data would be little-endian.

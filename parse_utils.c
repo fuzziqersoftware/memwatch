@@ -124,23 +124,39 @@ int parse_ull(const char* in, unsigned long long* value, int default_hex) {
   return sscanf(in, default_hex ? "%llx" : "%llu", value);
 }
 
-// macros used by read_stream_data to append to a buffer
-#define expand(bytes) \
-  { *data = (unsigned char*)realloc(*data, size + bytes); \
-  size += bytes; }
-#define write_byte(x) \
-  { expand(1); \
-  (*data)[size - 1] = x; }
-#define write_short(x) \
-  { expand(2); \
-  *(uint16_t*)(*data + size - 2) = x; }
+// macros used by read_string_data to append to a buffer
+#define expand(bytes) { \
+  size += bytes; \
+  *data = (unsigned char*)realloc(*data, size); \
+  if (vmask) \
+    *mask = (unsigned char*)realloc(*mask, size); \
+}
+#define write_byte(x) { \
+  expand(1); \
+  (*data)[size - 1] = x; \
+  if (vmask) \
+    (*mask)[size - 1] = 0xFF; \
+}
+#define write_short(x) { \
+  expand(2); \
+  *(uint16_t*)(*data + size - 2) = x; \
+  if (vmask) \
+    *(uint16_t*)(*mask + size - 2) = 0xFFFF; \
+}
+#define write_blank() { \
+  expand(1); \
+  (*mask)[size - 1] = 0; \
+}
 
-// like read_stream_data, but stops at the end of the string
-unsigned long long read_string_data(const char* in, void** vdata) {
-  
+// parses the memwatch data format from a string
+unsigned long long read_string_data(const char* in, void** vdata, void** vmask) {
+
   *vdata = NULL;
+  if (vmask)
+    *vmask = NULL;
   unsigned char** data = (unsigned char**)vdata;
-  
+  unsigned char** mask = (unsigned char**)vmask;
+
   int read, chr = 0;
   int string = 0, unicodestring = 0, high = 1;
   int filename = 0, filename_start, filesize;
@@ -201,7 +217,7 @@ unsigned long long read_string_data(const char* in, void** vdata) {
       if (in[0] == '>') {
         filename = 0;
         write_byte(0); // null-terminate the filename
-        // TODO: support <filename@offset> syntax
+        // TODO: support <filename@offset:size> syntax
 
         // open the file, read it into the buffer, close the file
         FILE* f = fopen((char*)(*data + filename_start), "rb");
@@ -219,6 +235,11 @@ unsigned long long read_string_data(const char* in, void** vdata) {
         fclose(f);
       } else
         write_byte(in[0]);
+      in++;
+
+    // ? is an unknown byte, but only if the caller wants a mask
+    } else if (in[0] == '?' && vmask) {
+      write_blank();
       in++;
 
     // $ changes the endian-ness

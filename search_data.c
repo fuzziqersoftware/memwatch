@@ -460,7 +460,7 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
 
     // if there were problems, print them out
     if (numOutsideRegions || numInsideBadRegions)
-      printf("warning: some results (%d) deleted due to memory read errors\n",
+      printf("warning: %d results deleted due to memory read errors\n",
              numOutsideRegions + numInsideBadRegions);
   }
 

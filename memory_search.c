@@ -141,8 +141,8 @@ static int command_find(struct state* st, const char* command) {
     VMResumeProcess(st->pid);
 
   // read the «search string from the command
-  void* data;
-  uint64_t size = read_string_data(command, &data);
+  char *data, *mask;
+  uint64_t size = read_string_data(command, (void**)&data, (void**)&mask);
 
   // loop through the regions, searching for the string
   unsigned long long num_results = 0;
@@ -155,9 +155,12 @@ static int command_find(struct state* st, const char* command) {
       continue;
 
     // search through this region's data for the string
-    int y;
+    int y, z;
     for (y = 0; y <= map->regions[x].region._size - size; y++) {
-      if (!memcmp(&map->regions[x].s8_data[y], data, size)) {
+      for (z = 0; z < size; z++)
+        if (mask[z] && (map->regions[x].s8_data[y + z] != data[z]))
+          break;
+      if (z == size) {
         printf("%016llX (%c%c%c)\n", map->regions[x].region._address + y,
             (map->regions[x].region._attributes & VMREGION_READABLE) ? 'r' : '-',
             (map->regions[x].region._attributes & VMREGION_WRITABLE) ? 'w' : '-',
@@ -277,7 +280,7 @@ static int command_write(struct state* st, const char* command) {
   uint64_t addr, size;
   void* data;
   sscanf(command, "%llX", &addr);
-  size = read_string_data(skip_word(command, ' '), &data);
+  size = read_string_data(skip_word(command, ' '), &data, NULL);
 
   if (st->freeze_while_operating)
     VMPauseProcess(st->pid);
@@ -337,7 +340,7 @@ static int command_freeze(struct state* st, const char* command) {
   } else {
     // read the data
     command = skip_word(command, ' ');
-    size = read_string_data(command, &data);
+    size = read_string_data(command, &data, NULL);
   }
 
   // add it to the frozen-list
@@ -620,7 +623,7 @@ static int command_search(struct state* st, const char* command) {
       sscanf(value_text, "%lf", &dvalue);
       value = &dvalue;
     } else if (search->type == SEARCHTYPE_DATA) {
-      size = read_string_data(value_text, &data);
+      size = read_string_data(value_text, &data, NULL);
       value = data;
     }
   }
@@ -697,7 +700,7 @@ static int command_set(struct state* st, const char* command) {
     data = &dvalue;
     size = SearchDataSize(st->search->type);
   } else if (st->search->type == SEARCHTYPE_DATA) {
-    size = read_string_data(command, &datavalue);
+    size = read_string_data(command, &datavalue, NULL);
     data = datavalue;
   } else {
     printf("error: unknown search type\n");
