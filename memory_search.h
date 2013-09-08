@@ -5,7 +5,8 @@
 #define MEMORY_SEARCH_H
 
 #include <sys/types.h>
+#include <stdint.h>
 
-int prompt_for_commands(pid_t pid, int freeze_while_operating);
+int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_results);
 
 #endif // MEMORY_SEARCH_H

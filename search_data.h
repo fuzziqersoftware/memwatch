@@ -69,7 +69,7 @@ void DeleteSearch(MemorySearchData* search);
 // DON'T DELETE THE MAP AFTER CALLING THIS FUNCTION. it becomes part of the
 // search object and will be deleted when the search object is deleted.
 MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
-    int pred, void* value, unsigned long long size);
+    int pred, void* value, unsigned long long size, uint64_t max_results);
 int DeleteResults(MemorySearchData* s, uint64_t start, uint64_t end);
 
 const char* GetSearchTypeName(int type);

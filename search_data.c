@@ -283,7 +283,7 @@ void _ApplyMapToSearch_ByteswapValueIfLE(int searchtype, void* value) {
 // copies a memory search data structure
 // note that ApplyMapToSearch may modify the value
 MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
-    int pred, void* value, unsigned long long size) {
+    int pred, void* value, unsigned long long size, uint64_t max_results) {
 
   int x;
   _ApplyMapToSearch_ByteswapValueIfLE(s->type, value);
@@ -335,7 +335,7 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
     // check every address in every region
     unsigned long long y;
     unsigned long long numAllocatedResults = 0;
-    int cont = 1;
+    int cont = 1, cancelled_by_max = 0;
     cancel_var = &cont;
     for (x = 0; cont && (x < n->memory->numRegions); x++) {
 
@@ -373,12 +373,19 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
         // add this result to the list
         n->results[n->numResults] = n->memory->regions[x].region._address + y;
         n->numResults++;
+
+        // if there's a max and we've reached it, stop searching
+        if (n->numResults >= max_results) {
+          printf("warning: too many results; stopping search early\n");
+          cont = 0;
+          cancelled_by_max = 1;
+        }
       }
     }
     cancel_var = NULL;
 
     // if we were canceled, return NULL
-    if (!cont) {
+    if (!cont && !cancelled_by_max) {
       DeleteSearch(n);
       return NULL;
     }

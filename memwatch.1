@@ -1,9 +1,9 @@
-.TH memwatch 1 "3 Aug 2013"
+.TH memwatch 1 "7 Sep 2013"
 .SH NAME
 memwatch \- find and modify variables in other processes
 .SH SYNOPSIS
 .B memwatch
-[ -c ] [ -f ]
+[ -c ] [ -f ] [ -nX ]
 .I pid_or_name
 .SH DESCRIPTION
 .B memwatch
@@ -18,6 +18,9 @@ By default, memwatch sometimes uses color escape sequences when printing to the 
 .TP
 .B \-f, --no-freeze
 By default, the target process will be suspended while its memory is being read or written. If this flag is specified, the target will not be paused during these operations. This can result in instability or unexpected behavior in the target process.
+.TP
+.B \-nX, --max-results=X
+By default, memwatch limits the number of results in iterative searches to 1073741824 (that's 2^30). This option overrides this limit. Setting the limit to zero allows an unlimited number of results, but this can be dangerous - for example, when performing a search that yields lots of results, memwatch's memory usage may increase to several times that of the target process.
 .TP
 .B pid_or_name
 The process ID or partial name (case-insensitive) of a process to target. In the case of a partial name, memwatch first searches the list of running processes. If no matching process is found, it then searches the list of processes with arguments. This list is the same as is given by the command \'ps auxwww\'.

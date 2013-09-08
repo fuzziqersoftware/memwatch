@@ -67,6 +67,7 @@ int main(int argc, char* argv[]) {
   int list_commands = 0;
   int showflags = 0;
   int freeze_while_operating = 1;
+  uint64_t max_results = 1024 * 1024 * 1024; // approx. 1 billion
   char processname[PROCESS_NAME_LENGTH] = {0};
 
   /*int num_commands = 0;
@@ -89,6 +90,12 @@ int main(int argc, char* argv[]) {
       showflags = atoi(&argv[x][2]);
     else if (!strncmp(argv[x], "--showflags=", 12))
       showflags = atoi(&argv[x][12]);
+
+    // -n, --max-results: set maximum number of results
+    else if (!strncmp(argv[x], "-n", 2))
+      sscanf(&argv[x][2], "%llu", &max_results);
+    else if (!strncmp(argv[x], "--max-results=", 14))
+      sscanf(&argv[x][14], "%llu", &max_results);
 
     // -l, --list-processes: display a list of running processes
     else if (!strcmp(argv[x], "-l") || !strcmp(argv[x], "--list-processes"))
@@ -164,5 +171,5 @@ int main(int argc, char* argv[]) {
     printf("warning: memwatch likely will not work if not run as root\n");
 
   // finally, enter interactive interface
-  return prompt_for_commands(pid, freeze_while_operating);
+  return prompt_for_commands(pid, freeze_while_operating, max_results);
 }

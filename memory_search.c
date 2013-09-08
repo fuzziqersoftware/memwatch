@@ -26,6 +26,7 @@ struct state {
   pid_t pid; // process id of the process that's being operated on
   char processname[PROCESS_NAME_LENGTH]; // name of that process
   int freeze_while_operating;
+  uint64_t max_results;
   int run; // set to 0 to exit the memory search interface
   MemorySearchDataList* searches; // list of open searches
   MemorySearchData* search; // the current search
@@ -644,7 +645,7 @@ static int command_search(struct state* st, const char* command) {
 
   // run the search, then delete the data (if allocated)
   MemorySearchData* search_result = ApplyMapToSearch(search, map, pred, value,
-      size);
+      size, st->max_results);
   if (data)
     free(data);
 
@@ -1175,7 +1176,7 @@ static const struct {
 
 
 // memory searching user interface!
-int prompt_for_commands(pid_t pid, int freeze_while_operating) {
+int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_results) {
 
   // construct the initial state
   struct state st;
@@ -1184,6 +1185,7 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating) {
   st.run = 1;
   st.searches = CreateSearchList();
   st.freeze_while_operating = freeze_while_operating;
+  st.max_results = max_results;
 
   // get the process name
   if (!st.pid)
