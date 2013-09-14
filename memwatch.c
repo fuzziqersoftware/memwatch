@@ -40,7 +40,7 @@ void sigint(int signum) {
 }
 
 // prints the process pid and name
-// called bu enumprocesses, where invoked below
+// called bu enum_processes, where invoked below
 int print_process(pid_t pid, const char* proc, void* param) {
   printf("%6u - %s\n", pid, proc);
   return 0;
@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
   int showflags = 0;
   int freeze_while_operating = 1;
   uint64_t max_results = 1024 * 1024 * 1024; // approx. 1 billion
-  char processname[PROCESS_NAME_LENGTH] = {0};
+  char process_name[PROCESS_NAME_LENGTH] = {0};
 
   /*int num_commands = 0;
   char** commands = NULL; */
@@ -106,10 +106,10 @@ int main(int argc, char* argv[]) {
       list_commands = 1;
 
     // first non-dash param: a process name or pid
-    else if (!pid && !processname[0]) {
+    else if (!pid && !process_name[0]) {
       pid = atoi(argv[x]);
       if (!pid)
-        strcpy(processname, argv[x]);
+        strcpy(process_name, argv[x]);
 
     // all subsequent non-dash params: unnecessary parameters
     } else {
@@ -121,29 +121,29 @@ int main(int argc, char* argv[]) {
 
   // are we working on the kernel? (WOO DANGEROUS)
   int operate_on_kernel = 0;
-  if (!strcmp(processname, "KERNEL")) {
+  if (!strcmp(process_name, "KERNEL")) {
     pid = 0;
     operate_on_kernel = 1;
   }
 
   // listing processes or commands?
   if (list_procs) {
-    enumprocesses(print_process, NULL, 0);
+    enum_processes(print_process, NULL, 0);
     return 0;
   }
   if (list_commands) {
-    enumprocesses(print_process, NULL, 1);
+    enum_processes(print_process, NULL, 1);
     return 0;
   }
 
   // find pid for process name
-  if (processname[0] && !pid && !operate_on_kernel) {
+  if (process_name[0] && !pid && !operate_on_kernel) {
 
-    int num_found = getnamepid(processname, &pid, 0);
+    int num_found = pid_for_name(process_name, &pid, 0);
     if (num_found == 0) {
       printf("warning: no processes found by name; searching commands\n");
       ignore_match = getpid(); // don't match this process by command
-      num_found = getnamepid(processname, &pid, 1);
+      num_found = pid_for_name(process_name, &pid, 1);
     }
     if (num_found == 0) {
       printf("no processes found\n");
@@ -163,8 +163,10 @@ int main(int argc, char* argv[]) {
   }
 
   // warn user if pid is memwatch itself
-  if (pid == getpid())
-    printf("warning: memwatch is operating on itself\n");
+  if (pid == getpid()) {
+    printf("warning: memwatch is operating on itself; -f is implied\n");
+    freeze_while_operating = 0;
+  }
 
   // warn user if not running as root
   if (geteuid())

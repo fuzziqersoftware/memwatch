@@ -39,9 +39,10 @@
 void change_color(int color, ...);
 
 void print_data(unsigned long long address, const void* ds, const void* diff,
-		unsigned long long data_size, int flags);
+    unsigned long long data_size, int flags);
 
-unsigned long long read_string_data(const char* in_buffer, void** vdata, void** vmask);
+unsigned long long read_string_data(const char* in_buffer, void** vdata,
+    void** vmask);
 int read_ull(FILE* in, unsigned long long* value, int default_hex);
 char* read_string_delimited(FILE* in, char delimiter, int consume_delim);
 void trim_spaces(char* string);
@@ -49,5 +50,5 @@ const char* skip_word(const char* string, char delim);
 char* get_word(const char* in, char delim);
 int copy_quoted_string(const char* in, char** out);
 int read_addr_size(const char* str, unsigned long long* addr,
-                   unsigned long long* size);
+    unsigned long long* size);
 #endif // PARSE_UTILS_H

@@ -7,7 +7,7 @@
 #include "parse_utils.h"
 #include "process_utils.h"
 
-// used by size_to_human_readable
+// used by _size_to_human_readable
 #define KB_SIZE 1024ULL
 #define MB_SIZE (KB_SIZE * 1024ULL)
 #define GB_SIZE (MB_SIZE * 1024ULL)
@@ -19,7 +19,7 @@
 #define HB_SIZE (YB_SIZE * 1024ULL)
 
 // gets the name for the specified process
-int getpidname(pid_t pid, char* name, int namelen) {
+int name_for_pid(pid_t pid, char* name, int namelen) {
   char command[0x80];
   sprintf(command, "ps -ax -c -o pid -o command | grep ^\\ *%u\\ | sed s/[0-9]*\\ //g",
           pid);
@@ -55,7 +55,7 @@ typedef struct _find_pid_data {
   int matches_found;
 } find_pid_data;
 
-int find_pid_for_process_name(pid_t pid, const char* proc, void* param) {
+static int _find_pid_for_process_name(pid_t pid, const char* proc, void* param) {
   if (pid == ignore_match)
     return 0;
   
@@ -83,7 +83,7 @@ int find_pid_for_process_name(pid_t pid, const char* proc, void* param) {
 
 // gets the pid of the process specified by name, optionally searching commands
 // return: number of processes found (if not 1, then pid can't be trusted)
-int getnamepid(const char* name, pid_t* pid, int commands) {
+int pid_for_name(const char* name, pid_t* pid, int commands) {
 
   int x;
   find_pid_data d;
@@ -92,14 +92,14 @@ int getnamepid(const char* name, pid_t* pid, int commands) {
     d.name[x] = tolower(d.name[x]);
   d.pid = 0;
   d.matches_found = 0;
-  enumprocesses(find_pid_for_process_name, &d, commands);
+  enum_processes(_find_pid_for_process_name, &d, commands);
   *pid = d.pid;
   return d.matches_found;
 }
 
 // calls the specified callback once for each process
-int enumprocesses(int callback(pid_t pid, const char* proc, void* param),
-                  void* param, int commands) {
+int enum_processes(int (*callback)(pid_t pid, const char* proc, void* param),
+    void* param, int commands) {
 
   int namelen = 0x100;
   char name[namelen];
@@ -130,7 +130,7 @@ int enumprocesses(int callback(pid_t pid, const char* proc, void* param),
   return 0;
 }
 
-char* size_to_human_readable(uint64_t size, char* out) {
+static char* _size_to_human_readable(uint64_t size, char* out) {
 
   if (size < KB_SIZE)
     sprintf(out, "%llu bytes", size);
@@ -213,19 +213,19 @@ void print_region_map(VMRegionDataMap* map) {
   // print the counters
   char sizebuffer[0x40]; // doesn't need to be long...
   printf("%5lu regions, %s in total\n", map->numRegions,
-         size_to_human_readable(total_bytes, sizebuffer));
+         _size_to_human_readable(total_bytes, sizebuffer));
   printf("%5lld regions, %s unread by memwatch\n", num_error,
-         size_to_human_readable(total_error, sizebuffer));
+         _size_to_human_readable(total_error, sizebuffer));
   printf("%5lld regions, %s accessible\n", num_accessible,
-         size_to_human_readable(total_accessible, sizebuffer));
+         _size_to_human_readable(total_accessible, sizebuffer));
   printf("%5lld regions, %s readable\n", num_readable,
-         size_to_human_readable(total_readable, sizebuffer));
+         _size_to_human_readable(total_readable, sizebuffer));
   printf("%5lld regions, %s writable\n", num_writable,
-         size_to_human_readable(total_writable, sizebuffer));
+         _size_to_human_readable(total_writable, sizebuffer));
   printf("%5lld regions, %s executable\n", num_executable,
-         size_to_human_readable(total_executable, sizebuffer));
+         _size_to_human_readable(total_executable, sizebuffer));
   printf("%5lld regions, %s inaccessible\n", num_inaccessible,
-         size_to_human_readable(total_inaccessible, sizebuffer));
+         _size_to_human_readable(total_inaccessible, sizebuffer));
 }
 
 // prints a chunk of data, along with the process' name and the current time

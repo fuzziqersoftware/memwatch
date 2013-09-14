@@ -24,7 +24,7 @@ extern int* cancel_var;
 // struct to contain all of the mutable state of the memory search utility
 struct state {
   pid_t pid; // process id of the process that's being operated on
-  char processname[PROCESS_NAME_LENGTH]; // name of that process
+  char process_name[PROCESS_NAME_LENGTH]; // name of that process
   int freeze_while_operating;
   uint64_t max_results;
   int run; // set to 0 to exit the memory search interface
@@ -94,16 +94,16 @@ static int command_dump(struct state* st, const char* command) {
 
       // build the filename: prefix_address
       sprintf(filename_piece, "%s_%016llX", command,
-              map->regions[x].region._address);
+          map->regions[x].region._address);
 
       // print region info
       printf("%016llX %016llX %c%c%c %s\n",
-        map->regions[x].region._address,
-        map->regions[x].region._size,
-        (map->regions[x].region._attributes & VMREGION_READABLE) ? 'r' : '-',
-        (map->regions[x].region._attributes & VMREGION_WRITABLE) ? 'w' : '-',
-        (map->regions[x].region._attributes & VMREGION_EXECUTABLE) ? 'x' : '-',
-        map->regions[x].data ? filename_piece : "[data not read]");
+          map->regions[x].region._address,
+          map->regions[x].region._size,
+          (map->regions[x].region._attributes & VMREGION_READABLE) ? 'r' : '-',
+          (map->regions[x].region._attributes & VMREGION_WRITABLE) ? 'w' : '-',
+          (map->regions[x].region._attributes & VMREGION_EXECUTABLE) ? 'x' : '-',
+          map->regions[x].data ? filename_piece : "[data not read]");
 
       // save the file
       if (map->regions[x].data) {
@@ -247,7 +247,7 @@ static int command_read(struct state* st, const char* command) {
         } else
           printf("failed to open file\n");
       } else {
-        print_process_data(st->processname, addr, read_data,
+        print_process_data(st->process_name, addr, read_data,
                            times ? read_data_prev : NULL, size);
       }
     }
@@ -346,8 +346,8 @@ static int command_freeze(struct state* st, const char* command) {
 
   // add it to the frozen-list
   char* use_name = freeze_name ? freeze_name :
-                   (st->search ? st->search->name : "[no associated search]");
-  if (FreezeRegion(st->pid, addr, size, data, use_name))
+      (st->search ? st->search->name : "[no associated search]");
+  if (freeze_region(st->pid, addr, size, data, use_name))
     printf("failed to freeze region\n");
   else
     printf("region frozen\n");
@@ -365,7 +365,7 @@ static int command_unfreeze(struct state* st, const char* command) {
   // index given? unfreeze a region
   if (command[0]) {
     // first try to unfreeze by name
-    int num_by_name = UnfreezeRegionByName(command);
+    int num_by_name = unfreeze_by_name(command);
     if (num_by_name == 1) {
       printf("region unfrozen\n");
     } else if (num_by_name > 1) {
@@ -375,13 +375,13 @@ static int command_unfreeze(struct state* st, const char* command) {
       // if unfreezing by name didn't match any regions, unfreeze by address
       uint64_t addr;
       sscanf(command, "%llX", &addr);
-      if (!UnfreezeRegionByAddr(addr))
+      if (!unfreeze_by_addr(addr))
         printf("region unfrozen\n");
       else {
 
         // if that didn't work either, try to unfreeze by index
         sscanf(command, "%llu", &addr);
-        if (!UnfreezeRegionByIndex(addr))
+        if (!unfreeze_by_index(addr))
           printf("region unfrozen\n");
         else
           printf("failed to unfreeze region\n");
@@ -390,7 +390,7 @@ static int command_unfreeze(struct state* st, const char* command) {
 
   // else, print frozen regions
   } else
-    PrintFrozenRegions(0);
+    print_frozen_regions(0);
 
   return 0;
 }
@@ -1067,17 +1067,17 @@ static int command_attach(struct state* st, const char* command) {
   // if no command given, use the current process name
   // (i.e. if program was quit & restarted, its pid will probably change)
   if (!command[0])
-    command = st->processname;
+    command = st->process_name;
 
   // try to read new pid
   pid_t new_pid = atoi(command);
   if (!new_pid) {
 
     // no number? then it's a process name
-    int num_results = getnamepid(command, &new_pid, 0);
+    int num_results = pid_for_name(command, &new_pid, 0);
     if (num_results == 0) {
       printf("warning: no processes found by name; searching commands\n");
-      num_results = getnamepid(command, &new_pid, 1);
+      num_results = pid_for_name(command, &new_pid, 1);
     }
     if (num_results == 0) {
       printf("error: no processes found\n");
@@ -1090,17 +1090,19 @@ static int command_attach(struct state* st, const char* command) {
   }
 
   // if we can get its name, we're fine - the process exists
-  char new_processname[PROCESS_NAME_LENGTH] = "";
-  getpidname(new_pid, new_processname, PROCESS_NAME_LENGTH);
-  if (new_processname[0]) {
+  char new_process_name[PROCESS_NAME_LENGTH] = "";
+  name_for_pid(new_pid, new_process_name, PROCESS_NAME_LENGTH);
+  if (new_process_name[0]) {
     st->pid = new_pid;
-    strcpy(st->processname, new_processname);
-    MoveFrozenRegionsToProcess(st->pid);
+    strcpy(st->process_name, new_process_name);
+    move_frozen_regions_to_process(st->pid);
 
     // warn user if pid is memwatch itself
-    if (st->pid == getpid())
-      printf("warning: memwatch is operating on itself\n");
-    printf("switched to new process %u/%s\n", st->pid, st->processname);
+    if (st->pid == getpid()) {
+      printf("warning: memwatch is operating on itself; -f is implied\n");
+      st->freeze_while_operating = 0;
+    }
+    printf("switched to new process %u/%s\n", st->pid, st->process_name);
   }
   return 0;
 }
@@ -1134,6 +1136,8 @@ static const struct {
   {"d", command_dump},
   {"find", command_find},
   {"fi", command_find},
+  //{"fork", command_fork}, // TODO
+  //{"fo", command_fork},
   {"freeze", command_freeze},
   {"fr", command_freeze},
   {"f", command_freeze},
@@ -1189,18 +1193,18 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_resu
 
   // get the process name
   if (!st.pid)
-    strcpy(st.processname, "KERNEL");
+    strcpy(st.process_name, "KERNEL");
   else
-    getpidname(st.pid, st.processname, PROCESS_NAME_LENGTH);
+    name_for_pid(st.pid, st.process_name, PROCESS_NAME_LENGTH);
 
   // no process name? process doesn't exist!
-  if (!strlen(st.processname)) {
+  if (!strlen(st.process_name)) {
     printf("process %u does not exist\n", st.pid);
     return (-2);
   }
 
   // init the region freezer
-  InitRegionFreezer();
+  freeze_init();
 
   // while we have stuff to do...
   char* command = NULL;
@@ -1208,24 +1212,24 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_resu
 
     // decide what to prompt the user with (include the seearch name if a search
     // is currently open)
-    // prompt is memwatch:<pid>/<processname> <num_search>/<num_frozen> <searchname> #
-    // or memwatch:<pid>/<processname> <num_search>/<num_frozen> #
+    // prompt is memwatch:<pid>/<process_name> <num_search>/<num_frozen> <searchname> #
+    // or memwatch:<pid>/<process_name> <num_search>/<num_frozen> #
     char* prompt;
     if (st.search) {
-      prompt = (char*)malloc(50 + strlen(st.processname) +
+      prompt = (char*)malloc(50 + strlen(st.process_name) +
                              strlen(st.search->name));
       if (!st.search->memory)
-        sprintf(prompt, "memwatch:%u/%s %ds/%df %s # ", st.pid, st.processname,
-                st.searches->numSearches, GetNumFrozenRegions(),
+        sprintf(prompt, "memwatch:%u/%s %ds/%df %s # ", st.pid, st.process_name,
+                st.searches->numSearches, get_num_frozen_regions(),
                 st.search->name);
       else
         sprintf(prompt, "memwatch:%u/%s %ds/%df %s(%llu) # ", st.pid,
-                st.processname, st.searches->numSearches, GetNumFrozenRegions(),
+                st.process_name, st.searches->numSearches, get_num_frozen_regions(),
                 st.search->name, st.search->numResults);
     } else {
-      prompt = (char*)malloc(30 + strlen(st.processname));
-      sprintf(prompt, "memwatch:%u/%s %ds/%df # ", st.pid, st.processname,
-              st.searches->numSearches, GetNumFrozenRegions());
+      prompt = (char*)malloc(30 + strlen(st.process_name));
+      sprintf(prompt, "memwatch:%u/%s %ds/%df # ", st.pid, st.process_name,
+              st.searches->numSearches, get_num_frozen_regions());
     }
 
     // delete the old command, if present
@@ -1264,6 +1268,6 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_resu
 
   // shut down the region freezer and return
   DeleteSearchList(st.searches);
-  CleanupRegionFreezer();
+  freeze_exit();
   return 0;
 }

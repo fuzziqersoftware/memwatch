@@ -16,19 +16,17 @@ typedef struct {
   char* name;
 } FrozenRegion;
 
-int InitRegionFreezer();
-void CleanupRegionFreezer();
+int freeze_init();
+void freeze_exit();
 
-int FreezeRegion(pid_t pid, mach_vm_address_t addr, mach_vm_size_t size,
-                 const void* data, const char* name);
-int UnfreezeRegionByIndex(int index);
-int UnfreezeRegionByAddr(mach_vm_address_t addr);
-int UnfreezeRegionByName(const char* name);
+int freeze_region(pid_t pid, mach_vm_address_t addr, mach_vm_size_t size,
+    const void* data, const char* name);
+int unfreeze_by_index(int index);
+int unfreeze_by_addr(mach_vm_address_t addr);
+int unfreeze_by_name(const char* name);
+void move_frozen_regions_to_process(pid_t pid);
 
-void MoveFrozenRegionsToProcess(pid_t pid);
-
-void GetFrozenRegions(const FrozenRegion** regions, int* numRegions);
-void PrintFrozenRegions(int printData);
-int GetNumFrozenRegions();
+void print_frozen_regions(int _print_data);
+int get_num_frozen_regions();
 
 #endif // FREEZE_REGION_H

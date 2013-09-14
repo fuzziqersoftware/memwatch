@@ -23,7 +23,7 @@ By default, the target process will be suspended while its memory is being read 
 By default, memwatch limits the number of results in iterative searches to 1073741824 (that's 2^30). This option overrides this limit. Setting the limit to zero allows an unlimited number of results, but this can be dangerous - for example, when performing a search that yields lots of results, memwatch's memory usage may increase to several times that of the target process.
 .TP
 .B pid_or_name
-The process ID or partial name (case-insensitive) of a process to target. In the case of a partial name, memwatch first searches the list of running processes. If no matching process is found, it then searches the list of processes with arguments. This list is the same as is given by the command \'ps auxwww\'.
+The process ID or partial name (case-insensitive) of a process to target. In the case of a partial name, memwatch first searches the list of running processes. If no matching process is found, it then searches the list of processes with arguments. This list is the same as is given by the command \'ps auxwww\'. The value \"KERNEL\" (all caps) specifies that memwatch should operate on the kernel. Operating on the kernel is disabled by default on newer versions of Mac OS X; a kernel patch may be required to re-enable it.
 
 .SH "GENERAL COMMANDS"
 .BR memwatch "\'s interactive interface implements the following general commands:"

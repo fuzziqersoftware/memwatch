@@ -158,8 +158,8 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
   unsigned char** mask = (unsigned char**)vmask;
 
   int read, chr = 0;
-  int string = 0, unicodestring = 0, high = 1;
-  int filename = 0, filename_start, filesize;
+  int string = 0, unicode_string = 0, high = 1;
+  int filename = 0, filename_start;
   unsigned long size = 0;
   int endian = 0;
   while (in[0]) {
@@ -187,9 +187,9 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
       in++;
 
     // if between single quotes, word-expand bytes to output buffer, unescaping
-    } else if (unicodestring) {
+    } else if (unicode_string) {
       if (in[0] == '\'')
-        unicodestring = 0;
+        unicode_string = 0;
       else if (in[0] == '\\') { // unescape char after a backslash
         if (!in[1])
           return size;
@@ -227,11 +227,11 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
           return 0;
         }
         fseek(f, 0, SEEK_END);
-        filesize = ftell(f);
-        size = filename_start + filesize;
+        int file_size = ftell(f);
+        size = filename_start + file_size;
         *data = realloc(*data, size);
         fseek(f, 0, SEEK_SET);
-        fread((*data + filename_start), 1, filesize, f);
+        fread((*data + filename_start), 1, file_size, f);
         fclose(f);
       } else
         write_byte(in[0]);
@@ -302,7 +302,7 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
       if (in[0] == '\"')
         string = 1;
       if (in[0] == '\'')
-        unicodestring = 1;
+        unicode_string = 1;
       if (in[0] == '<') {
         filename = 1;
         filename_start = size;
@@ -401,7 +401,7 @@ int copy_quoted_string(const char* in, char** out) {
 // reads addr:size (hex) or addr size (dec) from a string; returns the number of
 // chars used up, or 0 if an error occurred
 int read_addr_size(const char* str, unsigned long long* addr,
-                   unsigned long long* size) {
+    unsigned long long* size) {
 
   // read address
   sscanf(str, "%llX", addr);
