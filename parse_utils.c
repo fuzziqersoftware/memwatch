@@ -285,6 +285,28 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
       while (isdigit(in[0]))
         in++;
 
+    // % is a float, %% is a double
+    } else if (in[0] == '%') {
+      in++;
+      if (in[0] == '%') {
+        in++;
+        expand(8);
+        double* value = (double*)(&((*data)[size - 8]));
+        sscanf(in, "%lf", value);
+        if (endian)
+          bswap(value, 8);
+      } else {
+        expand(4);
+        float* value = (float*)(&((*data)[size - 4]));
+        sscanf(in, "%f", value);
+        if (endian)
+          bswap(value, 4);
+      }
+      if (in[0] == '-')
+        in++;
+      while (isdigit(in[0]) || (in[0] == '.'))
+        in++;
+
     // anything else is a hex digit
     } else {
       if ((in[0] >= '0') && (in[0] <= '9')) {
