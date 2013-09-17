@@ -522,6 +522,11 @@ static void print_search_results(struct state* st, MemorySearchData* search,
 // print list of results for current search, or the named search
 static int command_results(struct state* st, const char* command) {
 
+  // if a ! is given, show results until cancelled
+  int cont = (command && (command[0] == '!'));
+  if (cont)
+    command++;
+
   // if a search name is given, show results for that search
   MemorySearchData* search = st->search;
   if (command && command[0])
@@ -538,7 +543,14 @@ static int command_results(struct state* st, const char* command) {
     return 0;
   }
 
-  print_search_results(st, search, 0);
+  cancel_var = &cont;
+  do {
+    print_search_results(st, search, 0);
+    if (cont)
+      usleep(1000000); // wait a second, if we're repeating
+  } while (cont);
+  cancel_var = NULL;
+
   return 0;
 }
 
