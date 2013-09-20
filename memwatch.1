@@ -50,7 +50,7 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 .RI "If " filename " is given, dumps all readable memory in the target process to files named " filename "_address. If " filename " is not given, only determines which regions are readable."
 .TP
 .BI "read " "address" " " "size" " " "[filename]"
-.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " is specified in hexadecimal, and " size " is specified in decimal. To specify " size " in hexadecimal, use the syntax " "address:size" " instead of " "address size" ". If a filename is given, writes the data to the given file instead of printing to the console. In addition, " address " may be prepended with \'!\' to repeat the read every second until Ctrl+C is pressed."
+.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " is specified in hexadecimal, and " size " is specified in decimal. To specify " size " in hexadecimal, use the syntax " "address:size" " instead of " "address size" ". If a filename is given, writes the data to the given file instead of printing to the console. The " read " command may be prepended with " watch " to repeat the read every second until Ctrl+C is pressed."
 .TP
 .BI "write " "address data"
 .RI "Writes " data " to " address " in the target process\'s memory. See the DATA FORMAT section for information on how to specify the data string."
@@ -74,7 +74,7 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 .RI "Reads the values of variables in the current list of results (or the named search's results, if a name is given), and filters out the results for which (new value " "operator prev value" ") is false. If " value " is not given, uses the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
 .TP
 .BI "results " "[search_name]"
-.RI "Displays the current list of results. If search_name is given, displays the results for that search."
+.RI "Displays the current list of results. If search_name is given, displays the results for that search. The command may be prepended with " watch " to read new values every second."
 .TP
 .BI "delete " "addr1 [addr2]"
 .RI "If " addr2 " is given, deletes all results between " addr1 " and " addr2 ". If " addr2 " is not given, deletes the search result at " addr1 .

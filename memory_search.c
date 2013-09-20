@@ -27,10 +27,14 @@ struct state {
   char process_name[PROCESS_NAME_LENGTH]; // name of that process
   int freeze_while_operating;
   uint64_t max_results;
+  int watch; // set to 1 to repeat commands
   int run; // set to 0 to exit the memory search interface
   MemorySearchDataList* searches; // list of open searches
   MemorySearchData* search; // the current search
 };
+
+// forward decl so commands can dispatch other commands
+int dispatch_command(struct state* st, const char* command);
 
 
 
@@ -64,6 +68,14 @@ static int command_list(struct state* st, const char* command) {
   print_region_map(map);
   DestroyDataMap(map);
   return 0;
+}
+
+// run another command with watch enabled
+static int command_watch(struct state* st, const char* command) {
+  st->watch = 1;
+  int ret = dispatch_command(st, command);
+  st->watch = 0;
+  return ret;
 }
 
 // take a snapshot of the target process' memory and save it to disk
@@ -200,10 +212,8 @@ static int command_access(struct state* st, const char* command) {
 // read data from targer memory
 static int command_read(struct state* st, const char* command) {
 
-  // if a ! is given in the command, make the read repeat
-  int cont = (command[0] == '!');
-  if (cont)
-    command++;
+  // we'll repeat the read if watch is enabled
+  int cont = st->watch;
 
   // read addr/size from the command
   uint64_t addr, size;
@@ -522,10 +532,8 @@ static void print_search_results(struct state* st, MemorySearchData* search,
 // print list of results for current search, or the named search
 static int command_results(struct state* st, const char* command) {
 
-  // if a ! is given, show results until cancelled
-  int cont = (command && (command[0] == '!'));
-  if (cont)
-    command++;
+  // if watch is enabled, show results until cancelled
+  int cont = st->watch;
 
   // if a search name is given, show results for that search
   MemorySearchData* search = st->search;
@@ -1179,6 +1187,9 @@ static const struct {
   {"t", command_find},
   {"unfreeze", command_unfreeze},
   {"u", command_unfreeze},
+  {"watch", command_watch},
+  {"wa", command_watch},
+  {"!", command_watch},
   {"wregs", command_write_regs},
   {"write", command_write},
   {"wr", command_write},
@@ -1190,6 +1201,24 @@ static const struct {
 
 
 
+// runs a single command
+int dispatch_command(struct state* st, const char* command) {
+
+  // if no command, do nothing
+  if (!command[0])
+    return 0;
+
+  // find the entry in the command table and run the command
+  int command_id;
+  for (command_id = 0; command_handlers[command_id].word; command_id++)
+    if (!strncmp(command_handlers[command_id].word, command,
+                 strlen(command_handlers[command_id].word)))
+      break;
+  if (command_handlers[command_id].func)
+    return command_handlers[command_id].func(st, skip_word(command, ' '));
+  printf("unknown command - try \'help\'\n");
+  return 1;
+}
 
 // memory searching user interface!
 int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_results) {
@@ -1261,21 +1290,8 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_resu
       break;
     }
 
-    // if no command, do nothing
-    if (!command[0]) {
-      continue;
-    }
-
-    // find the entry in the command table and run the command
-    int command_id, error;
-    for (command_id = 0; command_handlers[command_id].word; command_id++)
-      if (!strncmp(command_handlers[command_id].word, command,
-                   strlen(command_handlers[command_id].word)))
-        break;
-    if (command_handlers[command_id].func)
-      error = command_handlers[command_id].func(&st, skip_word(command, ' '));
-    else
-      printf("unknown command - try \'help\'\n");
+    // dispatch the command
+    dispatch_command(&st, command);
   }
 
   // shut down the region freezer and return
