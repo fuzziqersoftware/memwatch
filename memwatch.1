@@ -1,4 +1,4 @@
-.TH memwatch 1 "7 Sep 2013"
+.TH memwatch 1 "17 Nov 2013"
 .SH NAME
 memwatch \- find and modify variables in other processes
 .SH SYNOPSIS
@@ -69,6 +69,9 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 .TP
 .BI "close " name
 .RI "If " name " is given, closes the specified search. If " name " is not given, closes the current search."
+.TP
+.BI "fork " name " " [name2]
+.RI "If " name2 " is given, makes a copy of the search named " name " as " name2 ". Otherwise, makes a copy of the current search as " name " and switches to it."
 .TP
 .BI "search " "[search_name] operator value"
 .RI "Reads the values of variables in the current list of results (or the named search's results, if a name is given), and filters out the results for which (new value " "operator prev value" ") is false. If " value " is not given, uses the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."

@@ -153,7 +153,7 @@ static int command_find(struct state* st, const char* command) {
   if (st->freeze_while_operating)
     VMResumeProcess(st->pid);
 
-  // read the «search string from the command
+  // read the search string from the command
   char *data, *mask;
   uint64_t size = read_string_data(command, (void**)&data, (void**)&mask);
 
@@ -450,6 +450,49 @@ static int command_open(struct state* st, const char* command) {
   // report failure if none of the above happened
   } else
     printf("failed to open new search - did you use a valid typename?\n");
+
+  return 0;
+}
+
+// copies a search
+static int command_fork(struct state* st, const char* command) {
+  // fork <name> forks current search into new search and selects it
+  // fork <name1> <name2> forks one search into another and does not select it
+
+  const char* other_search_name = skip_word(command, ' ');
+  if (*other_search_name) {
+    // this is the second form: forking a non-current search
+    char* this_search_name = get_word(command, ' ');
+    if (!this_search_name) {
+      printf("failed to parse command\n");
+      return 0;
+    }
+
+    MemorySearchData* s = CopySearch(st->searches, st->search->name, command);
+    if (!s)
+      printf("failed to fork search\n");
+    else
+      printf("forked search %s into %s\n", st->search->name, s->name);
+
+  } else {
+    // this is the first form: forking the current search
+    if (!st->search) {
+      printf("no search is open; can\'t fork\n");
+      return 0;
+    }
+    if (!command[0]) {
+      printf("can\'t fork a named search into an unnamed search\n");
+      return 0;
+    }
+    MemorySearchData* s = CopySearch(st->searches, st->search->name, command);
+    if (!s)
+      printf("failed to fork search\n");
+    else {
+      printf("forked search %s into %s and switched to new search\n",
+          st->search->name, s->name);
+      st->search = s;
+    }
+  }
 
   return 0;
 }
@@ -1156,8 +1199,9 @@ static const struct {
   {"d", command_dump},
   {"find", command_find},
   {"fi", command_find},
-  //{"fork", command_fork}, // TODO
-  //{"fo", command_fork},
+  {"fork", command_fork},
+  {"fk", command_fork},
+  {"fo", command_fork},
   {"freeze", command_freeze},
   {"fr", command_freeze},
   {"f", command_freeze},

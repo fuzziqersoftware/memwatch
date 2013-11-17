@@ -152,6 +152,38 @@ int UpdateDataMap(VMRegionDataMap* map) {
   return 0;
 }
 
+VMRegionDataMap* CopyDataMap(VMRegionDataMap* s) {
+
+  int object_size = sizeof(VMRegionDataMap) +
+      sizeof(VMRegionData) * s->numRegions;
+  VMRegionDataMap* n = (VMRegionDataMap*)malloc(object_size);
+  if (!n)
+    return NULL;
+  memcpy(n, s, object_size);
+
+  long x;
+  for (x = 0; x < s->numRegions; x++) {
+    if (!s->regions[x].data)
+      continue; // no data for this region
+    n->regions[x].data = malloc(n->regions[x].region._size);
+    if (!n->regions[x].data)
+      break;
+    memcpy(n->regions[x].data, s->regions[x].data, n->regions[x].region._size);
+  }
+
+  // if the region copying didn't finish, then this is an incomplete map and we
+  // should destroy it
+  if (x < s->numRegions) {
+    for (; x >= 0; x--)
+      if (n->regions[x].data)
+        free(n->regions[x].data);
+    free(n);
+    n = NULL;
+  }
+
+  return n;
+}
+
 void DestroyDataMap(VMRegionDataMap* map) {
   if (map) {
     unsigned long x;

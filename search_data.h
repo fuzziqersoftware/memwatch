@@ -63,6 +63,7 @@ MemorySearchData* CreateNewSearch(int type, const char* name, long flags);
 MemorySearchData* CreateNewSearchByTypeName(const char* type, const char* name,
                                             long flags);
 void DeleteSearch(MemorySearchData* search);
+MemorySearchData* CopySearchData(MemorySearchData* d);
 
 // does the actual searching. ComparePredicate tells which comparator to use,
 // and value is the value to compare with (NULL to use previous values)

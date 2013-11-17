@@ -260,6 +260,23 @@ void DeleteSearch(MemorySearchData* search) {
   }
 }
 
+// copies a search data set
+MemorySearchData* CopySearchData(MemorySearchData* s) {
+
+  int object_size = sizeof(MemorySearchData) +
+      s->numResults * sizeof(unsigned long long);
+  MemorySearchData* n = (MemorySearchData*)malloc(object_size);
+  if (!n)
+    return NULL;
+  memcpy(n, s, sizeof(MemorySearchData));
+  n->memory = CopyDataMap(s->memory);
+  if (!n->memory) {
+    free(n);
+    return NULL;
+  }
+  return n;
+}
+
 // byteswaps a value, for use in ApplyMapToSearch
 void _ApplyMapToSearch_ByteswapValueIfLE(int searchtype, void* value) {
 
@@ -330,7 +347,8 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
     if ((n->type == SEARCHTYPE_DATA) && !size) {
       printf("zero size given on initial data search\n");
       return NULL;
-    }
+    } else if (n->type != SEARCHTYPE_DATA)
+      size = typeConfigs[n->type].field_size;
 
     // check every address in every region
     unsigned long long y;

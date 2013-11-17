@@ -17,6 +17,8 @@ void DeleteSearchList(MemorySearchDataList* list);
 int AddSearchToList(MemorySearchDataList* list, MemorySearchData* data);
 int DeleteSearchByName(MemorySearchDataList* list, const char* name);
 MemorySearchData* GetSearchByName(MemorySearchDataList* list, const char* name);
+MemorySearchData* CopySearch(MemorySearchDataList* l, const char* name,
+    const char* new_name);
 
 void PrintSearches(MemorySearchDataList* list);
 

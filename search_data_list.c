@@ -102,6 +102,23 @@ MemorySearchData* GetSearchByName(MemorySearchDataList* list,
   return NULL;
 }
 
+// make a copy of an existing search
+MemorySearchData* CopySearch(MemorySearchDataList* l, const char* name,
+    const char* new_name) {
+
+  MemorySearchData* orig_search = GetSearchByName(l, name);
+  if (!orig_search)
+    return NULL;
+
+  MemorySearchData* new_search = CopySearchData(orig_search);
+  if (!new_search)
+    return NULL;
+
+  strncpy(new_search->name, new_name, 0x80);
+  AddSearchToList(l, new_search);
+  return new_search;
+}
+
 // print a list of the searches in this list
 void PrintSearches(MemorySearchDataList* list) {
 
