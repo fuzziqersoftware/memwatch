@@ -258,8 +258,11 @@ static int command_read(struct state* st, const char* command) {
         } else
           printf("failed to open file\n");
       } else {
-        print_process_data(st->process_name, addr, read_data,
-                           times ? read_data_prev : NULL, size);
+        char time_str[0x80];
+        get_current_time_string(time_str);
+        printf("%s @ %016llX:%016llX // %s\n", st->process_name, addr, size, time_str);
+        print_data(addr, read_data, times ? read_data_prev : NULL, size, 0);
+        printf("\n");
       }
     }
 

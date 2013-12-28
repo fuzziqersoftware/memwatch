@@ -67,4 +67,7 @@ char* get_word(const char* in, char delim);
 int copy_quoted_string(const char* in, char** out);
 int read_addr_size(const char* str, unsigned long long* addr,
     unsigned long long* size);
+
+void get_current_time_string(char* output);
+
 #endif // PARSE_UTILS_H

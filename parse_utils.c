@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "parse_utils.h"
 
@@ -515,4 +516,22 @@ int read_addr_size(const char* str, unsigned long long* addr,
     return skip_word(next_spc, ' ') - str;
   }
   return 0;
+}
+
+// returns a string representing the current local time
+// example: "27 December 2013 17:45:40.236"
+void get_current_time_string(char* output) {
+  struct timeval rawtime;
+  gettimeofday(&rawtime, NULL);
+
+  struct tm cooked;
+  localtime_r(&rawtime.tv_sec, &cooked);
+
+  const char* monthnames[] = {"January", "February", "March",
+    "April", "May", "June", "July", "August", "September",
+    "October", "November", "December"};
+  sprintf(output, "%u %s %4u %2u:%02u:%02u.%03u", cooked.tm_mday,
+     monthnames[cooked.tm_mon], cooked.tm_year + 1900,
+     cooked.tm_hour, cooked.tm_min, cooked.tm_sec,
+     rawtime.tv_usec / 1000);
 }

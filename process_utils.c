@@ -2,7 +2,6 @@
 // odds and ends used for messing with processes
 
 #include <ctype.h>
-#include <sys/time.h>
 
 #include "parse_utils.h"
 #include "process_utils.h"
@@ -226,29 +225,4 @@ void print_region_map(VMRegionDataMap* map) {
          _size_to_human_readable(total_executable, sizebuffer));
   printf("%5lld regions, %s inaccessible\n", num_inaccessible,
          _size_to_human_readable(total_inaccessible, sizebuffer));
-}
-
-// prints a chunk of data, along with the process' name and the current time
-void print_process_data(const char* processname, unsigned long long addr,
-    void* read_data, void* diff_data, unsigned long long size) {
-
-  // get the current time
-  struct timeval rawtime;
-  struct tm cooked;
-  const char* monthnames[] = {"January", "February", "March",
-    "April", "May", "June", "July", "August", "September",
-    "October", "November", "December"};
-  gettimeofday(&rawtime, NULL);
-  localtime_r(&rawtime.tv_sec, &cooked);
-
-  // print the header
-  printf("%s @ %016llX:%016llX // ", processname, addr, size);
-  printf("%u %s %4u %2u:%02u:%02u.%03u\n", cooked.tm_mday,
-         monthnames[cooked.tm_mon], cooked.tm_year + 1900,
-         cooked.tm_hour, cooked.tm_min, cooked.tm_sec,
-         rawtime.tv_usec / 1000);
-
-  // and print the data
-  print_data(addr, read_data, diff_data, size, 0);
-  printf("\n");
 }
