@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <stdint.h>
 
+int run_one_command(pid_t pid, int freeze_while_operating, uint64_t max_results, const char* command);
 int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_results);
 
 #endif // MEMORY_SEARCH_H

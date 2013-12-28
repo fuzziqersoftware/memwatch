@@ -69,9 +69,8 @@ int main(int argc, char* argv[]) {
   int freeze_while_operating = 1;
   uint64_t max_results = 1024 * 1024 * 1024; // approx. 1 billion
   char process_name[PROCESS_NAME_LENGTH] = {0};
-
-  /*int num_commands = 0;
-  char** commands = NULL; */
+  char *input_command = NULL;
+  int input_command_len = 0;
 
   // parse command line args
   int x;
@@ -113,9 +112,12 @@ int main(int argc, char* argv[]) {
 
     // all subsequent non-dash params: unnecessary parameters
     } else {
-      // TODO: maybe someday we could take commands on the command line, then
-      // run them immediately
-      printf("warning: ignored excess argument: %s\n", argv[x]);
+
+      int token_len = strlen(argv[x]);
+      input_command = (char*)realloc(input_command, input_command_len + token_len + 2);
+      input_command[input_command_len] = ' ';
+      strcpy(&input_command[input_command_len + 1], argv[x]);
+      input_command_len += (token_len + 1);
     }
   }
 
@@ -172,6 +174,10 @@ int main(int argc, char* argv[]) {
   if (geteuid())
     printf("warning: memwatch likely will not work if not run as root\n");
 
-  // finally, enter interactive interface
+  // if a command is given on the cli, run it individually
+  if (input_command)
+    return run_one_command(pid, freeze_while_operating, max_results, input_command);
+
+  // else, use the interactive interface
   return prompt_for_commands(pid, freeze_while_operating, max_results);
 }

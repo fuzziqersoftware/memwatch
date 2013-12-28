@@ -28,6 +28,7 @@ struct state {
   int freeze_while_operating;
   uint64_t max_results;
   int watch; // set to 1 to repeat commands
+  int interactive; // 0 if run from the shell; 1 if from the memwatch prompt
   int run; // set to 0 to exit the memory search interface
   MemorySearchDataList* searches; // list of open searches
   MemorySearchData* search; // the current search
@@ -45,7 +46,7 @@ static int command_help(struct state* st, const char* command) {
   int retcode = system("man memwatch");
   if (retcode)
     printf("failed to open the man page - memwatch may not be installed properly on your system\n");
-  return 0;
+  return retcode;
 }
 
 // list regions of memory in the target process
@@ -58,7 +59,7 @@ static int command_list(struct state* st, const char* command) {
   VMRegionDataMap* map = GetProcessRegionList(st->pid, 0);
   if (!map) {
     printf("get process region list failed\n");
-    return 0;
+    return 1;
   }
 
   if (st->freeze_while_operating)
@@ -88,7 +89,7 @@ static int command_dump(struct state* st, const char* command) {
   VMRegionDataMap* map = DumpProcessMemory(st->pid, 0);
   if (!map) {
     printf("memory dump failed\n");
-    return 0;
+    return 1;
   }
 
   if (st->freeze_while_operating)
@@ -147,7 +148,7 @@ static int command_find(struct state* st, const char* command) {
   VMRegionDataMap* map = DumpProcessMemory(st->pid, 0);
   if (!map) {
     printf("memory dump failed\n");
-    return 0;
+    return 1;
   }
 
   if (st->freeze_while_operating)
@@ -220,7 +221,7 @@ static int command_read(struct state* st, const char* command) {
   int addrsize_read_result = read_addr_size(command, &addr, &size);
   if (!addrsize_read_result) {
     printf("invalid command format\n");
-    return 0;
+    return 1;
   }
   command += addrsize_read_result;
 
@@ -235,7 +236,7 @@ static int command_read(struct state* st, const char* command) {
       free(read_data);
     if (read_data_prev)
       free(read_data_prev);
-    return 0;
+    return 2;
   }
 
   // go ahead and read the target's memory
@@ -314,6 +315,12 @@ static int command_write(struct state* st, const char* command) {
 // add a region to the frozen-list with the given data
 static int command_freeze(struct state* st, const char* command) {
 
+  // interactive mode only
+  if (!st->interactive) {
+    printf("this command cannot be used from the command-line interface\n");
+    return 1;
+  }
+
   // if a quote is given, read the name
   char* freeze_name = NULL;
   if ((command[0] == '\'') || (command[0] == '\"')) {
@@ -331,7 +338,7 @@ static int command_freeze(struct state* st, const char* command) {
     data = malloc(size);
     if (!data) {
       printf("failed to allocate memory for reading\n");
-      return 0;
+      return 2;
     }
 
     if (st->freeze_while_operating)
@@ -345,7 +352,7 @@ static int command_freeze(struct state* st, const char* command) {
     else {
       printf("failed to read data from process (error %d)\n", error);
       free(data);
-      return 0;
+      return 3;
     }
 
   } else {
@@ -371,6 +378,12 @@ static int command_freeze(struct state* st, const char* command) {
 
 // remove a region from the frozen-list
 static int command_unfreeze(struct state* st, const char* command) {
+
+  // interactive mode only
+  if (!st->interactive) {
+    printf("this command cannot be used from the command-line interface\n");
+    return 1;
+  }
 
   // index given? unfreeze a region
   if (command[0]) {
@@ -408,10 +421,16 @@ static int command_unfreeze(struct state* st, const char* command) {
 // open a new search
 static int command_open(struct state* st, const char* command) {
 
+  // interactive mode only
+  if (!st->interactive) {
+    printf("this command cannot be used from the command-line interface\n");
+    return 1;
+  }
+
   // if no argument given, just show the list of searches
   if (!command[0]) {
     PrintSearches(st->searches);
-    return 0;
+    return 2;
   }
 
   // check if a search by the given name exists or not
@@ -459,13 +478,19 @@ static int command_fork(struct state* st, const char* command) {
   // fork <name> forks current search into new search and selects it
   // fork <name1> <name2> forks one search into another and does not select it
 
+  // interactive mode only
+  if (!st->interactive) {
+    printf("this command cannot be used from the command-line interface\n");
+    return 1;
+  }
+
   const char* other_search_name = skip_word(command, ' ');
   if (*other_search_name) {
     // this is the second form: forking a non-current search
     char* this_search_name = get_word(command, ' ');
     if (!this_search_name) {
       printf("failed to parse command\n");
-      return 0;
+      return 2;
     }
 
     MemorySearchData* s = CopySearch(st->searches, st->search->name, command);
@@ -478,11 +503,11 @@ static int command_fork(struct state* st, const char* command) {
     // this is the first form: forking the current search
     if (!st->search) {
       printf("no search is open; can\'t fork\n");
-      return 0;
+      return 3;
     }
     if (!command[0]) {
       printf("can\'t fork a named search into an unnamed search\n");
-      return 0;
+      return 4;
     }
     MemorySearchData* s = CopySearch(st->searches, st->search->name, command);
     if (!s)
@@ -575,6 +600,12 @@ static void print_search_results(struct state* st, MemorySearchData* search,
 // print list of results for current search, or the named search
 static int command_results(struct state* st, const char* command) {
 
+  // interactive mode only
+  if (!st->interactive) {
+    printf("this command cannot be used from the command-line interface\n");
+    return 1;
+  }
+
   // if watch is enabled, show results until cancelled
   int cont = st->watch;
 
@@ -587,11 +618,11 @@ static int command_results(struct state* st, const char* command) {
   // object has no memory associated with it (and therefore no valid results)
   if (!search) {
     printf("search not found, or no search currently open\n");
-    return 0;
+    return 2;
   }
   if (!search->memory) {
     printf("no initial search performed; results not available\n");
-    return 0;
+    return 3;
   }
 
   cancel_var = &cont;
@@ -608,15 +639,21 @@ static int command_results(struct state* st, const char* command) {
 // delete specific results from a search
 static int command_delete(struct state* st, const char* command) {
 
+  // interactive mode only
+  if (!st->interactive) {
+    printf("this command cannot be used from the command-line interface\n");
+    return 1;
+  }
+
   // can't do this if there isn't a current search, or if the current search
   // object has no memory associated with it (and therefore no valid results)
   if (!st->search) {
     printf("no search currently open\n");
-    return 0;
+    return 2;
   }
   if (!st->search->memory) {
     printf("no initial search performed\n");
-    return 0;
+    return 3;
   }
 
   // read the addresses
@@ -639,6 +676,12 @@ static int command_delete(struct state* st, const char* command) {
 // execute a search using the current search object
 static int command_search(struct state* st, const char* command) {
 
+  // interactive mode only
+  if (!st->interactive) {
+    printf("this command cannot be used from the command-line interface\n");
+    return 1;
+  }
+
   MemorySearchData* search = st->search;
 
   // read the predicate
@@ -650,7 +693,7 @@ static int command_search(struct state* st, const char* command) {
     char* search_name = get_word(command, ' ');
     if (!search_name) {
       printf("invalid predicate type\n");
-      return 0;
+      return 2;
     }
     search = GetSearchByName(st->searches, search_name);
     free(search_name);
@@ -662,7 +705,7 @@ static int command_search(struct state* st, const char* command) {
   // if there's no search, then we can't do anything
   if (!search) {
     printf("no search is open and no search was specified by name\n");
-    return 0;
+    return 3;
   }
 
   // check if a value followed the predicate
@@ -700,7 +743,7 @@ static int command_search(struct state* st, const char* command) {
       search->searchflags & SEARCHFLAG_ALLMEMORY ? 0 : VMREGION_WRITABLE);
   if (!map) {
     printf("memory dump failed\n");
-    return 0;
+    return 4;
   }
 
   if (st->freeze_while_operating)
@@ -715,7 +758,7 @@ static int command_search(struct state* st, const char* command) {
   // success? then save the result
   if (!search_result) {
     printf("search failed\n");
-    return 0;
+    return 5;
   }
 
   // add this search to the list. don't need to delete the old one here - it'll
@@ -732,14 +775,20 @@ static int command_search(struct state* st, const char* command) {
 // write a value to all current search results
 static int command_set(struct state* st, const char* command) {
 
+  // interactive mode only
+  if (!st->interactive) {
+    printf("this command cannot be used from the command-line interface\n");
+    return 1;
+  }
+
   // need an open search with valid results to do this
   if (!st->search) {
     printf("no search currently open\n");
-    return 0;
+    return 2;
   }
   if (!st->search->memory) {
     printf("no initial search performed\n");
-    return 0;
+    return 3;
   }
 
   // read the value, matching the search type
@@ -768,7 +817,7 @@ static int command_set(struct state* st, const char* command) {
     data = datavalue;
   } else {
     printf("error: unknown search type\n");
-    return 0;
+    return 4;
   }
 
   // byteswap the value if the search is a reverse-endian type
@@ -802,13 +851,19 @@ static int command_set(struct state* st, const char* command) {
 // close the current search or a search specified by name
 static int command_close(struct state* st, const char* command) {
 
+  // interactive mode only
+  if (!st->interactive) {
+    printf("this command cannot be used from the command-line interface\n");
+    return 1;
+  }
+
   // no name present? then we're closing the current search
   if (!command[0]) {
 
     // check if there's a current search
     if (!st->search) {
       printf("no search currently open\n");
-      return 0;
+      return 2;
     }
 
     // delete the search. if it has a name, delete it from the searches list;
@@ -897,7 +952,7 @@ static int command_write_regs(struct state* st, const char* command) {
       printf("invalid register name\n");
       if (st->freeze_while_operating)
         VMResumeProcess(st->pid);
-      return 0;
+      return 1;
     }
 
     // write the reg contents back to the process, and print the regs if
@@ -1091,7 +1146,7 @@ static int command_pause(struct state* st, const char* command) {
     printf("process suspended\n");
   else
     printf("failed to pause process (error %d)\n", error);
-  return 0;
+  return error;
 }
 
 // resume the target process
@@ -1101,7 +1156,7 @@ static int command_resume(struct state* st, const char* command) {
     printf("process resumed\n");
   else
     printf("failed to resume process (error %d)\n", error);
-  return 0;
+  return error;
 }
 
 // terminate the target process
@@ -1111,7 +1166,7 @@ static int command_terminate(struct state* st, const char* command) {
     printf("process terminated\n");
   else
     printf("failed to terminate process (error %d)\n", error);
-  return 0;
+  return error;
 }
 
 // send a signal the target process
@@ -1144,11 +1199,11 @@ static int command_attach(struct state* st, const char* command) {
     }
     if (num_results == 0) {
       printf("error: no processes found\n");
-      return 0;
+      return 1;
     }
     if (num_results > 1) {
       printf("error: multiple processes found\n");
-      return 0;
+      return 2;
     }
   }
 
@@ -1261,7 +1316,50 @@ int dispatch_command(struct state* st, const char* command) {
   if (command_handlers[command_id].func)
     return command_handlers[command_id].func(st, skip_word(command, ' '));
   printf("unknown command - try \'help\'\n");
-  return 1;
+  return (-1);
+}
+
+void init_state(struct state* st, pid_t pid, int freeze_while_operating, uint64_t max_results, int interactive) {
+  // fill in the struct
+  memset(st, 0, sizeof(struct state));
+  st->pid = pid;
+  st->run = 1;
+  st->searches = CreateSearchList();
+  st->freeze_while_operating = freeze_while_operating;
+  st->max_results = max_results;
+  st->interactive = interactive;
+
+  // get the process name
+  if (!st->pid)
+    strcpy(st->process_name, "KERNEL");
+  else
+    name_for_pid(st->pid, st->process_name, PROCESS_NAME_LENGTH);
+}
+
+void cleanup_state(struct state* st) {
+  DeleteSearchList(st->searches);
+}
+
+int run_one_command(pid_t pid, int freeze_while_operating, uint64_t max_results, const char* input_command) {
+  // construct the initial state
+  struct state st;
+  init_state(&st, pid, freeze_while_operating, max_results, 0);
+
+  // no process name? process doesn't exist!
+  if (!strlen(st.process_name)) {
+    printf("process %u does not exist\n", st.pid);
+    return (-2);
+  }
+
+  // trim & dispatch the command
+  char* command = strdup(input_command);
+  trim_spaces(command);
+  int retcode = dispatch_command(&st, command);
+
+  // clean up and return
+  free(command);
+  cleanup_state(&st);
+  return retcode;
 }
 
 // memory searching user interface!
@@ -1269,18 +1367,7 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_resu
 
   // construct the initial state
   struct state st;
-  memset(&st, 0, sizeof(struct state));
-  st.pid = pid;
-  st.run = 1;
-  st.searches = CreateSearchList();
-  st.freeze_while_operating = freeze_while_operating;
-  st.max_results = max_results;
-
-  // get the process name
-  if (!st.pid)
-    strcpy(st.process_name, "KERNEL");
-  else
-    name_for_pid(st.pid, st.process_name, PROCESS_NAME_LENGTH);
+  init_state(&st, pid, freeze_while_operating, max_results, 1);
 
   // no process name? process doesn't exist!
   if (!strlen(st.process_name)) {
@@ -1339,7 +1426,7 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_resu
   }
 
   // shut down the region freezer and return
-  DeleteSearchList(st.searches);
+  cleanup_state(&st);
   freeze_exit();
   return 0;
 }

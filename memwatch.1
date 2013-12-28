@@ -5,6 +5,7 @@ memwatch \- find and modify variables in other processes
 .B memwatch
 [ -c ] [ -f ] [ -nX ]
 .I pid_or_name
+[ command ]
 .SH DESCRIPTION
 .B memwatch
 provides an interactive interface to find and modify variables in the memory of a running process. This is done by repeatedly searching the process\' address space for values that follow the rules given by the user, narrowing down the result set until it includes only the desired variable. After finding this variable, memwatch can monitor it, change its value, "freeze" its value, and more. This functionality is similar to that provided by scanmem(1).
@@ -24,6 +25,9 @@ By default, memwatch limits the number of results in iterative searches to 10737
 .TP
 .B pid_or_name
 The process ID or partial name (case-insensitive) of a process to target. In the case of a partial name, memwatch first searches the list of running processes. If no matching process is found, it then searches the list of processes with arguments. This list is the same as is given by the command \'ps auxwww\'. The value \"KERNEL\" (all caps) specifies that memwatch should operate on the kernel. Operating on the kernel is disabled by default on newer versions of Mac OS X; a kernel patch may be required to re-enable it.
+.TP
+.B command
+A single command (see the following sections) which will be executed instead of entering the interactive interface. Freeze and search commands (except for "find") are not supported in this interface.
 
 .SH "GENERAL COMMANDS"
 .BR memwatch "\'s interactive interface implements the following general commands:"
