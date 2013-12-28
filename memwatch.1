@@ -122,6 +122,9 @@ A single command (see the following sections) which will be executed instead of 
 .BI "wregs" " value reg [thread_id]"
 .RI "Writes " value " to " reg " in all threads of the target process. If " thread_id " is given, writes the register\'s value only in that thread. " thread_id " should match one of the thread indices printed by the regs command."
 .TP
+.BI "stacks" " [size]"
+.RI "Reads " size " bytes from the stack of each thread. If not given, " size " defaults to 0x100."
+.TP
 .BI "break" " type address"
 .RI "Sets a " type " breakpoint on " address ". " type " may contain the characters x (break on execute), r (break on read), w (break on read/write), or i (break on I/O), as well as 1, 2, 4, or 8 (specifying the size of the region to watch)."
 

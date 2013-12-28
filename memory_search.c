@@ -977,6 +977,64 @@ static int command_write_regs(struct state* st, const char* command) {
   return 0;
 }
 
+// read stacks for all threads in the target process
+static int command_read_stacks(struct state* st, const char* command) {
+
+  // default size to read is 0x100 per thread if not specified
+  uint64_t size = 0x100;
+  sscanf(command, "%llX", &size);
+
+  if (st->freeze_while_operating)
+    VMPauseProcess(st->pid);
+
+  // get registers for target threads
+  VMThreadState* thread_state;
+  int x, error = VMGetProcessRegisters(st->pid, &thread_state);
+  if (error < 0) {
+    printf("failed to get registers; error %d\n", error);
+    return error;
+  } else if (error == 0) {
+    printf("no threads in process\n");
+    return 1;
+  } else {
+
+    void* read_data = malloc(size);
+    if (!read_data) {
+      printf("failed to allocate memory for reading\n");
+      return 2;
+    }
+
+    for (x = 0; x < error; x++) {
+
+      uint64_t addr = thread_state[x].is64 ? thread_state[x].st64.__rsp : thread_state[x].st32.__esp;
+
+      char time_str[0x80];
+      get_current_time_string(time_str);
+      printf("%s [Thread %d] @ %016llX:%016llX // %s\n", st->process_name, x,
+          addr, size, time_str);
+
+      if (st->freeze_while_operating)
+        VMPauseProcess(st->pid);
+      int error2 = VMReadBytes(st->pid, addr, read_data, &size);
+      if (error2)
+        printf("failed to read data from process (error %d)\n", error2);
+      else
+        print_data(addr, read_data, NULL, size, 0);
+      printf("\n");
+
+      if (st->freeze_while_operating)
+        VMResumeProcess(st->pid);
+    }
+    free(thread_state);
+    free(read_data);
+  }
+
+  if (st->freeze_while_operating)
+    VMResumeProcess(st->pid);
+
+  return 0;
+}
+
 // handler for breakpoint exceptions in the target process
 // for now, just prints out the breakpoint info and clears dr7
 static int _breakpoint_handler(mach_port_t thread, int exception,
@@ -1285,6 +1343,9 @@ static const struct {
   {"set", command_set},
   {"signal", command_signal},
   {"sig", command_signal},
+  {"stacks", command_read_stacks},
+  {"stax", command_read_stacks},
+  {"stx", command_read_stacks},
   {"s", command_search},
   {"t", command_find},
   {"unfreeze", command_unfreeze},
