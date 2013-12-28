@@ -82,6 +82,4 @@ int IsIntegerSearchType(int type);
 int IsReverseEndianSearchType(int type);
 int SearchDataSize(int type);
 
-void bswap(void* a, int size);
-
 #endif // SEARCH_DATA_H

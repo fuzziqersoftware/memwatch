@@ -36,6 +36,22 @@
 #define FLAG_SHOW_QWORDS   4
 #define FLAG_SHOW_OWORDS   8
 
+inline void bswap_int8_t(void* a);
+#define bswap_uint8_t bswap_int8_t
+
+inline void bswap_int16_t(void* a);
+#define bswap_uint16_t bswap_int16_t
+
+inline void bswap_int32_t(void* a);
+#define bswap_uint32_t bswap_int32_t
+#define bswap_float bswap_int32_t
+
+inline void bswap_int64_t(void* a);
+#define bswap_uint64_t bswap_int64_t
+#define bswap_double bswap_int64_t
+
+void bswap(void* a, int size);
+
 void change_color(int color, ...);
 
 void print_data(unsigned long long address, const void* ds, const void* diff,

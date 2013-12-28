@@ -4,11 +4,55 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "parse_utils.h"
-#include "search_data.h" // TODO: move bswap somewhere more accessible
 
 extern int use_color;
+
+inline void bswap_int8_t(void* a) { }
+
+inline void bswap_int16_t(void* a) {
+  ((int8_t*)a)[0] ^= ((int8_t*)a)[1];
+  ((int8_t*)a)[1] ^= ((int8_t*)a)[0];
+  ((int8_t*)a)[0] ^= ((int8_t*)a)[1];
+}
+
+inline void bswap_int32_t(void* a) {
+  ((int8_t*)a)[0] ^= ((int8_t*)a)[3];
+  ((int8_t*)a)[3] ^= ((int8_t*)a)[0];
+  ((int8_t*)a)[0] ^= ((int8_t*)a)[3];
+  ((int8_t*)a)[2] ^= ((int8_t*)a)[1];
+  ((int8_t*)a)[1] ^= ((int8_t*)a)[2];
+  ((int8_t*)a)[2] ^= ((int8_t*)a)[1];
+}
+
+inline void bswap_int64_t(void* a) {
+  ((int8_t*)a)[0] ^= ((int8_t*)a)[7];
+  ((int8_t*)a)[7] ^= ((int8_t*)a)[0];
+  ((int8_t*)a)[0] ^= ((int8_t*)a)[7];
+  ((int8_t*)a)[6] ^= ((int8_t*)a)[1];
+  ((int8_t*)a)[1] ^= ((int8_t*)a)[6];
+  ((int8_t*)a)[6] ^= ((int8_t*)a)[1];
+  ((int8_t*)a)[4] ^= ((int8_t*)a)[3];
+  ((int8_t*)a)[3] ^= ((int8_t*)a)[4];
+  ((int8_t*)a)[4] ^= ((int8_t*)a)[3];
+  ((int8_t*)a)[2] ^= ((int8_t*)a)[5];
+  ((int8_t*)a)[5] ^= ((int8_t*)a)[2];
+  ((int8_t*)a)[2] ^= ((int8_t*)a)[5];
+}
+
+void bswap(void* a, int size) {
+  if (size == 1)
+    bswap_int8_t(a);
+  if (size == 2)
+    bswap_int16_t(a);
+  if (size == 4)
+    bswap_int32_t(a);
+  if (size == 8)
+    bswap_int64_t(a);
+}
 
 // outputs control characters to the console to change color/formatting
 void change_color(int color, ...) {
@@ -32,76 +76,102 @@ void change_color(int color, ...) {
   printf("%s", fmt);
 }
 
-// prints data in a hex/ascii view to the console
-void print_data(unsigned long long address, const void* ds, const void* diff,
-    unsigned long long data_size, int flags) {
+void print_data(unsigned long long address, const void* _data,
+    const void* _prev, unsigned long long data_size, int flags) {
 
   if (data_size == 0)
     return;
 
-  unsigned char* data_source = (unsigned char*)ds;
-  unsigned char* diff_source = (unsigned char*)diff;
-  unsigned long x, y, off = 0;
-  char buffer[17] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  char diff_buffer[16];
-  int space_factor = (flags & FLAG_SHOW_OWORDS) ? 15 :
-                     (flags & FLAG_SHOW_QWORDS) ? 7 :
-                     (flags & FLAG_SHOW_DWORDS) ? 3 :
-                     (flags & FLAG_SHOW_WORDS) ? 1 :
-                     0;
+  // if color is disabled or no diff source is given, disable diffing
+  const uint8_t* data = (const uint8_t*)_data;
+  const uint8_t* prev = (const uint8_t*)((_prev && use_color) ? _prev : _data);
 
-  printf("%016llX | ", address);
-  for (x = 0; x < data_size; x++) {
+  char data_ascii[20];
+  char prev_ascii[20]; // actually only 16 is necessary but w/e
 
-    if (off == 16) {
+  // start_offset is how many blank spaces to print before the first byte
+  int start_offset = address & 0x0F;
+  address &= ~0x0F;
+  data_size += start_offset;
+
+  // if nonzero, print the address here (the loop won't do it for the 1st line)
+  if (start_offset)
+    printf("%016llX | ", address);
+
+  // print initial spaces, if any
+  unsigned long long x, y;
+  for (x = 0; x < start_offset; x++) {
+    printf("   ");
+    data_ascii[x] = ' ';
+    prev_ascii[x] = ' ';
+  }
+
+  // print the data
+  for (; x < data_size; x++) {
+
+    int line_offset = x & 0x0F;
+    int data_offset = x - start_offset;
+    data_ascii[line_offset] = data[data_offset];
+    prev_ascii[line_offset] = prev[data_offset];
+
+    // first byte on the line? then print the address
+    if ((x & 0x0F) == 0)
+      printf("%016llX | ", address + x);
+
+    // print the byte itself
+    if (prev[data_offset] != data[data_offset])
+      change_color(FORMAT_BOLD, FORMAT_FG_RED, FORMAT_END);
+    printf("%02X ", data[data_offset]);
+    if (prev[data_offset] != data[data_offset])
+      change_color(FORMAT_NORMAL, FORMAT_END);
+
+    // last byte on the line? then print the ascii view and a \n
+    if ((x & 0x0F) == 0x0F) {
       printf("| ");
       for (y = 0; y < 16; y++) {
-        if (diff_buffer[y])
+        if (prev_ascii[y] != data_ascii[y])
           change_color(FORMAT_FG_RED, FORMAT_END);
-        if (buffer[y] < 0x20 || buffer[y] == 0x7F) {
-          change_color(FORMAT_INVERSE, FORMAT_END);
+
+        if (data_ascii[y] < 0x20 || data_ascii[y] == 0x7F) {
+          if (use_color)
+            change_color(FORMAT_INVERSE, FORMAT_END);
           putc(' ', stdout);
-          change_color(FORMAT_NORMAL, FORMAT_END);
+          if (use_color)
+            change_color(FORMAT_NORMAL, FORMAT_END);
         } else
-          putc(buffer[y], stdout);
-        if (diff_buffer[y])
+          putc(data_ascii[y], stdout);
+
+        if (prev_ascii[y] != data_ascii[y])
           change_color(FORMAT_NORMAL, FORMAT_END);
       }
-      printf("\n%016llX | ", address + x);
-      off = 0;
+
+      printf("\n");
     }
-
-    buffer[off] = data_source[x];
-    diff_buffer[off] = use_color && diff_source &&
-                       (diff_source[x] != data_source[x]);
-    if (diff_buffer[off])
-      change_color(FORMAT_BOLD, FORMAT_FG_RED, FORMAT_END);
-    if (!(off & space_factor))
-      printf("%02X ", data_source[x]);
-    else
-      printf("%02X", data_source[x]);
-    if (diff_buffer[off])
-      change_color(FORMAT_NORMAL, FORMAT_END);
-
-    off++;
   }
-  buffer[off] = 0;
-  for (y = 0; y < 16 - off; y++)
-    printf("   ");
-  printf("| ");
-  for (y = 0; y < off; y++) {
-    if (diff_buffer[y])
-      change_color(FORMAT_FG_RED, FORMAT_END);
-    if (buffer[y] < 0x20 || buffer[y] == 0x7F) {
-      change_color(FORMAT_INVERSE, FORMAT_END);
-      putc(' ', stdout);
-      change_color(FORMAT_NORMAL, FORMAT_END);
-    } else
-      putc(buffer[y], stdout);
-    if (diff_buffer[y])
-      change_color(FORMAT_NORMAL, FORMAT_END);
+
+  // if the last line is a partial line, print the remaining ascii chars
+  if (x & 0x0F) {
+    for (y = x; y & 0x0F; y++)
+      printf("   ");
+    printf("| ");
+    for (y = 0; y < (x & 0x0F); y++) {
+      if (prev_ascii[y] != data_ascii[y])
+        change_color(FORMAT_FG_RED, FORMAT_END);
+
+      if (data_ascii[y] < 0x20 || data_ascii[y] == 0x7F) {
+        if (use_color)
+          change_color(FORMAT_INVERSE, FORMAT_END);
+        putc(' ', stdout);
+        if (use_color)
+          change_color(FORMAT_NORMAL, FORMAT_END);
+      } else
+        putc(data_ascii[y], stdout);
+
+      if (prev_ascii[y] != data_ascii[y])
+        change_color(FORMAT_NORMAL, FORMAT_END);
+    }
+    printf("\n");
   }
-  printf("\n");
 }
 
 // reads an unsigned long long from the input string. defaults to decimal, but
