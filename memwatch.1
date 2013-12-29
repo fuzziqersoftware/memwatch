@@ -1,4 +1,4 @@
-.TH memwatch 1 "17 Nov 2013"
+.TH memwatch 1 "29 Dec 2013"
 .SH NAME
 memwatch \- find and modify variables in other processes
 .SH SYNOPSIS
@@ -32,11 +32,14 @@ A single command (see the following sections) which will be executed instead of 
 .SH "GENERAL COMMANDS"
 .BR memwatch "\'s interactive interface implements the following general commands:"
 .TP
-.BR "attach [pid_or_name]"
+.BR "help"
+.RI "Displays this manual page."
+.TP
+.BR "attach " [pid_or_name]
 .RI "Attaches to a new process by PID or by name. If no argument is given, attaches to a process with the same name as the currently-attached process."
 .TP
-.BR "help"
-.RI "Displays a help message detailing usage of the commands."
+.BR "data " data_string
+.RI "Parses the data string and displays the raw values returned from the parser. You can use this to test complex data strings before writing them to be sure the correct data will be written."
 .TP
 .BR "quit"
 .RI "Exits memwatch."
@@ -147,7 +150,7 @@ Search for an unsigned 8-bit, 16-bit, 32-bit, or 64-bit value.
 Search for a signed 8-bit, 16-bit, 32-bit, or 64-bit value.
 
 .SH "DATA FORMAT"
-Input data for raw data searches and the find, write, and freeze commands is specified in "immediate" format. Every pair of hexadecimal digits represents one byte, with special control sequences as follows:
+.RB "Input data for raw data searches and the " find ", " write ", and " freeze " commands is specified in a custom format, described here. You can try using this format with the " data " command (see above). Every pair of hexadecimal digits represents one byte, with special control sequences as follows:"
 .TP
 .B Decimal integers
 A decimal integer may be specified by preceding it with # signs (# for a single byte, ## for a 16-bit int, ### for a 32-bit int, or #### for a 64-bit int).
@@ -162,15 +165,18 @@ ASCII strings must be enclosed in double quotes, and unicode strings in single q
 A string enclosed in < > will be treated as a filename, and will be replaced with the contents of the file in the output data.
 .TP
 .B Change of endianness
-A dollar sign ($) inverts the endianness of the data following it.
+A dollar sign ($) inverts the endianness of the data following it. This applies to unicode string literals, integers specified with # signs, and floating-point numbers.
 .TP
 .B Wildcard
 .RB "A question mark (?) will match any byte when searching with the " find " command. This is not yet implemented for the " search " command."
+.TP
+.B Comments
+Comments are formatted in C-style blocks; anything between /* and */ will be omitted from the output string, as well as anything between // and a newline (though this format is rarely used since commands are delimited by newlines). Comments cannot be nested.
 
 .RS n
 Any non-recognized characters are ignored. The initial endian-ness of the output depends on the endian-ness of the host machine: on an Intel machine, the resulting data would be little-endian.
 
-Example data string: 03 04 $ ##30 $ ##127 "dark" ###-1 'cold'
+Example data string: /* omit 01 02 */ 03 04 $ ##30 $ ##127 "dark" ###-1 'cold'
 
 Resulting data (Intel): 03 04 00 1E 7F 00 64 61 72 6B FF FF FF FF 63 00 6F 00 6C 00 64 00
 

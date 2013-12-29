@@ -315,6 +315,23 @@ static int command_write(struct state* st, const char* command) {
   return 0;
 }
 
+// print what would be written (useful for making sure of how data is parsed)
+static int command_data(struct state* st, const char* command) {
+  // read the address and data from the command string
+  void *data, *mask;
+  uint64_t size = read_string_data(command, &data, &mask);
+
+  printf("read %llu (0x%llX) bytes:\n", size, size);
+  print_data(0, data, NULL, size, 0);
+  printf("wildcard mask:\n");
+  print_data(0, mask, NULL, size, 0);
+
+  // clean up & return
+  free(data);
+  free(mask);
+  return 0;
+}
+
 // add a region to the frozen-list with the given data
 static int command_freeze(struct state* st, const char* command) {
 
@@ -1309,6 +1326,7 @@ static const struct {
   {"b", command_breakpoint},
   {"close", command_close},
   {"c", command_close},
+  {"data", command_data},
   {"delete", command_delete},
   {"del", command_delete},
   {"dump", command_dump},

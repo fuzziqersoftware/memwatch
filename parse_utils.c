@@ -229,15 +229,29 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
   unsigned char** mask = (unsigned char**)vmask;
 
   int read, chr = 0;
-  int string = 0, unicode_string = 0, high = 1;
+  int string = 0, unicode_string = 0, comment = 0, multiline_comment = 0, high = 1;
   int filename = 0, filename_start;
   unsigned long size = 0;
   int endian = 0;
   while (in[0]) {
     read = 0;
 
+    // if between // and a newline, don't write to output buffer
+    if (comment) {
+      if (in[0] == '\n')
+        comment = 0;
+      in++;
+
+    // if between /* and */, don't write to output buffer
+    } else if (multiline_comment) {
+      if (in[0] == '*' && in[1] == '/') {
+        multiline_comment = 0;
+        in++;
+      }
+      in++;
+
     // if between quotes, read bytes to output buffer, unescaping
-    if (string) {
+    } else if (string) {
       if (in[0] == '\"')
         string = 0;
       else if (in[0] == '\\') { // unescape char after a backslash
@@ -402,6 +416,10 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
         string = 1;
       if (in[0] == '\'')
         unicode_string = 1;
+      if (in[0] == '/' && in[1] == '/')
+        comment = 1;
+      if (in[0] == '/' && in[1] == '*')
+        multiline_comment = 1;
       if (in[0] == '<') {
         filename = 1;
         filename_start = size;
