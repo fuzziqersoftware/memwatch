@@ -143,7 +143,6 @@ typedef struct {
   };
 } VMThreadState;
 
-void VMPrintThreadRegisters(VMThreadState* state, int thread_id);
 int VMSetRegisterValueByName(VMThreadState* state, const char* name,
                              uint64_t value);
 int VMGetThreadRegisters(mach_port_t thread_port, VMThreadState* _state);

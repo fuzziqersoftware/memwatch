@@ -284,50 +284,6 @@ int VMTerminateProcess(pid_t pid) {
 ////////////////////////////////////////////////////////////////////////////////
 // register modification facilities
 
-// prints the register contents in a thread state
-void VMPrintThreadRegisters(VMThreadState* state, int thread_id) {
-  
-  if (!state->is64) {
-    printf("[%d: thread 32-bit @ eip:%08X]\n", thread_id, state->st32.__eip);
-    printf("  eax: %08X  ecx: %08X  edx: %08X  ebx: %08X\n", state->st32.__eax,
-           state->st32.__ecx, state->st32.__edx, state->st32.__ebx);
-    printf("  ebp: %08X  esp: %08X  esi: %08X  edi: %08X\n", state->st32.__ebp,
-           state->st32.__esp, state->st32.__esi, state->st32.__edi);
-    printf("  eflags: %08X\n", state->st32.__eflags);
-    printf("  cs:  %08X  ds:  %08X  es:  %08X  fs:  %08X\n", state->st32.__cs,
-           state->st32.__ds, state->st32.__es, state->st32.__fs);
-    printf("  gs:  %08X  ss:  %08X\n", state->st32.__gs, state->st32.__ss);
-    // TODO: print floating state
-    printf("  dr0: %08X  dr1: %08X  dr2: %08X  dr3: %08X\n", state->db32.__dr0,
-           state->db32.__dr1, state->db32.__dr2, state->db32.__dr3);
-    printf("  dr4: %08X  dr5: %08X  dr6: %08X  dr7: %08X\n", state->db32.__dr4,
-           state->db32.__dr5, state->db32.__dr6, state->db32.__dr7);
-  } else {
-    printf("[%d: thread 64-bit @ rip:%016llX]\n", thread_id, state->st64.__rip);
-    printf("  rax: %016llX  rcx: %016llX  rdx: %016llX\n", state->st64.__rax,
-           state->st64.__rcx, state->st64.__rdx);
-    printf("  rbx: %016llX  rbp: %016llX  rsp: %016llX\n", state->st64.__rbx,
-           state->st64.__rbp, state->st64.__rsp);
-    printf("  rsi: %016llX  rdi: %016llX  r8:  %016llX\n", state->st64.__rsi,
-           state->st64.__rdi, state->st64.__r8);
-    printf("  r9:  %016llX  r10: %016llX  r11: %016llX\n", state->st64.__r9,
-           state->st64.__r10, state->st64.__r11);
-    printf("  r12: %016llX  r13: %016llX  r14: %016llX\n", state->st64.__r12,
-           state->st64.__r13, state->st64.__r14);
-    printf("  r15: %016llX  rflags: %016llX\n", state->st64.__r15,
-           state->st64.__rflags);
-    printf("  cs:  %016llX  fs:  %016llX  gs:  %016llX\n", state->st64.__cs,
-           state->st64.__fs, state->st64.__gs);
-    // TODO: print floating state
-    printf("  dr0: %016llX  dr1: %016llX  dr2: %016llX\n", state->db64.__dr0,
-           state->db64.__dr1, state->db64.__dr2);
-    printf("  dr3: %016llX  dr4: %016llX  dr5: %016llX\n", state->db64.__dr3,
-           state->db64.__dr4, state->db64.__dr5);
-    printf("  dr6: %016llX  dr7: %016llX\n", state->db64.__dr6,
-           state->db64.__dr7);
-  }
-}
-
 #define offsetof(st, m) __builtin_offsetof(st, m)
 
 // sets a regiter value in the given state by name
@@ -534,6 +490,8 @@ int VMSetRegisterValueByName(VMThreadState* state, const char* name,
 // gets thread registers for any thread
 // return: < 0 if error
 int VMGetThreadRegisters(mach_port_t thread_port, VMThreadState* _state) {
+
+  _state->tid = thread_port;
 
   // get the thread state
   x86_thread_state_t state;

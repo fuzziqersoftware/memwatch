@@ -548,6 +548,7 @@ void get_current_time_string(char* output) {
   const char* monthnames[] = {"January", "February", "March",
     "April", "May", "June", "July", "August", "September",
     "October", "November", "December"};
+
   sprintf(output, "%u %s %4u %2u:%02u:%02u.%03u", cooked.tm_mday,
      monthnames[cooked.tm_mon], cooked.tm_year + 1900,
      cooked.tm_hour, cooked.tm_min, cooked.tm_sec,

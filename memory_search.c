@@ -909,30 +909,161 @@ static int command_close(struct state* st, const char* command) {
   return 0;
 }
 
+#define print_reg_value(str, state, prev, regname) \
+  do { \
+    int diff = ((prev) && ((state)->regname != (prev)->regname)); \
+    if (diff) \
+      change_color(FORMAT_BOLD, FORMAT_FG_RED, FORMAT_END); \
+    printf((str), (state)->regname); \
+    if (diff) \
+      change_color(FORMAT_NORMAL, FORMAT_END); \
+  } while (0);
+
+// prints the register contents in a thread state
+static void print_thread_regs(VMThreadState* state, VMThreadState* prev) {
+
+  if (prev && (state->tid != prev->tid)) {
+    printf("warning: previous thread id does not match current thread id\n");
+  }
+
+  if (prev && (state->is64 != prev->is64)) {
+    printf("warning: previous thread state does not match architecture of current state\n");
+    prev = NULL;
+  }
+
+  if (!state->is64) {
+    printf("[%d: thread 32-bit @ ", state->tid);
+    print_reg_value("eip:%08X", state, prev, st32.__eip);
+    printf("]\n");
+    print_reg_value("  eax: %08X", state, prev, st32.__eax);
+    print_reg_value("  ecx: %08X", state, prev, st32.__ecx);
+    print_reg_value("  edx: %08X", state, prev, st32.__edx);
+    print_reg_value("  ebx: %08X\n", state, prev, st32.__ebx);
+    print_reg_value("  ebp: %08X", state, prev, st32.__ebp);
+    print_reg_value("  esp: %08X", state, prev, st32.__esp);
+    print_reg_value("  esi: %08X", state, prev, st32.__esi);
+    print_reg_value("  edi: %08X\n", state, prev, st32.__edi);
+    print_reg_value("  eflags: %08X\n", state, prev, st32.__eflags);
+    print_reg_value("  cs:  %08X", state, prev, st32.__cs);
+    print_reg_value("  ds:  %08X", state, prev, st32.__ds);
+    print_reg_value("  es:  %08X", state, prev, st32.__es);
+    print_reg_value("  fs:  %08X\n", state, prev, st32.__fs);
+    print_reg_value("  gs:  %08X", state, prev, st32.__gs);
+    print_reg_value("  ss:  %08X\n", state, prev, st32.__ss);
+    // TODO: print floating state
+    print_reg_value("  dr0: %08X", state, prev, db32.__dr0);
+    print_reg_value("  dr1: %08X", state, prev, db32.__dr1);
+    print_reg_value("  dr2: %08X", state, prev, db32.__dr2);
+    print_reg_value("  dr3: %08X\n", state, prev, db32.__dr3);
+    print_reg_value("  dr4: %08X", state, prev, db32.__dr4);
+    print_reg_value("  dr5: %08X", state, prev, db32.__dr5);
+    print_reg_value("  dr6: %08X", state, prev, db32.__dr6);
+    print_reg_value("  dr7: %08X\n", state, prev, db32.__dr7);
+
+  } else {
+    printf("[%d: thread 64-bit @ ", state->tid);
+    print_reg_value("rip:%016llX", state, prev, st64.__rip);
+    printf("]\n");
+    print_reg_value("  rax: %016llX",      state, prev, st64.__rax);
+    print_reg_value("  rcx: %016llX",      state, prev, st64.__rcx);
+    print_reg_value("  rdx: %016llX\n",    state, prev, st64.__rdx);
+    print_reg_value("  rbx: %016llX",      state, prev, st64.__rbx);
+    print_reg_value("  rbp: %016llX",      state, prev, st64.__rbp);
+    print_reg_value("  rsp: %016llX\n",    state, prev, st64.__rsp);
+    print_reg_value("  rsi: %016llX",      state, prev, st64.__rsi);
+    print_reg_value("  rdi: %016llX",      state, prev, st64.__rdi);
+    print_reg_value("  r8:  %016llX\n",    state, prev, st64.__r8);
+    print_reg_value("  r9:  %016llX",      state, prev, st64.__r9);
+    print_reg_value("  r10: %016llX",      state, prev, st64.__r10);
+    print_reg_value("  r11: %016llX\n",    state, prev, st64.__r11);
+    print_reg_value("  r12: %016llX",      state, prev, st64.__r12);
+    print_reg_value("  r13: %016llX",      state, prev, st64.__r13);
+    print_reg_value("  r14: %016llX\n",    state, prev, st64.__r14);
+    print_reg_value("  r15: %016llX  ",    state, prev, st64.__r15);
+    print_reg_value("  rflags: %016llX\n", state, prev, st64.__rflags);
+    // TODO: print floating state
+    print_reg_value("  cs:  %016llX",      state, prev, st64.__cs);
+    print_reg_value("  fs:  %016llX",      state, prev, st64.__fs);
+    print_reg_value("  gs:  %016llX\n",    state, prev, st64.__gs);
+    print_reg_value("  dr0: %016llX",      state, prev, db64.__dr0);
+    print_reg_value("  dr1: %016llX",      state, prev, db64.__dr1);
+    print_reg_value("  dr2: %016llX\n",    state, prev, db64.__dr2);
+    print_reg_value("  dr3: %016llX",      state, prev, db64.__dr3);
+    print_reg_value("  dr4: %016llX",      state, prev, db64.__dr4);
+    print_reg_value("  dr5: %016llX\n",    state, prev, db64.__dr5);
+    print_reg_value("  dr6: %016llX",      state, prev, db64.__dr6);
+    print_reg_value("  dr7: %016llX\n",    state, prev, db64.__dr7);
+  }
+}
+
 // read registers for all threads in the target process
 static int command_read_regs(struct state* st, const char* command) {
 
-  if (st->freeze_while_operating)
-    VMPauseProcess(st->pid);
+  // we'll repeat the read if watch is enabled
+  int cont = st->watch;
 
-  // get registers for target threads
-  VMThreadState* thread_state;
-  int x, error = VMGetProcessRegisters(st->pid, &thread_state);
-  if (error < 0)
-    printf("failed to get registers; error %d\n", error);
-  else if (error == 0)
-    printf("no threads in process\n");
-  else {
+  // go ahead and read the target's memory
+  cancel_var = &cont;
+  int num_prev_threads = 0;
+  VMThreadState *prev_thread_state = NULL;
+  do {
+    if (st->freeze_while_operating)
+      VMPauseProcess(st->pid);
 
-    // success? then print the regs for each thread
-    for (x = 0; x < error; x++)
-      VMPrintThreadRegisters(&thread_state[x], x);
-    free(thread_state);
-  }
+    // get registers for target threads
+    VMThreadState* thread_state;
+    int x, error = VMGetProcessRegisters(st->pid, &thread_state);
+    if (error < 0)
+      printf("failed to get registers; error %d\n", error);
+    else if (error == 0)
+      printf("no threads in process\n");
+    else {
 
-  if (st->freeze_while_operating)
-    VMResumeProcess(st->pid);
+      // success? then print the regs for each thread
+      char time_str[0x80];
+      get_current_time_string(time_str);
+      printf("%s [%d threads] // %s\n", st->process_name, error, time_str);
 
+      // if there are previous states, print diffs
+      if (prev_thread_state) {
+        int current_prev_thread_id = 0;
+        for (x = 0; x < error; x++) {
+          for (; (prev_thread_state[current_prev_thread_id].tid < thread_state[x].tid) && (current_prev_thread_id < num_prev_threads); current_prev_thread_id++)
+            printf("[%d: thread has terminated]\n", prev_thread_state[current_prev_thread_id].tid);
+          if ((current_prev_thread_id < num_prev_threads) && (prev_thread_state[current_prev_thread_id].tid == thread_state[x].tid)) {
+            print_thread_regs(&thread_state[x], &prev_thread_state[current_prev_thread_id]);
+            current_prev_thread_id++;
+          } else {
+            print_thread_regs(&thread_state[x], NULL);
+          }
+        }
+        for (; current_prev_thread_id < num_prev_threads; current_prev_thread_id++)
+          printf("[%d: thread has terminated]\n", prev_thread_state[current_prev_thread_id].tid);
+
+      // no previous state - just print the regs
+      } else
+        for (x = 0; x < error; x++)
+          print_thread_regs(&thread_state[x], NULL);
+
+      // keep the previous state for comparison
+      if (prev_thread_state)
+        free(prev_thread_state);
+      prev_thread_state = thread_state;
+      num_prev_threads = error;
+    }
+
+    if (st->freeze_while_operating)
+      VMResumeProcess(st->pid);
+
+    if (cont)
+      usleep(1000000); // wait a second, if the read is repeating
+
+  } while (cont);
+
+  // clean up & return
+  if (prev_thread_state)
+    free(prev_thread_state);
+  cancel_var = NULL;
   return 0;
 }
 
@@ -982,7 +1113,7 @@ static int command_write_regs(struct state* st, const char* command) {
       printf("failed to set registers; error %d\n", error);
     else
       for (x = 0; x < error; x++)
-        VMPrintThreadRegisters(&thread_state[x], x);
+        print_thread_regs(&thread_state[x], NULL);
 
     // clean up
     free(thread_state);
@@ -1078,7 +1209,7 @@ static int _breakpoint_handler(mach_port_t thread, int exception,
     type = "mach syscall";
   printf("  type: %s\n", type);
 
-  VMPrintThreadRegisters(state, -1);
+  print_thread_regs(state, NULL);
 
   // read the regs for each thread
   /*VMThreadState* thread_state = NULL;
