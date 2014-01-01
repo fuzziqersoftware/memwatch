@@ -346,14 +346,16 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
             parse_ull(in, (unsigned long long*)(&((*data)[size - 8])), 0);
             if (endian)
               bswap(&((*data)[size - 8]), 8);
-            *(unsigned long long*)(&((*mask)[size - 8])) = 0xFFFFFFFFFFFFFFFF;
+            if (mask)
+              *(unsigned long long*)(&((*mask)[size - 8])) = 0xFFFFFFFFFFFFFFFF;
           } else {
             expand(4);
             parse_ull(in, &value, 0);
             if (endian)
               bswap(&value, 4);
             *(int32_t*)(&((*data)[size - 4])) = value;
-            *(uint32_t*)(&((*mask)[size - 4])) = 0xFFFFFFFF;
+            if (mask)
+              *(uint32_t*)(&((*mask)[size - 4])) = 0xFFFFFFFF;
           }
         } else {
           expand(2);
@@ -361,13 +363,15 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
           if (endian)
             bswap(&value, 2);
           *(int16_t*)(&((*data)[size - 2])) = value;
-          *(uint16_t*)(&((*mask)[size - 2])) = 0xFFFF;
+          if (mask)
+            *(uint16_t*)(&((*mask)[size - 2])) = 0xFFFF;
         }
       } else {
         expand(1);
         parse_ull(in, &value, 0);
         *(int8_t*)(&((*data)[size - 1])) = value;
-        *(uint8_t*)(&((*mask)[size - 1])) = 0xFF;
+        if (mask)
+          *(uint8_t*)(&((*mask)[size - 1])) = 0xFF;
       }
       if (in[0] == '-')
         in++;
@@ -384,14 +388,16 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
         sscanf(in, "%lf", value);
         if (endian)
           bswap(value, 8);
-        *(unsigned long long*)(&((*mask)[size - 8])) = 0xFFFFFFFFFFFFFFFF;
+        if (mask)
+          *(unsigned long long*)(&((*mask)[size - 8])) = 0xFFFFFFFFFFFFFFFF;
       } else {
         expand(4);
         float* value = (float*)(&((*data)[size - 4]));
         sscanf(in, "%f", value);
         if (endian)
           bswap(value, 4);
-        *(uint32_t*)(&((*mask)[size - 4])) = 0xFFFFFFFF;
+        if (mask)
+          *(uint32_t*)(&((*mask)[size - 4])) = 0xFFFFFFFF;
       }
       if (in[0] == '-')
         in++;
