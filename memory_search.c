@@ -32,7 +32,37 @@ struct state {
   int run; // set to 0 to exit the memory search interface
   MemorySearchDataList* searches; // list of open searches
   MemorySearchData* search; // the current search
+  unsigned long long num_find_results_allocated;
+  unsigned long long num_find_results;
+  uint64_t* find_results;
 };
+
+int get_addr_from_command(struct state* st, const char* command, uint64_t* addr) {
+  if (command[0] == 'x' || command[0] == 's') {
+    command++;
+    sscanf(command, "%llX", addr);
+    if (!st->search) {
+      printf("no search is currently open\n");
+      return -1;
+    }
+    if (*addr >= st->search->numResults) {
+      printf("current search has only %lld results\n", st->search->numResults);
+      return -2;
+    }
+    *addr = st->search->results[*addr];
+  } else if (command[0] == 't') {
+    command++;
+    sscanf(command, "%llX", addr);
+    if (*addr >= st->num_find_results) {
+      printf("previous find had only %llu results\n", st->num_find_results);
+      return -3;
+    }
+    *addr = st->find_results[*addr];
+  } else {
+    sscanf(command, "%llX", addr);
+  }
+  return 0;
+}
 
 // forward decl so commands can dispatch other commands
 int dispatch_command(struct state* st, const char* command);
@@ -158,8 +188,14 @@ static int command_find(struct state* st, const char* command) {
   char *data, *mask;
   uint64_t size = read_string_data(command, (void**)&data, (void**)&mask);
 
+  // clear the previous find results
+  if (st->find_results) {
+    st->num_find_results_allocated = 16;
+    st->num_find_results = 0;
+    st->find_results = realloc(st->find_results, sizeof(uint64_t) * st->num_find_results_allocated);
+  }
+
   // loop through the regions, searching for the string
-  unsigned long long num_results = 0;
   int x, cont = 1;
   cancel_var = &cont; // this operation can be canceled
   for (x = 0; cont && (x < map->numRegions); x++) {
@@ -175,18 +211,23 @@ static int command_find(struct state* st, const char* command) {
         if (mask[z] && (map->regions[x].s8_data[y + z] != data[z]))
           break;
       if (z == size) {
-        printf("%016llX (%c%c%c)\n", map->regions[x].region._address + y,
+        printf("(%llu) %016llX (%c%c%c)\n", st->num_find_results,
+            map->regions[x].region._address + y,
             (map->regions[x].region._attributes & VMREGION_READABLE) ? 'r' : '-',
             (map->regions[x].region._attributes & VMREGION_WRITABLE) ? 'w' : '-',
             (map->regions[x].region._attributes & VMREGION_EXECUTABLE) ? 'x' : '-');
-        num_results++;
+        if (st->num_find_results == st->num_find_results_allocated) {
+          st->num_find_results_allocated *= 2;
+          st->find_results = realloc(st->find_results, sizeof(uint64_t) * st->num_find_results_allocated);
+        }
+        st->find_results[st->num_find_results] = map->regions[x].region._address + y;
+        st->num_find_results++;
       }
     }
   }
   cancel_var = NULL;
 
-  // print the result count, clean up and return
-  printf("results: %llu\n", num_results);
+  // clean up and return
   free(data);
   DestroyDataMap(map);
   return 0;
@@ -292,10 +333,11 @@ static int command_read(struct state* st, const char* command) {
 static int command_write(struct state* st, const char* command) {
 
   // read the address and data from the command string
-  uint64_t addr, size;
   void* data;
-  sscanf(command, "%llX", &addr);
-  size = read_string_data(skip_word(command, ' '), &data, NULL);
+  uint64_t addr;
+  if (get_addr_from_command(st, command, &addr))
+    return 0;
+  uint64_t size = read_string_data(skip_word(command, ' '), &data, NULL);
 
   if (st->freeze_while_operating)
     VMPauseProcess(st->pid);
@@ -351,10 +393,14 @@ static int command_freeze(struct state* st, const char* command) {
   // read the address
   void* data;
   uint64_t addr, size;
-  int num_args = sscanf(command, "%llX:%llX", &addr, &size);
-  if (num_args == 2) {
+  if (get_addr_from_command(st, command, &addr))
+    return 0;
+
+  const char* size_ptr = skip_word(command, ':');
+  if (*size_ptr) {
 
     // user gave a size... read the data to be frozen from the process
+    sscanf(size_ptr, "%llX", &size);
     data = malloc(size);
     if (!data) {
       printf("failed to allocate memory for reading\n");
@@ -557,12 +603,12 @@ static void print_search_results(struct state* st, MemorySearchData* search,
   int x;
   if (search->type == SEARCHTYPE_DATA) {
     for (x = 0; x < search->numResults; x++)
-      printf("%016llX\n", search->results[x]);
+      printf("(%d) %016llX\n", x, search->results[x]);
   } else {
     mach_vm_size_t size = SearchDataSize(search->type);
     void* data = malloc(size);
     for (x = 0; x < search->numResults; x++) {
-      printf("%016llX ", search->results[x]);
+      printf("(%d) %016llX ", x, search->results[x]);
       int error = VMReadBytes(st->pid, search->results[x], data, &size);
       if (error)
         printf("<< memory not readable, %d >>\n", error);
@@ -614,7 +660,6 @@ static void print_search_results(struct state* st, MemorySearchData* search,
     if (data)
       free(data);
   }
-  printf("results: %lld\n", search->numResults);
 }
 
 // print list of results for current search, or the named search
@@ -1551,6 +1596,8 @@ void init_state(struct state* st, pid_t pid, int freeze_while_operating, uint64_
 
 void cleanup_state(struct state* st) {
   DeleteSearchList(st->searches);
+  if (st->find_results)
+    free(st->find_results);
 }
 
 int run_one_command(pid_t pid, int freeze_while_operating, uint64_t max_results, const char* input_command) {
