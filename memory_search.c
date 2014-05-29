@@ -239,7 +239,9 @@ static int command_access(struct state* st, const char* command) {
   // read the address
   int mode;
   uint64_t addr;
-  sscanf(command, "%d %llX", &mode, &addr);
+  sscanf(command, "%d", &mode);
+  if (get_addr_from_command(st, skip_word(command, ' '), &addr))
+    return 0;
 
   // attempt to change the access permissions
   int err = VMSetRegionProtection(st->pid, addr, 1, mode, VMREGION_ALL);
@@ -463,8 +465,7 @@ static int command_unfreeze(struct state* st, const char* command) {
 
       // if unfreezing by name didn't match any regions, unfreeze by address
       uint64_t addr;
-      sscanf(command, "%llX", &addr);
-      if (!unfreeze_by_addr(addr))
+      if (!get_addr_from_command(st, command, &addr) && !unfreeze_by_addr(addr))
         printf("region unfrozen\n");
       else {
 
@@ -723,11 +724,10 @@ static int command_delete(struct state* st, const char* command) {
 
   // read the addresses
   uint64_t addr1 = 0, addr2 = 0;
-  sscanf(command, "%llX %llX", &addr1, &addr2);
-
-  // if only 1 address given, addr2 will be 0, so just make a 1-byte range
-  if (addr2 < addr1)
-    addr2 = addr1 + 1;
+  if (get_addr_from_command(st, command, &addr1))
+    return 0;
+  if (get_addr_from_command(st, skip_word(command, ' '), &addr2))
+    addr2 = addr2 + 1; // if only 1 address given, just make a 1-byte range
 
   // delete search results in the given range
   DeleteResults(st->search, addr1, addr2);
