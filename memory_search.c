@@ -1650,14 +1650,15 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_resu
     if (st.search) {
       prompt = (char*)malloc(50 + strlen(st.process_name) +
                              strlen(st.search->name));
+      const char* search_name = st.search->name[0] ? st.search->name : "(unnamed search)";
       if (!st.search->memory)
         sprintf(prompt, "memwatch:%u/%s %ds/%df %s # ", st.pid, st.process_name,
                 st.searches->numSearches, get_num_frozen_regions(),
-                st.search->name);
+                search_name);
       else
         sprintf(prompt, "memwatch:%u/%s %ds/%df %s(%llu) # ", st.pid,
                 st.process_name, st.searches->numSearches, get_num_frozen_regions(),
-                st.search->name, st.search->numResults);
+                search_name, st.search->numResults);
     } else {
       prompt = (char*)malloc(30 + strlen(st.process_name));
       sprintf(prompt, "memwatch:%u/%s %ds/%df # ", st.pid, st.process_name,
