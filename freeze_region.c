@@ -122,6 +122,10 @@ static int _unfreeze_by_index_unlocked(int index) {
   if (index < 0 || index >= _num_frozen_regions)
     return 1;
 
+  // free the allocated data
+  if (_frozen[index].data)
+    free(_frozen[index].data);
+
   // copy the regions back to remove the given index
   _num_frozen_regions--;
   memcpy(&_frozen[index], &_frozen[index + 1],
