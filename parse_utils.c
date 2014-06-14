@@ -503,20 +503,29 @@ int copy_quoted_string(const char* in, char** out) {
     return 0;
 
   const char* in_orig = in;
-  int out_size = 0;
-  *out = NULL;
   char quote = in[0];
+
   for (in++; in[0] && in[0] != quote; in++) {
-    out_size++;
-    *out = (char*)realloc(*out, out_size * sizeof(char*));
+    if (in[0] == '\\' && in[1])
+      in++;
+  }
+  int out_max_size = in - in_orig;
+
+  *out = (char*)calloc(sizeof(char), out_max_size + 1);
+  int out_size = 0;
+
+  in = in_orig;
+  for (in++; in[0] && in[0] != quote; in++) {
     if (in[0] == '\\' && in[1]) {
-      (*out)[out_size - 1] = in[1];
+      (*out)[out_size] = in[1];
       in++;
     } else
-      (*out)[out_size - 1] = in[0];
+      (*out)[out_size] = in[0];
+    out_size++;
   }
   if (in[0] == quote)
     in++;
+  (*out)[out_size] = 0;
 
   return in - in_orig;
 }
