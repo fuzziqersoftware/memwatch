@@ -12,7 +12,10 @@ typedef struct {
   mach_vm_address_t addr;
   mach_vm_size_t size;
   int error;
+  int max_array_size;
   void* data;
+  void* array_null_data;
+  void* array_temp_data;
   char* name;
 } FrozenRegion;
 
@@ -20,7 +23,8 @@ int freeze_init();
 void freeze_exit();
 
 int freeze_region(pid_t pid, mach_vm_address_t addr, mach_vm_size_t size,
-    const void* data, const char* name);
+    const void* data, int max_array_size, const void* array_null_data,
+    const char* name);
 int unfreeze_by_index(int index);
 int unfreeze_by_addr(mach_vm_address_t addr);
 int unfreeze_by_name(const char* name);

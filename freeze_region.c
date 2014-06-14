@@ -22,6 +22,54 @@ static int _freezer_closing = 0;
 static int _num_frozen_regions = 0;
 static FrozenRegion* _frozen = NULL;
 
+static int _freeze_update_region(FrozenRegion* rgn) {
+  if (rgn->max_array_size) {
+
+    // read the entire array contents
+    mach_vm_size_t array_size = rgn->max_array_size * rgn->size;
+    if (!rgn->array_temp_data)
+      rgn->array_temp_data = malloc(array_size);
+    if (!rgn->array_temp_data)
+      return -1;
+    VMReadBytes(rgn->pid, rgn->addr, rgn->array_temp_data, &array_size);
+    if (array_size != rgn->max_array_size * rgn->size) {
+      return -2;
+    }
+
+    // find the first null entry in the array, OR find an entry that matches
+    // the frozen data
+    int x, y;
+    for (x = 0; x < rgn->max_array_size; x++) {
+      void* array_pos_local = (char*)rgn->array_temp_data + (x * rgn->size);
+
+      if (!memcmp(array_pos_local, rgn->data, rgn->size))
+        return 0; // data already present in array
+
+      if (rgn->array_null_data) {
+        if (!memcmp(array_pos_local, rgn->array_null_data, rgn->size))
+          break;
+      } else {
+        for (y = 0; y < rgn->size; y++)
+          if (((char*)array_pos_local)[y] != 0)
+            break;
+        if (y == rgn->size)
+          break;
+      }
+    }
+
+    // no null entries? then don't write anything
+    if (x == rgn->max_array_size)
+      return -3;
+
+    // else, write to the first null entry
+    return VMWriteBytes(rgn->pid, rgn->addr + (x * rgn->size), rgn->data,
+        rgn->size);
+
+  } else {
+    return VMWriteBytes(rgn->pid, rgn->addr, rgn->data, rgn->size);
+  }
+}
+
 // freezer routine. repeatedly writes data to processes based on the frozen
 // region list, until told to stop via _freezer_closing.
 static void* _freeze_thread_routine(void* data) {
@@ -30,8 +78,7 @@ static void* _freeze_thread_routine(void* data) {
   while (!_freezer_closing) {
     pthread_mutex_lock(&_mutex);
     for (x = 0; x < _num_frozen_regions; x++)
-      _frozen[x].error = VMWriteBytes(_frozen[x].pid, _frozen[x].addr,
-          _frozen[x].data, _frozen[x].size);
+      _frozen[x].error = _freeze_update_region(&_frozen[x]);
     pthread_mutex_unlock(&_mutex);
     usleep(10000);
   }
@@ -75,7 +122,8 @@ void freeze_exit() {
 
 // adds a region to the freeze-list
 int freeze_region(pid_t pid, mach_vm_address_t addr, mach_vm_size_t size,
-    const void* data, const char* name) {
+    const void* data, int max_array_size, const void* array_null_data,
+    const char* name) {
 
   // first unfreeze this address (in case it's already frozen)
   unfreeze_by_addr(addr);
@@ -90,24 +138,38 @@ int freeze_region(pid_t pid, mach_vm_address_t addr, mach_vm_size_t size,
     pthread_mutex_unlock(&_mutex);
     return 1;
   }
+  FrozenRegion* this_region = &_frozen[_num_frozen_regions];
 
-  // fill in pid, addr and size
-  _frozen[_num_frozen_regions].pid = pid;
-  _frozen[_num_frozen_regions].addr = addr;
-  _frozen[_num_frozen_regions].size = size;
+  // fill in pid, addr and sizes
+  this_region->pid = pid;
+  this_region->addr = addr;
+  this_region->size = size;
+  this_region->max_array_size = max_array_size;
+  this_region->array_temp_data = NULL;
 
   // make a copy of the data and append the name on the end
-  _frozen[_num_frozen_regions].data = malloc(size + strlen(name) + 1);
-  if (!_frozen[_num_frozen_regions].data) {
+  int data_size = size + strlen(name) + 1;
+  if (array_null_data)
+    data_size += size;
+  this_region->data = malloc(data_size);
+  if (!this_region->data) {
     pthread_mutex_unlock(&_mutex);
     return 2;
   }
-  memcpy(_frozen[_num_frozen_regions].data, data, size);
+  memcpy(this_region->data, data, size);
 
-  // set the name ptr and copy the name in
-  _frozen[_num_frozen_regions].name =
-    (char*)_frozen[_num_frozen_regions].data + size;
-  strcpy(_frozen[_num_frozen_regions].name, name);
+  // if array_null_data is given, copy it in
+  if (array_null_data) {
+    this_region->array_null_data = (char*)this_region->data + size;
+    memcpy(this_region->array_null_data, array_null_data, size);
+    this_region->name = (char*)this_region->array_null_data + size;
+  } else {
+    this_region->array_null_data = NULL;
+    this_region->name = (char*)this_region->data + size;
+  }
+
+  // copy the name in
+  strcpy(this_region->name, name);
   _num_frozen_regions++;
 
   // unlock & return
@@ -125,6 +187,8 @@ static int _unfreeze_by_index_unlocked(int index) {
   // free the allocated data
   if (_frozen[index].data)
     free(_frozen[index].data);
+  if (_frozen[index].array_temp_data)
+    free(_frozen[index].array_temp_data);
 
   // copy the regions back to remove the given index
   _num_frozen_regions--;
@@ -218,11 +282,20 @@ void print_frozen_regions(int _print_data) {
   if (_num_frozen_regions > 0) {
     printf("frozen regions:\n");
     for (x = 0; x < _num_frozen_regions; x++) {
-      printf("%3d: %6u %016llX:%016llX [%d] %s\n", x, _frozen[x].pid,
-             _frozen[x].addr, _frozen[x].size, _frozen[x].error,
-             _frozen[x].name);
-      if (_print_data)
+      if (_frozen[x].max_array_size)
+        printf("%3d: %6u %016llX:%016llX [array:%d] [%d] %s\n", x,
+            _frozen[x].pid, _frozen[x].addr, _frozen[x].size,
+            _frozen[x].max_array_size, _frozen[x].error, _frozen[x].name);
+      else
+        printf("%3d: %6u %016llX:%016llX [%d] %s\n", x, _frozen[x].pid,
+            _frozen[x].addr, _frozen[x].size, _frozen[x].error,
+            _frozen[x].name);
+      if (_print_data) {
         print_data(_frozen[x].addr, _frozen[x].data, NULL, _frozen[x].size, 0);
+        if (_frozen[x].array_null_data)
+          print_data(_frozen[x].addr, _frozen[x].array_null_data, NULL,
+              _frozen[x].size, 0);
+      }
     }
   // if there are no frozen regions, too bad :(
   } else
