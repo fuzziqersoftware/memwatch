@@ -485,6 +485,22 @@ static int command_unfreeze(struct state* st, const char* command) {
   return 0;
 }
 
+// show frozen regions with or without data
+static int command_frozen(struct state* st, const char* command) {
+
+  // interactive mode only
+  if (!st->interactive) {
+    printf("this command cannot be used from the command-line interface\n");
+    return 1;
+  }
+
+  int show_data = 0;
+  if (!strcmp(command, "data"))
+    show_data = 1;
+  print_frozen_regions(show_data);
+  return 0;
+}
+
 // open a new search
 static int command_open(struct state* st, const char* command) {
 
@@ -1512,6 +1528,8 @@ static const struct {
   {"fork", command_fork},
   {"fk", command_fork},
   {"fo", command_fork},
+  {"frozen", command_frozen},
+  {"fzn", command_frozen},
   {"freeze", command_freeze},
   {"fr", command_freeze},
   {"f", command_freeze},
