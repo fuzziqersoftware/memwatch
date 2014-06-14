@@ -2,10 +2,12 @@
 
 CC=gcc
 CFLAGS=-g -Wall
-EXECUTABLES=value_test value_test_float register_test32 register_test64
+EXECUTABLES=array_test value_test value_test_float register_test32 register_test64
 
 all: $(EXECUTABLES)
 
+array_test: array_test.c
+	g++ $(LDFLAGS) -o array_test $^
 value_test: value_test.c
 	g++ $(LDFLAGS) -o value_test $^
 value_test_float: value_test_float.c
