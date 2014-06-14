@@ -1512,6 +1512,7 @@ static const struct {
 } command_handlers[] = {
   {"access", command_access},
   {"attach", command_attach},
+  {"att", command_attach},
   {"at", command_attach},
   {"a", command_access},
   {"break", command_breakpoint},
@@ -1585,10 +1586,12 @@ int dispatch_command(struct state* st, const char* command) {
 
   // find the entry in the command table and run the command
   int command_id;
-  for (command_id = 0; command_handlers[command_id].word; command_id++)
-    if (!strncmp(command_handlers[command_id].word, command,
-                 strlen(command_handlers[command_id].word)))
+  for (command_id = 0; command_handlers[command_id].word; command_id++) {
+    int cmd_len = strlen(command_handlers[command_id].word);
+    if (!strncmp(command_handlers[command_id].word, command, cmd_len) &&
+        (command[cmd_len] == 0 || command[cmd_len] == ' '))
       break;
+  }
   if (command_handlers[command_id].func)
     return command_handlers[command_id].func(st, skip_word(command, ' '));
   printf("unknown command - try \'help\'\n");
