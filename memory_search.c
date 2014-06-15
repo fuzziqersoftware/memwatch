@@ -229,6 +229,7 @@ static int command_find(struct state* st, const char* command) {
 
   // clean up and return
   free(data);
+  free(mask);
   DestroyDataMap(map);
   return 0;
 }
@@ -396,6 +397,8 @@ static int command_freeze(struct state* st, const char* command) {
   int max_array_size = 0;
   uint64_t array_null_data_size = 0;
   void* array_null_data = NULL;
+  void* array_null_data_mask = NULL;
+  void* array_data_mask = NULL;
   int null_data_present = 0;
   if (!strncmp(command, "array ", 6)) {
     command = skip_word(command, ' ');
@@ -440,12 +443,14 @@ static int command_freeze(struct state* st, const char* command) {
 
     command = skip_word(command, ' ');
     if (max_array_size && command[0] && null_data_present) {
-      array_null_data_size = read_string_data(command, &array_null_data, NULL);
+      array_null_data_size = read_string_data(command, &array_null_data,
+          &array_null_data_mask);
       if (array_null_data_size != size) {
         printf("null data size (%llu) does not match data size (%llu)\n",
             array_null_data_size, size);
         free(data);
         free(array_null_data);
+        free(array_null_data_mask);
         return 4;
       }
     }
@@ -453,7 +458,8 @@ static int command_freeze(struct state* st, const char* command) {
   } else {
     // read the data
     command = skip_word(command, ' ');
-    size = read_string_data(command, &data, NULL);
+    size = read_string_data(command, &data,
+        max_array_size ? &array_data_mask : NULL);
 
     if (null_data_present) {
       if (size & 1) {
@@ -464,25 +470,33 @@ static int command_freeze(struct state* st, const char* command) {
 
       size = size / 2;
       array_null_data_size = size;
+
       array_null_data = malloc(size);
       memcpy(array_null_data, (char*)data + array_null_data_size,
           array_null_data_size);
+      array_null_data_mask = malloc(size);
+      memcpy(array_null_data_mask,
+          (char*)array_data_mask + array_null_data_size, array_null_data_size);
     }
   }
 
   // add it to the frozen-list
   char* use_name = freeze_name ? freeze_name :
       (st->search ? st->search->name : "[no associated search]");
-  if (freeze_region(st->pid, addr, size, data, max_array_size, array_null_data,
-      use_name))
+  if (freeze_region(st->pid, addr, size, data, max_array_size, array_data_mask,
+      array_null_data, array_null_data_mask, use_name))
     printf("failed to freeze region\n");
   else
     printf("region frozen\n");
 
   // clean up & return
   free(data);
+  if (array_data_mask)
+    free(array_data_mask);
   if (array_null_data)
     free(array_null_data);
+  if (array_null_data_mask)
+    free(array_null_data_mask);
   if (freeze_name)
     free(freeze_name);
   return 0;

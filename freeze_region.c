@@ -22,6 +22,24 @@ static int _freezer_closing = 0;
 static int _num_frozen_regions = 0;
 static FrozenRegion* _frozen = NULL;
 
+static int memcmp_mask(void* a, void* b, void* mask, size_t size) {
+
+  if (!mask)
+    return memcmp(a, b, size);
+
+  int masked_differences = 0;
+  uint8_t *va = (uint8_t*)a, *vb = (uint8_t*)b, *vmask = (uint8_t*)mask;
+  for (; size > 0; size--, va++, vb++, vmask++) {
+    if (va[0] != vb[0]) {
+      if (!vmask[0])
+        masked_differences = 1;
+      else
+        return -1;
+    }
+  }
+  return masked_differences;
+}
+
 static int _freeze_update_region(FrozenRegion* rgn) {
   if (rgn->max_array_size) {
 
@@ -42,12 +60,21 @@ static int _freeze_update_region(FrozenRegion* rgn) {
     for (x = 0; x < rgn->max_array_size; x++) {
       void* array_pos_local = (char*)rgn->array_temp_data + (x * rgn->size);
 
-      if (!memcmp(array_pos_local, rgn->data, rgn->size))
-        return 0; // data already present in array
+      int cmp_result = memcmp_mask(array_pos_local, rgn->data,
+          rgn->array_data_mask, rgn->size);
+      if (cmp_result == 0) // data already present in array
+        return 0;
+      if (cmp_result == 1) // data present with masked differences - overwrite
+        return VMWriteBytes(rgn->pid, rgn->addr + (x * rgn->size), rgn->data,
+            rgn->size);
 
+      // if null data is given, check if this entry is null (and mask if needed)
       if (rgn->array_null_data) {
-        if (!memcmp(array_pos_local, rgn->array_null_data, rgn->size))
-          break;
+        cmp_result = memcmp_mask(array_pos_local, rgn->array_null_data,
+            rgn->array_null_data_mask, rgn->size);
+        if (cmp_result >= 0)
+          break; // entry is null (possibly only by mask but we don't care)
+
       } else {
         for (y = 0; y < rgn->size; y++)
           if (((char*)array_pos_local)[y] != 0)
@@ -122,7 +149,8 @@ void freeze_exit() {
 
 // adds a region to the freeze-list
 int freeze_region(pid_t pid, mach_vm_address_t addr, mach_vm_size_t size,
-    const void* data, int max_array_size, const void* array_null_data,
+    const void* data, int max_array_size, const void* array_data_mask,
+    const void* array_null_data, const void* array_null_data_mask,
     const char* name) {
 
   // first unfreeze this address (in case it's already frozen)
@@ -147,29 +175,37 @@ int freeze_region(pid_t pid, mach_vm_address_t addr, mach_vm_size_t size,
   this_region->max_array_size = max_array_size;
   this_region->array_temp_data = NULL;
 
-  // make a copy of the data and append the name on the end
-  int data_size = size + strlen(name) + 1;
-  if (array_null_data)
-    data_size += size;
-  this_region->data = malloc(data_size);
+  this_region->name = strdup(name);
+
+  // make a copy of the data elements
+  this_region->data = malloc(this_region->size);
   if (!this_region->data) {
     pthread_mutex_unlock(&_mutex);
     return 2;
   }
   memcpy(this_region->data, data, size);
 
-  // if array_null_data is given, copy it in
-  if (array_null_data) {
-    this_region->array_null_data = (char*)this_region->data + size;
-    memcpy(this_region->array_null_data, array_null_data, size);
-    this_region->name = (char*)this_region->array_null_data + size;
-  } else {
-    this_region->array_null_data = NULL;
-    this_region->name = (char*)this_region->data + size;
+  this_region->array_data_mask = malloc(this_region->size);
+  if (!this_region->array_data_mask) {
+    pthread_mutex_unlock(&_mutex);
+    return 2;
   }
+  memcpy(this_region->array_data_mask, array_data_mask, size);
 
-  // copy the name in
-  strcpy(this_region->name, name);
+  this_region->array_null_data = malloc(this_region->size);
+  if (!this_region->array_null_data) {
+    pthread_mutex_unlock(&_mutex);
+    return 2;
+  }
+  memcpy(this_region->array_null_data, array_null_data, size);
+
+  this_region->array_null_data_mask = malloc(this_region->size);
+  if (!this_region->array_null_data_mask) {
+    pthread_mutex_unlock(&_mutex);
+    return 2;
+  }
+  memcpy(this_region->array_null_data_mask, array_null_data_mask, size);
+
   _num_frozen_regions++;
 
   // unlock & return
@@ -187,6 +223,12 @@ static int _unfreeze_by_index_unlocked(int index) {
   // free the allocated data
   if (_frozen[index].data)
     free(_frozen[index].data);
+  if (_frozen[index].array_data_mask)
+    free(_frozen[index].array_data_mask);
+  if (_frozen[index].array_null_data)
+    free(_frozen[index].array_null_data);
+  if (_frozen[index].array_null_data_mask)
+    free(_frozen[index].array_null_data_mask);
   if (_frozen[index].array_temp_data)
     free(_frozen[index].array_temp_data);
 
@@ -291,10 +333,20 @@ void print_frozen_regions(int _print_data) {
             _frozen[x].addr, _frozen[x].size, _frozen[x].error,
             _frozen[x].name);
       if (_print_data) {
-        print_data(_frozen[x].addr, _frozen[x].data, NULL, _frozen[x].size, 0);
-        if (_frozen[x].array_null_data)
-          print_data(_frozen[x].addr, _frozen[x].array_null_data, NULL,
-              _frozen[x].size, 0);
+        printf("data:\n");
+        print_data(0, _frozen[x].data, NULL, _frozen[x].size, 0);
+        if (_frozen[x].array_data_mask) {
+          printf("data mask:\n");
+          print_data(0, _frozen[x].array_data_mask, NULL, _frozen[x].size, 0);
+        }
+        if (_frozen[x].array_null_data) {
+          printf("null data:\n");
+          print_data(0, _frozen[x].array_null_data, NULL, _frozen[x].size, 0);
+        }
+        if (_frozen[x].array_null_data_mask) {
+          printf("null data mask:\n");
+          print_data(0, _frozen[x].array_null_data_mask, NULL, _frozen[x].size, 0);
+        }
       }
     }
   // if there are no frozen regions, too bad :(

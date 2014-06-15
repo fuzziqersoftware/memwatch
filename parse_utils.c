@@ -202,21 +202,12 @@ int parse_ull(const char* in, unsigned long long* value, int default_hex) {
   if (vmask) \
     *mask = (unsigned char*)realloc(*mask, size); \
 }
-#define write_byte(x) { \
-  expand(1); \
-  (*data)[size - 1] = x; \
+
+#define write_data(type, value) { \
+  expand(sizeof(type)); \
+  (*data)[size - sizeof(type)] = value; \
   if (vmask) \
-    (*mask)[size - 1] = 0xFF; \
-}
-#define write_short(x) { \
-  expand(2); \
-  *(uint16_t*)(*data + size - 2) = x; \
-  if (vmask) \
-    *(uint16_t*)(*mask + size - 2) = 0xFFFF; \
-}
-#define write_blank() { \
-  expand(1); \
-  (*mask)[size - 1] = 0; \
+    memset((*mask) + (size - sizeof(type)), mask_enabled ? 0xFF : 0, sizeof(type)); \
 }
 
 // parses the memwatch data format from a string
@@ -233,6 +224,7 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
   int filename = 0, filename_start;
   unsigned long size = 0;
   int endian = 0;
+  int mask_enabled = 1;
   while (in[0]) {
     read = 0;
 
@@ -258,17 +250,17 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
         if (!in[1])
           return size;
         if (in[1] == 'n') {
-          write_byte('\n');
+          write_data(char, '\n');
         } else if (in[1] == 'r') {
-          write_byte('\r');
+          write_data(char, '\r');
         } else if (in[1] == 't') {
-          write_byte('\t');
+          write_data(char, '\t');
         } else {
-          write_byte(in[1]);
+          write_data(char, in[1]);
         }
         in++;
       } else
-        write_byte(in[0]);
+        write_data(char, in[0]);
       in++;
 
     // if between single quotes, word-expand bytes to output buffer, unescaping
@@ -279,19 +271,19 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
         if (!in[1])
           return size;
         if (in[1] == 'n') {
-          write_short('\n');
+          write_data(int16_t, '\n');
         } else if (in[1] == 'r') {
-          write_short('\r');
+          write_data(int16_t, '\r');
         } else if (in[1] == 't') {
-          write_short('\t');
+          write_data(int16_t, '\t');
         } else {
-          write_short(in[1]);
+          write_data(int16_t, in[1]);
         }
         if (endian)
           bswap(&(*data)[size - 2], 2);
         in++;
       } else {
-        write_short(in[0]);
+        write_data(int16_t, in[0]);
         if (endian)
           bswap(&(*data)[size - 2], 2);
       }
@@ -301,7 +293,7 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
     } else if (filename) {
       if (in[0] == '>') {
         filename = 0;
-        write_byte(0); // null-terminate the filename
+        write_data(char, 0); // null-terminate the filename
         // TODO: support <filename@offset:size> syntax
 
         // open the file, read it into the buffer, close the file
@@ -319,12 +311,12 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
         fread((*data + filename_start), 1, file_size, f);
         fclose(f);
       } else
-        write_byte(in[0]);
+        write_data(char, in[0]);
       in++;
 
-    // ? is an unknown byte, but only if the caller wants a mask
+    // ? inverts mask_enabled
     } else if (in[0] == '?' && vmask) {
-      write_blank();
+      mask_enabled = !mask_enabled;
       in++;
 
     // $ changes the endian-ness
@@ -342,36 +334,25 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
           in++;
           if (in[0] == '#') { // 64-bit
             in++;
-            expand(8);
-            parse_ull(in, (unsigned long long*)(&((*data)[size - 8])), 0);
+            parse_ull(in, &value, 0);
             if (endian)
-              bswap(&((*data)[size - 8]), 8);
-            if (mask)
-              *(unsigned long long*)(&((*mask)[size - 8])) = 0xFFFFFFFFFFFFFFFF;
+              bswap(&value, 8);
+            write_data(uint64_t, value);
           } else {
-            expand(4);
             parse_ull(in, &value, 0);
             if (endian)
               bswap(&value, 4);
-            *(int32_t*)(&((*data)[size - 4])) = value;
-            if (mask)
-              *(uint32_t*)(&((*mask)[size - 4])) = 0xFFFFFFFF;
+            write_data(uint32_t, value);
           }
         } else {
-          expand(2);
           parse_ull(in, &value, 0);
           if (endian)
             bswap(&value, 2);
-          *(int16_t*)(&((*data)[size - 2])) = value;
-          if (mask)
-            *(uint16_t*)(&((*mask)[size - 2])) = 0xFFFF;
+          write_data(uint16_t, value);
         }
       } else {
-        expand(1);
         parse_ull(in, &value, 0);
-        *(int8_t*)(&((*data)[size - 1])) = value;
-        if (mask)
-          *(uint8_t*)(&((*mask)[size - 1])) = 0xFF;
+        write_data(uint8_t, value);
       }
       if (in[0] == '-')
         in++;
@@ -383,21 +364,17 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
       in++;
       if (in[0] == '%') {
         in++;
-        expand(8);
-        double* value = (double*)(&((*data)[size - 8]));
-        sscanf(in, "%lf", value);
+        uint64_t value;
+        sscanf(in, "%lf", (double*)&value);
         if (endian)
-          bswap(value, 8);
-        if (mask)
-          *(unsigned long long*)(&((*mask)[size - 8])) = 0xFFFFFFFFFFFFFFFF;
+          bswap(&value, 8);
+        write_data(uint64_t, value);
       } else {
-        expand(4);
-        float* value = (float*)(&((*data)[size - 4]));
-        sscanf(in, "%f", value);
+        uint32_t value;
+        sscanf(in, "%f", (float*)&value);
         if (endian)
-          bswap(value, 4);
-        if (mask)
-          *(uint32_t*)(&((*mask)[size - 4])) = 0xFFFFFFFF;
+          bswap(&value, 4);
+        write_data(uint32_t, value);
       }
       if (in[0] == '-')
         in++;
@@ -437,7 +414,7 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
       if (high)
         chr = chr << 4;
       else {
-        write_byte(chr);
+        write_data(uint8_t, chr);
         chr = 0;
       }
       high = !high;

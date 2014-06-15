@@ -177,7 +177,7 @@ A string enclosed in < > will be treated as a filename, and will be replaced wit
 A dollar sign ($) inverts the endianness of the data following it. This applies to unicode string literals, integers specified with # signs, and floating-point numbers.
 .TP
 .B Wildcard
-.RB "A question mark (?) will match any byte when searching with the " find " command. This is not yet implemented for the " search " command."
+.RB "Any data between question marks (?) will match any byte when searching with the " find " command or freezing array entries with the " freeze array " command. This is not yet implemented for the " search " command."
 .TP
 .B Comments
 Comments are formatted in C-style blocks; anything between /* and */ will be omitted from the output string, as well as anything between // and a newline (though this format is rarely used since commands are delimited by newlines). Comments cannot be nested.
@@ -185,9 +185,11 @@ Comments are formatted in C-style blocks; anything between /* and */ will be omi
 .RS n
 Any non-recognized characters are ignored. The initial endian-ness of the output depends on the endian-ness of the host machine: on an Intel machine, the resulting data would be little-endian.
 
-Example data string: /* omit 01 02 */ 03 04 $ ##30 $ ##127 "dark" ###-1 'cold'
+Example data string: /* omit 01 02 */ 03 ?04? $ ##30 $ ##127 ?"dark"? ###-1 'cold'
 
 Resulting data (Intel): 03 04 00 1E 7F 00 64 61 72 6B FF FF FF FF 63 00 6F 00 6C 00 64 00
+
+Resulting mask: FF 00 FF FF FF FF 00 00 00 00 FF FF FF FF FF FF FF FF FF FF FF FF
 
 .SH "EXAMPLE"
 You're playing Supaplex in DOSBox and you want to have infinite bombs. It's not obvious what the data size is for this variable, but the value is always small, so a u8 search should find it. 
