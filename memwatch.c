@@ -40,15 +40,14 @@ void sigint(int signum) {
 }
 
 // prints the process pid and name
-// called bu enum_processes, where invoked below
+// called by enum_processes, where invoked below
 int print_process(pid_t pid, const char* proc, void* param) {
   printf("%6u - %s\n", pid, proc);
   return 0;
 }
 
 void print_usage() {
-  printf("usage: memwatch [ -l | -L ]\n");
-  printf("       memwatch [ -c ] [ -f ] pid_or_name\n");
+  printf("usage: memwatch [ -c ] [ -f ] pid_or_name [command ...]\n");
   printf("see `man memwatch` for more information\n");
 }
 
@@ -63,56 +62,54 @@ int main(int argc, char* argv[]) {
 
   // only a few variables
   pid_t pid = 0;
-  int list_procs = 0;
-  int list_commands = 0;
   int showflags = 0;
   int freeze_while_operating = 1;
   uint64_t max_results = 1024 * 1024 * 1024; // approx. 1 billion
   char process_name[PROCESS_NAME_LENGTH] = {0};
   char *input_command = NULL;
   int input_command_len = 0;
+  int num_bad_arguments = 0;
 
   // parse command line args
   int x;
   for (x = 1; x < argc; x++) {
 
-    // -c, --no-color: don't use colors in terminal output
-    if (!strcmp(argv[x], "-c") || !strcmp(argv[x], "--no-color"))
-      use_color = 0;
+    if (argv[x][0] == '-') {
 
-    // -f, --no-freeze: don't freeze target while operating on it
-    if (!strcmp(argv[x], "-f") || !strcmp(argv[x], "--no-freeze"))
-      freeze_while_operating = 0;
+      // -c, --no-color: don't use colors in terminal output
+      if (!strcmp(argv[x], "-c") || !strcmp(argv[x], "--no-color"))
+        use_color = 0;
 
-    // -s, --showflags: determine how to display data
-    else if (!strncmp(argv[x], "-s", 2))
-      showflags = atoi(&argv[x][2]);
-    else if (!strncmp(argv[x], "--showflags=", 12))
-      showflags = atoi(&argv[x][12]);
+      // -f, --no-freeze: don't freeze target while operating on it
+      if (!strcmp(argv[x], "-f") || !strcmp(argv[x], "--no-freeze"))
+        freeze_while_operating = 0;
 
-    // -n, --max-results: set maximum number of results
-    else if (!strncmp(argv[x], "-n", 2))
-      sscanf(&argv[x][2], "%llu", &max_results);
-    else if (!strncmp(argv[x], "--max-results=", 14))
-      sscanf(&argv[x][14], "%llu", &max_results);
+      // -s, --showflags: determine how to display data
+      else if (!strncmp(argv[x], "-s", 2))
+        showflags = atoi(&argv[x][2]);
+      else if (!strncmp(argv[x], "--showflags=", 12))
+        showflags = atoi(&argv[x][12]);
 
-    // -l, --list-processes: display a list of running processes
-    else if (!strcmp(argv[x], "-l") || !strcmp(argv[x], "--list-processes"))
-      list_procs = 1;
+      // -n, --max-results: set maximum number of results
+      else if (!strncmp(argv[x], "-n", 2))
+        sscanf(&argv[x][2], "%llu", &max_results);
+      else if (!strncmp(argv[x], "--max-results=", 14))
+        sscanf(&argv[x][14], "%llu", &max_results);
 
-    // -L, --list-commands: like -l, but displays commands instead of processes
-    else if (!strcmp(argv[x], "-L") || !strcmp(argv[x], "--list-commands"))
-      list_commands = 1;
+      // complain if an unknown arg was given
+      else {
+        printf("unknown command-line argument: %s\n", argv[x]);
+        num_bad_arguments++;
+      }
 
     // first non-dash param: a process name or pid
-    else if (!pid && !process_name[0]) {
+    } else if (!pid && !process_name[0]) {
       pid = atoi(argv[x]);
       if (!pid)
         strcpy(process_name, argv[x]);
 
-    // all subsequent non-dash params: unnecessary parameters
+    // all subsequent non-dash params: command to be run
     } else {
-
       int token_len = strlen(argv[x]);
       input_command = (char*)realloc(input_command, input_command_len + token_len + 2);
       input_command[input_command_len] = ' ';
@@ -121,21 +118,15 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  if (num_bad_arguments) {
+    return 1;
+  }
+
   // are we working on the kernel? (WOO DANGEROUS)
   int operate_on_kernel = 0;
   if (!strcmp(process_name, "KERNEL")) {
     pid = 0;
     operate_on_kernel = 1;
-  }
-
-  // listing processes or commands?
-  if (list_procs) {
-    enum_processes(print_process, NULL, 0);
-    return 0;
-  }
-  if (list_commands) {
-    enum_processes(print_process, NULL, 1);
-    return 0;
   }
 
   // find pid for process name
@@ -149,11 +140,11 @@ int main(int argc, char* argv[]) {
     }
     if (num_found == 0) {
       printf("no processes found\n");
-      return 0;
+      return 2;
     }
     if (num_found > 1) {
       printf("multiple processes found\n");
-      return 0;
+      return 2;
     }
   }
 
@@ -161,7 +152,7 @@ int main(int argc, char* argv[]) {
   if (!pid && !operate_on_kernel) {
     printf("error: no process id or process name given\n");
     print_usage();
-    return (-2);
+    return 3;
   }
 
   // warn user if pid is memwatch itself
