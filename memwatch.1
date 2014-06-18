@@ -32,16 +32,19 @@ A single command (see the following sections) which will be executed instead of 
 .SH "GENERAL COMMANDS"
 .BR memwatch "\'s interactive interface implements the following general commands:"
 .TP
-.BR "help"
+.BI "help"
 .RI "Displays this manual page."
 .TP
-.BR "attach " [pid_or_name]
+.BI "attach " [pid_or_name]
 .RI "Attaches to a new process by PID or by name. If no argument is given, attaches to a process with the same name as the currently-attached process."
 .TP
-.BR "data " data_string
+.BI "data " data_string
 .RI "Parses the data string and displays the raw values returned from the parser. You can use this to test complex data strings before writing them to be sure the correct data will be written."
 .TP
-.BR "quit"
+.BI "state " "[field_name value]"
+.RI "With no arguments, displays simple variables from memwatch's internal state. This includes variables from command-line options, like use_color and freeze_while_operating. With arguments, sets the internal variable " field_name " to " value "."
+.TP
+.BI "quit"
 .RI "Exits memwatch."
 
 .SH "MEMORY ACCESS COMMANDS"

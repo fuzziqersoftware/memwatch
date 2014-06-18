@@ -21,6 +21,8 @@
 // if this happens, the current operation should cancel itself
 extern int* cancel_var;
 
+extern int use_color;
+
 // struct to contain all of the mutable state of the memory search utility
 struct state {
   pid_t pid; // process id of the process that's being operated on
@@ -1553,6 +1555,49 @@ static int command_attach(struct state* st, const char* command) {
   return 0;
 }
 
+// change current state (including command-line options)
+static int command_state(struct state* st, const char* command) {
+
+  if (!command[0]) {
+    printf("use_color = %d\n", use_color);
+    printf("pid = %d\n", st->pid);
+    printf("process_name = \"%s\"\n", st->process_name);
+    printf("freeze_while_operating = %d\n", st->freeze_while_operating);
+    printf("max_results = %llu\n", st->max_results);
+    printf("interactive = %d\n", st->interactive);
+    printf("run = %d\n", st->run);
+    printf("num_find_results_allocated = %llu\n", st->num_find_results_allocated);
+    printf("num_find_results = %llu\n", st->num_find_results);
+    return 0;
+  }
+
+  const char* field_name = command;
+  command = skip_word(command, ' ');
+  if (!command || !command[0]) {
+    printf("no value given\n");
+    return 1;
+  }
+
+  if (!strncmp(field_name, "use_color ", 10))
+    use_color = atoi(command);
+  else if (!strncmp(field_name, "pid ", 4))
+    st->pid = atoi(command);
+  else if (!strncmp(field_name, "process_name ", 13))
+    strcpy(st->process_name, command);
+  else if (!strncmp(field_name, "freeze_while_operating ", 23))
+    st->freeze_while_operating = atoi(command);
+  else if (!strncmp(field_name, "max_results ", 12))
+    st->max_results = atoi(command);
+  else if (!strncmp(field_name, "run ", 4))
+    st->run = atoi(command);
+  else {
+    printf("unknown or read-only field\n");
+    return 2;
+  }
+
+  return 0;
+}
+
 // exit memwatch
 static int command_quit(struct state* st, const char* command) {
   st->run = 0;
@@ -1611,13 +1656,15 @@ static const struct {
   {"res", command_results},
   {"r", command_read},
   {"search", command_search},
+  {"s", command_search},
   {"set", command_set},
   {"signal", command_signal},
   {"sig", command_signal},
   {"stacks", command_read_stacks},
   {"stax", command_read_stacks},
   {"stx", command_read_stacks},
-  {"s", command_search},
+  {"state", command_state},
+  {"st", command_state},
   {"t", command_find},
   {"unfreeze", command_unfreeze},
   {"u", command_unfreeze},
