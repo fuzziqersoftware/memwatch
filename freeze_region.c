@@ -185,26 +185,35 @@ int freeze_region(pid_t pid, mach_vm_address_t addr, mach_vm_size_t size,
   }
   memcpy(this_region->data, data, size);
 
-  this_region->array_data_mask = malloc(this_region->size);
-  if (!this_region->array_data_mask) {
-    pthread_mutex_unlock(&_mutex);
-    return 2;
-  }
-  memcpy(this_region->array_data_mask, array_data_mask, size);
+  if (array_data_mask) {
+    this_region->array_data_mask = malloc(this_region->size);
+    if (!this_region->array_data_mask) {
+      pthread_mutex_unlock(&_mutex);
+      return 2;
+    }
+    memcpy(this_region->array_data_mask, array_data_mask, size);
+  } else
+    this_region->array_data_mask = NULL;
 
-  this_region->array_null_data = malloc(this_region->size);
-  if (!this_region->array_null_data) {
-    pthread_mutex_unlock(&_mutex);
-    return 2;
-  }
-  memcpy(this_region->array_null_data, array_null_data, size);
+  if (array_null_data) {
+    this_region->array_null_data = malloc(this_region->size);
+    if (!this_region->array_null_data) {
+      pthread_mutex_unlock(&_mutex);
+      return 2;
+    }
+    memcpy(this_region->array_null_data, array_null_data, size);
+  } else
+    this_region->array_null_data = NULL;
 
-  this_region->array_null_data_mask = malloc(this_region->size);
-  if (!this_region->array_null_data_mask) {
-    pthread_mutex_unlock(&_mutex);
-    return 2;
-  }
-  memcpy(this_region->array_null_data_mask, array_null_data_mask, size);
+  if (array_null_data_mask) {
+    this_region->array_null_data_mask = malloc(this_region->size);
+    if (!this_region->array_null_data_mask) {
+      pthread_mutex_unlock(&_mutex);
+      return 2;
+    }
+    memcpy(this_region->array_null_data_mask, array_null_data_mask, size);
+  } else
+    this_region->array_null_data_mask = NULL;
 
   _num_frozen_regions++;
 
