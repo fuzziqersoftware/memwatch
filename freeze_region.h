@@ -33,7 +33,11 @@ int unfreeze_by_addr(mach_vm_address_t addr);
 int unfreeze_by_name(const char* name);
 void move_frozen_regions_to_process(pid_t pid);
 
-void print_frozen_regions(int _print_data);
+#define FZN_PRINT_METADATA_ONLY  0
+#define FZN_PRINT_DATA           1
+#define FZN_PRINT_COMMANDS       2
+
+void print_frozen_regions(int print_mode);
 int get_num_frozen_regions();
 
 #endif // FREEZE_REGION_H

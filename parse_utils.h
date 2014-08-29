@@ -59,6 +59,8 @@ void print_data(unsigned long long address, const void* ds, const void* diff,
 
 unsigned long long read_string_data(const char* in_buffer, void** vdata,
     void** vmask);
+void print_string_data(FILE* stream, void* data, void* mask,
+    unsigned long long size);
 int read_ull(FILE* in, unsigned long long* value, int default_hex);
 char* read_string_delimited(FILE* in, char delimiter, int consume_delim);
 void trim_spaces(char* string);

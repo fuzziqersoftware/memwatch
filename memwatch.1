@@ -113,8 +113,8 @@ A single command (see the following sections) which will be executed instead of 
 .BI "unfreeze " "id"
 .RI "If " id " is not given, displays the list of currently-frozen regions. Otherwise, " id " may be the index, address, or name of the region to unfreeze. If a name is given and multiple regions have the same name, unfreezes all of them."
 .TP
-.BI "frozen [data]"
-.RB "Displays the list of currently-frozen regions. If run as " "frozen data" ", displays the data associated with each region as well."
+.BI "frozen [data | commands]"
+.RB "Displays the list of currently-frozen regions. If run as " "frozen data" ", displays the data associated with each region as well. If run as " "frozen commands" ", displays for each frozen region a command to freeze that region (this is generally a more concise way to view frozen regions with their data)."
 
 .SH "EXECUTION STATE MANAGEMENT COMMANDS"
 .BR memwatch " implements experimental support for viewing and modifying execution state in the target process, implemented by the following commands:"

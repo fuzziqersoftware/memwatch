@@ -540,7 +540,7 @@ static int command_unfreeze(struct state* st, const char* command) {
 
   // else, print frozen regions
   } else
-    print_frozen_regions(0);
+    print_frozen_regions(FZN_PRINT_METADATA_ONLY);
 
   return 0;
 }
@@ -554,10 +554,12 @@ static int command_frozen(struct state* st, const char* command) {
     return 1;
   }
 
-  int show_data = 0;
+  int print_mode = FZN_PRINT_METADATA_ONLY;
   if (!strcmp(command, "data"))
-    show_data = 1;
-  print_frozen_regions(show_data);
+    print_mode = FZN_PRINT_DATA;
+  if (!strcmp(command, "cmds") || !strcmp(command, "commands"))
+    print_mode = FZN_PRINT_COMMANDS;
+  print_frozen_regions(print_mode);
   return 0;
 }
 

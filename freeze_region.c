@@ -323,44 +323,63 @@ void move_frozen_regions_to_process(pid_t pid) {
 }
 
 // prints the list of frozen regions
-void print_frozen_regions(int _print_data) {
+void print_frozen_regions(int print_mode) {
 
   // lock the region list
   int x;
   pthread_mutex_lock(&_mutex);
 
-  // if there are any frozen regions, print a list of them
-  if (_num_frozen_regions > 0) {
-    printf("frozen regions:\n");
+  if (print_mode == FZN_PRINT_COMMANDS) {
     for (x = 0; x < _num_frozen_regions; x++) {
       if (_frozen[x].max_array_size)
-        printf("%3d: %6u %016llX:%016llX [array:%d] [%d] %s\n", x,
-            _frozen[x].pid, _frozen[x].addr, _frozen[x].size,
-            _frozen[x].max_array_size, _frozen[x].error, _frozen[x].name);
+        printf("f \"%s\" array %d%s %016llX ", _frozen[x].name,
+            _frozen[x].max_array_size,
+            (_frozen[x].array_null_data ? " null" : ""), _frozen[x].addr);
       else
-        printf("%3d: %6u %016llX:%016llX [%d] %s\n", x, _frozen[x].pid,
-            _frozen[x].addr, _frozen[x].size, _frozen[x].error,
-            _frozen[x].name);
-      if (_print_data) {
-        printf("data:\n");
-        print_data(0, _frozen[x].data, NULL, _frozen[x].size, 0);
-        if (_frozen[x].array_data_mask) {
-          printf("data mask:\n");
-          print_data(0, _frozen[x].array_data_mask, NULL, _frozen[x].size, 0);
-        }
-        if (_frozen[x].array_null_data) {
-          printf("null data:\n");
-          print_data(0, _frozen[x].array_null_data, NULL, _frozen[x].size, 0);
-        }
-        if (_frozen[x].array_null_data_mask) {
-          printf("null data mask:\n");
-          print_data(0, _frozen[x].array_null_data_mask, NULL, _frozen[x].size, 0);
+        printf("f \"%s\" %016llX ", _frozen[x].name, _frozen[x].addr);
+
+      print_string_data(stdout, _frozen[x].data, _frozen[x].array_data_mask,
+          _frozen[x].size);
+      if (_frozen[x].array_null_data)
+        print_string_data(stdout, _frozen[x].array_null_data,
+            _frozen[x].array_null_data_mask, _frozen[x].size);
+      printf("\n");
+    }
+  } else {
+
+    // if there are any frozen regions, print a list of them
+    if (_num_frozen_regions > 0) {
+      printf("frozen regions:\n");
+      for (x = 0; x < _num_frozen_regions; x++) {
+        if (_frozen[x].max_array_size)
+          printf("%3d: %6u %016llX:%016llX [array:%d] [%d] %s\n", x,
+              _frozen[x].pid, _frozen[x].addr, _frozen[x].size,
+              _frozen[x].max_array_size, _frozen[x].error, _frozen[x].name);
+        else
+          printf("%3d: %6u %016llX:%016llX [%d] %s\n", x, _frozen[x].pid,
+              _frozen[x].addr, _frozen[x].size, _frozen[x].error,
+              _frozen[x].name);
+        if (print_mode == FZN_PRINT_DATA) {
+          printf("data:\n");
+          print_data(0, _frozen[x].data, NULL, _frozen[x].size, 0);
+          if (_frozen[x].array_data_mask) {
+            printf("data mask:\n");
+            print_data(0, _frozen[x].array_data_mask, NULL, _frozen[x].size, 0);
+          }
+          if (_frozen[x].array_null_data) {
+            printf("null data:\n");
+            print_data(0, _frozen[x].array_null_data, NULL, _frozen[x].size, 0);
+          }
+          if (_frozen[x].array_null_data_mask) {
+            printf("null data mask:\n");
+            print_data(0, _frozen[x].array_null_data_mask, NULL, _frozen[x].size, 0);
+          }
         }
       }
-    }
-  // if there are no frozen regions, too bad :(
-  } else
-    printf("no regions frozen\n");
+    // if there are no frozen regions, too bad :(
+    } else
+      printf("no regions frozen\n");
+  }
 
   // unlock the region list
   pthread_mutex_unlock(&_mutex);  

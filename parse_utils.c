@@ -423,6 +423,24 @@ unsigned long long read_string_data(const char* in, void** vdata, void** vmask) 
   return size;
 }
 
+// prints data in a format readable by read_string_data
+void print_string_data(FILE* stream, void* data, void* mask,
+    unsigned long long size) {
+
+  uint8_t* bdata = (uint8_t*)data;
+  uint8_t* bmask = (uint8_t*)mask;
+  int mask_enabled = 1;
+  unsigned long long x;
+  for (x = 0; x < size; x++) {
+    if (bmask && ((bmask[x] && !mask_enabled) || (!bmask[x] && mask_enabled))) {
+      mask_enabled = !mask_enabled;
+      fprintf(stream, "?");
+    }
+    fprintf(stream, "%02X", bdata[x]);
+  }
+}
+
+
 // reads a string from the given stream. return value must be free'd later.
 char* read_string_delimited(FILE* in, char delimiter, int consume_delim) {
   char* string = NULL;
