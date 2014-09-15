@@ -12,38 +12,6 @@
 
 extern int use_color;
 
-inline void bswap_int8_t(void* a) { }
-
-inline void bswap_int16_t(void* a) {
-  ((int8_t*)a)[0] ^= ((int8_t*)a)[1];
-  ((int8_t*)a)[1] ^= ((int8_t*)a)[0];
-  ((int8_t*)a)[0] ^= ((int8_t*)a)[1];
-}
-
-inline void bswap_int32_t(void* a) {
-  ((int8_t*)a)[0] ^= ((int8_t*)a)[3];
-  ((int8_t*)a)[3] ^= ((int8_t*)a)[0];
-  ((int8_t*)a)[0] ^= ((int8_t*)a)[3];
-  ((int8_t*)a)[2] ^= ((int8_t*)a)[1];
-  ((int8_t*)a)[1] ^= ((int8_t*)a)[2];
-  ((int8_t*)a)[2] ^= ((int8_t*)a)[1];
-}
-
-inline void bswap_int64_t(void* a) {
-  ((int8_t*)a)[0] ^= ((int8_t*)a)[7];
-  ((int8_t*)a)[7] ^= ((int8_t*)a)[0];
-  ((int8_t*)a)[0] ^= ((int8_t*)a)[7];
-  ((int8_t*)a)[6] ^= ((int8_t*)a)[1];
-  ((int8_t*)a)[1] ^= ((int8_t*)a)[6];
-  ((int8_t*)a)[6] ^= ((int8_t*)a)[1];
-  ((int8_t*)a)[4] ^= ((int8_t*)a)[3];
-  ((int8_t*)a)[3] ^= ((int8_t*)a)[4];
-  ((int8_t*)a)[4] ^= ((int8_t*)a)[3];
-  ((int8_t*)a)[2] ^= ((int8_t*)a)[5];
-  ((int8_t*)a)[5] ^= ((int8_t*)a)[2];
-  ((int8_t*)a)[2] ^= ((int8_t*)a)[5];
-}
-
 void bswap(void* a, int size) {
   if (size == 1)
     bswap_int8_t(a);

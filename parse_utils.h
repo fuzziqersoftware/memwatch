@@ -4,6 +4,7 @@
 #ifndef PARSE_UTILS_H
 #define PARSE_UTILS_H
 
+#include <stdint.h>
 #include <stdio.h>
 
 #define FORMAT_END         (-1)
@@ -36,17 +37,35 @@
 #define FLAG_SHOW_QWORDS   4
 #define FLAG_SHOW_OWORDS   8
 
-inline void bswap_int8_t(void* a);
+static inline void bswap_int8_t(void* a) { }
+
+static inline void bswap_int16_t(void* a) {
+  *(uint16_t*)a = ((*(uint16_t*)a >> 8) & 0x00FF) |
+                  ((*(uint16_t*)a << 8) & 0xFF00);
+}
+
+static inline void bswap_int32_t(void* a) {
+  *(uint32_t*)a = ((*(uint32_t*)a >> 24) & 0x000000FF) |
+                  ((*(uint32_t*)a >> 8)  & 0x0000FF00) |
+                  ((*(uint32_t*)a << 8)  & 0x00FF0000) |
+                  ((*(uint32_t*)a << 24) & 0xFF000000);
+}
+
+static inline void bswap_int64_t(void* a) {
+  *(uint64_t*)a = ((*(uint64_t*)a >> 56) & 0x00000000000000FF) |
+                  ((*(uint64_t*)a >> 40) & 0x000000000000FF00) |
+                  ((*(uint64_t*)a >> 24) & 0x0000000000FF0000) |
+                  ((*(uint64_t*)a >> 8)  & 0x00000000FF000000) |
+                  ((*(uint64_t*)a << 8)  & 0x000000FF00000000) |
+                  ((*(uint64_t*)a << 24) & 0x0000FF0000000000) |
+                  ((*(uint64_t*)a << 40) & 0x00FF000000000000) |
+                  ((*(uint64_t*)a << 56) & 0xFF00000000000000);
+}
+
 #define bswap_uint8_t bswap_int8_t
-
-inline void bswap_int16_t(void* a);
 #define bswap_uint16_t bswap_int16_t
-
-inline void bswap_int32_t(void* a);
 #define bswap_uint32_t bswap_int32_t
 #define bswap_float bswap_int32_t
-
-inline void bswap_int64_t(void* a);
 #define bswap_uint64_t bswap_int64_t
 #define bswap_double bswap_int64_t
 
