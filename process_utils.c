@@ -162,7 +162,7 @@ void print_region_map(VMRegionDataMap* map) {
   // enumerate the regions
   unsigned long x;
   printf("address, end address, access flags\n");
-  for (x = 0; x < map->numRegions; x++) {
+  for (x = 0; x < map->num_regions; x++) {
 
     // print region info
     printf("%016llX %016llX %c%c%c/%c%c%c",
@@ -211,7 +211,7 @@ void print_region_map(VMRegionDataMap* map) {
 
   // print the counters
   char sizebuffer[0x40]; // doesn't need to be long...
-  printf("%5lu regions, %s in total\n", map->numRegions,
+  printf("%5lu regions, %s in total\n", map->num_regions,
          _size_to_human_readable(total_bytes, sizebuffer));
   printf("%5lld regions, %s unread by memwatch\n", num_error,
          _size_to_human_readable(total_error, sizebuffer));

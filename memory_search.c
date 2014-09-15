@@ -47,8 +47,8 @@ int get_addr_from_command(struct state* st, const char* command, uint64_t* addr)
       printf("no search is currently open\n");
       return -1;
     }
-    if (*addr >= st->search->numResults) {
-      printf("current search has only %lld results\n", st->search->numResults);
+    if (*addr >= st->search->num_results) {
+      printf("current search has only %lld results\n", st->search->num_results);
       return -2;
     }
     *addr = st->search->results[*addr];
@@ -135,7 +135,7 @@ static int command_dump(struct state* st, const char* command) {
 
     // for each region...
     unsigned long x;
-    for (x = 0; x < map->numRegions; x++) {
+    for (x = 0; x < map->num_regions; x++) {
 
       // build the filename: prefix_address
       sprintf(filename_piece, "%s_%016llX", command,
@@ -200,7 +200,7 @@ static int command_find(struct state* st, const char* command) {
   // loop through the regions, searching for the string
   int x, cont = 1;
   cancel_var = &cont; // this operation can be canceled
-  for (x = 0; cont && (x < map->numRegions); x++) {
+  for (x = 0; cont && (x < map->num_regions); x++) {
 
     // skip regions with no data
     if (!map->regions[x].data)
@@ -673,20 +673,20 @@ static void print_search_results(struct state* st, MemorySearchData* search,
 
   // if there's a max given, don't print results if there are more than that
   // many of them
-  if (max_results && (search->numResults > max_results)) {
-    printf("results: %lld\n", search->numResults);
+  if (max_results && (search->num_results > max_results)) {
+    printf("results: %lld\n", search->num_results);
     return;
   }
 
   // print the results!
   int x;
   if (search->type == SEARCHTYPE_DATA) {
-    for (x = 0; x < search->numResults; x++)
+    for (x = 0; x < search->num_results; x++)
       printf("(%d) %016llX\n", x, search->results[x]);
   } else {
     mach_vm_size_t size = SearchDataSize(search->type);
     void* data = malloc(size);
-    for (x = 0; x < search->numResults; x++) {
+    for (x = 0; x < search->num_results; x++) {
       printf("(%d) %016llX ", x, search->results[x]);
       int error = VMReadBytes(st->pid, search->results[x], data, &size);
       if (error)
@@ -972,7 +972,7 @@ static int command_set(struct state* st, const char* command) {
 
   // write the data to each result address
   int x, error;
-  for (x = 0; x < st->search->numResults; x++) {
+  for (x = 0; x < st->search->num_results; x++) {
     uint64_t addr = st->search->results[x];
     error = VMWriteBytes(st->pid, addr, data, size);
     if (!error)
@@ -1790,16 +1790,16 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_resu
       const char* search_name = st.search->name[0] ? st.search->name : "(unnamed search)";
       if (!st.search->memory)
         sprintf(prompt, "memwatch:%u/%s %ds/%df %s # ", st.pid, st.process_name,
-                st.searches->numSearches, get_num_frozen_regions(),
+                st.searches->num_searches, get_num_frozen_regions(),
                 search_name);
       else
         sprintf(prompt, "memwatch:%u/%s %ds/%df %s(%llu) # ", st.pid,
-                st.process_name, st.searches->numSearches, get_num_frozen_regions(),
-                search_name, st.search->numResults);
+                st.process_name, st.searches->num_searches, get_num_frozen_regions(),
+                search_name, st.search->num_results);
     } else {
       prompt = (char*)malloc(30 + strlen(st.process_name));
       sprintf(prompt, "memwatch:%u/%s %ds/%df # ", st.pid, st.process_name,
-              st.searches->numSearches, get_num_frozen_regions());
+              st.searches->num_searches, get_num_frozen_regions());
     }
 
     // delete the old command, if present

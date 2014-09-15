@@ -29,7 +29,7 @@ typedef struct _VMRegionData {
 
 typedef struct _VMRegionDataMap {
   pid_t process;
-  unsigned long numRegions;
+  unsigned long num_regions;
   VMRegionData regions[0];
 } VMRegionDataMap;
 

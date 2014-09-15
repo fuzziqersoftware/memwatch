@@ -7,7 +7,7 @@
 #include "search_data.h"
 
 typedef struct _MemorySearchDataList {
-  int numSearches;
+  int num_searches;
   MemorySearchData** searches;
 } MemorySearchDataList;
 

@@ -19,7 +19,7 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
   if (!map)
     return NULL;
   map->process = pid;
-  map->numRegions = 0;
+  map->num_regions = 0;
 
   // now, for each region...
   int cont = 1;
@@ -37,20 +37,20 @@ VMRegionDataMap* GetProcessRegionList(pid_t pid, unsigned int modeMask) {
 
     // alloc space for this region's metadata in the map
     map = (VMRegionDataMap*)realloc(map, sizeof(VMRegionDataMap) +
-                                  sizeof(VMRegionData) * (map->numRegions + 1));
+                                  sizeof(VMRegionData) * (map->num_regions + 1));
     if (!map) {
       cancel_var = NULL;
       return NULL;
     }
 
     // fill in region info and advance
-    map->regions[map->numRegions].region._process = pid;
-    map->regions[map->numRegions].region._address = vmr._address;
-    map->regions[map->numRegions].region._size = vmr._size;
-    map->regions[map->numRegions].region._attributes = vmr._attributes;
-    map->regions[map->numRegions].error = 0;
-    map->regions[map->numRegions].data = NULL;
-    map->numRegions++;
+    map->regions[map->num_regions].region._process = pid;
+    map->regions[map->num_regions].region._address = vmr._address;
+    map->regions[map->num_regions].region._size = vmr._size;
+    map->regions[map->num_regions].region._attributes = vmr._attributes;
+    map->regions[map->num_regions].error = 0;
+    map->regions[map->num_regions].data = NULL;
+    map->num_regions++;
   }
   cancel_var = NULL;
 
@@ -75,7 +75,7 @@ VMRegionDataMap* DumpProcessMemory(pid_t pid, unsigned int modeMask) {
   // now, for each region...
   int cont = 1;
   cancel_var = &cont;
-  for (x = 0; cont && (x < map->numRegions); x++) {
+  for (x = 0; cont && (x < map->num_regions); x++) {
 
     // alloc space for this region's data
     map->regions[x].data = VMAlloc(map->regions[x].region._size);
@@ -131,7 +131,7 @@ int UpdateDataMap(VMRegionDataMap* map) {
   // for each region...
   int cont = 1;
   cancel_var = &cont;
-  for (x = 0; x < map->numRegions; x++) {
+  for (x = 0; x < map->num_regions; x++) {
 
     // read the data in this section
     mach_vm_size_t newsize = map->regions[x].region._size;
@@ -155,14 +155,14 @@ int UpdateDataMap(VMRegionDataMap* map) {
 VMRegionDataMap* CopyDataMap(VMRegionDataMap* s) {
 
   int object_size = sizeof(VMRegionDataMap) +
-      sizeof(VMRegionData) * s->numRegions;
+      sizeof(VMRegionData) * s->num_regions;
   VMRegionDataMap* n = (VMRegionDataMap*)malloc(object_size);
   if (!n)
     return NULL;
   memcpy(n, s, object_size);
 
   long x;
-  for (x = 0; x < s->numRegions; x++) {
+  for (x = 0; x < s->num_regions; x++) {
     if (!s->regions[x].data)
       continue; // no data for this region
     n->regions[x].data = malloc(n->regions[x].region._size);
@@ -173,7 +173,7 @@ VMRegionDataMap* CopyDataMap(VMRegionDataMap* s) {
 
   // if the region copying didn't finish, then this is an incomplete map and we
   // should destroy it
-  if (x < s->numRegions) {
+  if (x < s->num_regions) {
     for (; x >= 0; x--)
       if (n->regions[x].data)
         free(n->regions[x].data);
@@ -187,7 +187,7 @@ VMRegionDataMap* CopyDataMap(VMRegionDataMap* s) {
 void DestroyDataMap(VMRegionDataMap* map) {
   if (map) {
     unsigned long x;
-    for (x = 0; x < map->numRegions; x++)
+    for (x = 0; x < map->num_regions; x++)
       if (map->regions[x].data)
         VMFree(map->regions[x].data, map->regions[x].region._size);
     free(map);

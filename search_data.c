@@ -186,7 +186,7 @@ MemorySearchData* CreateNewSearch(int type, const char* name, long flags) {
   s->searchflags = flags;
   s->prev_size = 0;
   s->type = type;
-  s->numResults = 0;
+  s->num_results = 0;
   s->memory = NULL;
   return s;
 }
@@ -213,7 +213,7 @@ void DeleteSearch(MemorySearchData* search) {
 MemorySearchData* CopySearchData(MemorySearchData* s) {
 
   int object_size = sizeof(MemorySearchData) +
-      s->numResults * sizeof(unsigned long long);
+      s->num_results * sizeof(unsigned long long);
   MemorySearchData* n = (MemorySearchData*)malloc(object_size);
   if (!n)
     return NULL;
@@ -270,7 +270,7 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
 
   // alloc a new search object
   MemorySearchData* n = (MemorySearchData*)malloc(sizeof(MemorySearchData) +
-                              s->numResults * sizeof(unsigned long long));
+                              s->num_results * sizeof(unsigned long long));
   if (!n) {
     printf("couldn\'t allocate new result set\n");
     return NULL;
@@ -278,7 +278,7 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
 
   // copy into the new object
   memcpy(n, s, sizeof(MemorySearchData) +
-         s->numResults * sizeof(unsigned long long));
+         s->num_results * sizeof(unsigned long long));
   n->memory = map;
 
   // if this is the first search, we need to check every address
@@ -304,7 +304,7 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
     unsigned long long numAllocatedResults = 0;
     int cont = 1, cancelled_by_max = 0;
     cancel_var = &cont;
-    for (x = 0; cont && (x < n->memory->numRegions); x++) {
+    for (x = 0; cont && (x < n->memory->num_regions); x++) {
 
       // if the region has no data, skip it
       if (!n->memory->regions[x].data)
@@ -321,7 +321,7 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
           continue;
 
         // expand the result list if necessary
-        while (n->numResults >= numAllocatedResults) {
+        while (n->num_results >= numAllocatedResults) {
           if (!numAllocatedResults)
             numAllocatedResults = 128;
           else
@@ -338,11 +338,11 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
         }
 
         // add this result to the list
-        n->results[n->numResults] = n->memory->regions[x].region._address + y;
-        n->numResults++;
+        n->results[n->num_results] = n->memory->regions[x].region._address + y;
+        n->num_results++;
 
         // if there's a max and we've reached it, stop searching
-        if (n->numResults >= max_results) {
+        if (n->num_results >= max_results) {
           printf("warning: too many results; stopping search early\n");
           cont = 0;
           cancelled_by_max = 1;
@@ -368,16 +368,16 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
     int cont = 1;
     int numOutsideRegions = 0, numInsideBadRegions = 0;
     cancel_var = &cont;
-    for (x = 0; cont && (x < n->numResults); x++) {
+    for (x = 0; cont && (x < n->num_results); x++) {
 
       // move the current region until we're inside it, for both maps
-      while (currentRegionN < n->memory->numRegions &&
+      while (currentRegionN < n->memory->num_regions &&
              n->memory->regions[currentRegionN].region._address <= n->results[x]
              && !VMAddressInRegion(n->memory->regions[currentRegionN].region,
                                    n->results[x]))
         currentRegionN++;
       if (s->memory)
-        while (currentRegionS < s->memory->numRegions &&
+        while (currentRegionS < s->memory->num_regions &&
                s->memory->regions[currentRegionS].region._address <= n->results[x]
                && !VMAddressInRegion(s->memory->regions[currentRegionS].region,
                                      n->results[x]))
@@ -385,9 +385,9 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
 
       // if there are no regions left or the current region is after the current
       // result, then the current result is invalid - get rid of it
-      if (currentRegionN >= n->memory->numRegions ||
+      if (currentRegionN >= n->memory->num_regions ||
           n->memory->regions[currentRegionN].region._address > n->results[x] ||
-          currentRegionS >= s->memory->numRegions ||
+          currentRegionS >= s->memory->num_regions ||
           s->memory->regions[currentRegionS].region._address > n->results[x]) {
         n->results[x] = 0;
         numOutsideRegions++;
@@ -417,13 +417,13 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
 
     // remove deleted results
     int numRemainingResults = 0;
-    for (x = 0; x < n->numResults; x++) {
+    for (x = 0; x < n->num_results; x++) {
       if (n->results[x]) {
         n->results[numRemainingResults] = n->results[x];
         numRemainingResults++;
       }
     }
-    n->numResults = numRemainingResults;
+    n->num_results = numRemainingResults;
     cancel_var = NULL;
     
     // if we were canceled, return NULL
@@ -441,7 +441,7 @@ MemorySearchData* ApplyMapToSearch(MemorySearchData* s, VMRegionDataMap* map,
   // save the prev size and return
   n->prev_size = size;
   return (MemorySearchData*)realloc(n, sizeof(MemorySearchData) +
-                                    n->numResults * sizeof(unsigned long long));
+                                    n->num_results * sizeof(unsigned long long));
 }
 
 // deletes results from the search
@@ -450,17 +450,17 @@ int DeleteResults(MemorySearchData* s, uint64_t start, uint64_t end) {
     return (-1);
 
   int startIndex, endIndex;
-  for (startIndex = 0; (startIndex < s->numResults) &&
+  for (startIndex = 0; (startIndex < s->num_results) &&
        (s->results[startIndex] < start); startIndex++);
-  for (endIndex = startIndex; (endIndex < s->numResults) &&
+  for (endIndex = startIndex; (endIndex < s->num_results) &&
        (s->results[endIndex] < end); endIndex++);
   if (endIndex == startIndex)
     return 0;
 
   int numToRemove = endIndex - startIndex;
-  s->numResults -= numToRemove;
+  s->num_results -= numToRemove;
   memcpy(&s->results[startIndex], &s->results[endIndex],
-         (s->numResults - startIndex) * sizeof(uint64_t));
+         (s->num_results - startIndex) * sizeof(uint64_t));
   return numToRemove;
 }
 

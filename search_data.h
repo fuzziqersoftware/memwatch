@@ -55,7 +55,7 @@ typedef struct _MemorySearchData {
   char name[0x80];
   VMRegionDataMap* memory;
   uint64_t prev_size;
-  uint64_t numResults;
+  uint64_t num_results;
   uint64_t results[0];
 } MemorySearchData;
 
