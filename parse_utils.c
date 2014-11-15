@@ -2,11 +2,14 @@
 // odds and ends used for messing with text and data
 
 #include <ctype.h>
+#include <pwd.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "parse_utils.h"
 
@@ -531,4 +534,20 @@ void get_current_time_string(char* output) {
      monthnames[cooked.tm_mon], cooked.tm_year + 1900,
      cooked.tm_hour, cooked.tm_min, cooked.tm_sec,
      rawtime.tv_usec / 1000);
+}
+
+int get_user_homedir(char* out, int out_len) {
+  const char *homedir = getenv("HOME");
+  if (homedir == NULL) {
+    struct passwd *pw = getpwuid(getuid());
+    if (!pw)
+      return -2;
+    homedir = pw->pw_dir;
+  }
+
+  int homedir_len = strlen(homedir);
+  if (homedir_len >= out_len)
+    return -1;
+  strcpy(out, homedir);
+  return homedir_len;
 }

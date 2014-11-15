@@ -7,15 +7,15 @@ EXECUTABLES=array_test value_test value_test_float register_test32 register_test
 all: $(EXECUTABLES)
 
 array_test: array_test.c
-	g++ $(LDFLAGS) -o array_test $^
+	gcc $(LDFLAGS) -o array_test $^
 value_test: value_test.c
-	g++ $(LDFLAGS) -o value_test $^
+	gcc $(LDFLAGS) -o value_test $^
 value_test_float: value_test_float.c
-	g++ $(LDFLAGS) -o value_test_float $^
+	gcc $(LDFLAGS) -o value_test_float $^
 register_test64: register_test64.s
-	g++ $(LDFLAGS) -m64 -o register_test64 $^
+	gcc $(LDFLAGS) -m64 -o register_test64 $^
 register_test32: register_test32.s
-	g++ $(LDFLAGS) -m32 -o register_test32 $^
+	gcc $(LDFLAGS) -m32 -o register_test32 $^
 
 clean:
 	rm -rf *.o *.dSYM $(EXECUTABLES)

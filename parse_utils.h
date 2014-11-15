@@ -91,4 +91,6 @@ int read_addr_size(const char* str, unsigned long long* addr,
 
 void get_current_time_string(char* output);
 
+int get_user_homedir(char* out, int out_len);
+
 #endif // PARSE_UTILS_H

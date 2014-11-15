@@ -1,6 +1,7 @@
 // memory_search.c, by Martin Michelsen, 2012
 // interface for interactive memory search
 
+#include <sys/syslimits.h>
 #include <readline/readline.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -14,6 +15,9 @@
 #include "search_data_list.h"
 #include "vmmap.h"
 #include "vmmap_data.h"
+
+#define HISTORY_FILE_LENGTH  1024
+
 
 // TODO: undoing searches
 
@@ -32,6 +36,7 @@ struct state {
   int watch; // set to 1 to repeat commands
   int interactive; // 0 if run from the shell; 1 if from the memwatch prompt
   int run; // set to 0 to exit the memory search interface
+  uint64_t num_commands_run;
   MemorySearchDataList* searches; // list of open searches
   MemorySearchData* search; // the current search
   unsigned long long num_find_results_allocated;
@@ -1577,6 +1582,7 @@ static int command_state(struct state* st, const char* command) {
     printf("max_results = %llu\n", st->max_results);
     printf("interactive = %d\n", st->interactive);
     printf("run = %d\n", st->run);
+    printf("num_commands_run = %llu\n", st->num_commands_run);
     printf("num_find_results_allocated = %llu\n", st->num_find_results_allocated);
     printf("num_find_results = %llu\n", st->num_find_results);
     return 0;
@@ -1775,6 +1781,14 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_resu
   // init the region freezer
   freeze_init();
 
+  // initialize history
+  char history_filename[PATH_MAX];
+  using_history();
+  get_user_homedir(history_filename, PATH_MAX);
+  strcat(history_filename, "/.memwatch_history");
+  read_history(history_filename);
+  stifle_history(HISTORY_FILE_LENGTH);
+
   // while we have stuff to do...
   char* command = NULL;
   while (st.run) {
@@ -1824,6 +1838,7 @@ int prompt_for_commands(pid_t pid, int freeze_while_operating, uint64_t max_resu
   }
 
   // shut down the region freezer and return
+  write_history(history_filename);
   cleanup_state(&st);
   freeze_exit();
   return 0;
