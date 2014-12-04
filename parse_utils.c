@@ -176,7 +176,7 @@ int parse_ull(const char* in, unsigned long long* value, int default_hex) {
 
 #define write_data(type, value) { \
   expand(sizeof(type)); \
-  (*data)[size - sizeof(type)] = value; \
+  *(type*)((*data) + (size - sizeof(type))) = value; \
   if (vmask) \
     memset((*mask) + (size - sizeof(type)), mask_enabled ? 0xFF : 0, sizeof(type)); \
 }
