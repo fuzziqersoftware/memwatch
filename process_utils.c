@@ -161,7 +161,7 @@ void print_region_map(VMRegionDataMap* map) {
 
   // enumerate the regions
   unsigned long x;
-  printf("address, end address, access flags\n");
+  printf("address, size, access flags\n");
   for (x = 0; x < map->num_regions; x++) {
 
     // print region info
@@ -176,7 +176,7 @@ void print_region_map(VMRegionDataMap* map) {
       (map->regions[x].region._max_attributes & VMREGION_EXECUTABLE) ? 'x' : '-');
     if (!map->regions[x].data) {
       if (map->regions[x].error)
-        printf(" [data not read, %d]", map->regions[x].error);
+        printf(" [data not read, error %d]", map->regions[x].error);
       else
         printf(" [data not read]");
     }
