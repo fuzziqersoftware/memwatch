@@ -1487,7 +1487,7 @@ command_breakpoint_error:
 
 // pause the target process
 static int command_pause(struct state* st, const char* command) {
-  int error = VMPauseProcess(st->pid);
+  int error = st->pid ? VMPauseProcess(st->pid) : -1;
   if (!error)
     printf("process suspended\n");
   else
@@ -1497,7 +1497,7 @@ static int command_pause(struct state* st, const char* command) {
 
 // resume the target process
 static int command_resume(struct state* st, const char* command) {
-  int error = VMResumeProcess(st->pid);
+  int error = st->pid ? VMResumeProcess(st->pid) : -1;
   if (!error)
     printf("process resumed\n");
   else
@@ -1507,7 +1507,7 @@ static int command_resume(struct state* st, const char* command) {
 
 // terminate the target process
 static int command_terminate(struct state* st, const char* command) {
-  int error = VMTerminateProcess(st->pid);
+  int error = st->pid ? VMTerminateProcess(st->pid) : -1;
   if (!error)
     printf("process terminated\n");
   else
@@ -1517,6 +1517,11 @@ static int command_terminate(struct state* st, const char* command) {
 
 // send a signal the target process
 static int command_signal(struct state* st, const char* command) {
+  if (st->pid == 0) {
+    printf("can\'t send signals to the kernel\n");
+    return 1;
+  }
+
   int sig = atoi(command);
   kill(st->pid, sig);
   if (sig == SIGKILL)

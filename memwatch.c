@@ -127,6 +127,10 @@ int main(int argc, char* argv[]) {
   if (!strcmp(process_name, "KERNEL")) {
     pid = 0;
     operate_on_kernel = 1;
+    if (freeze_while_operating) {
+      printf("warning: operating on the kernel; -f is implied\n");
+      freeze_while_operating = 0;
+    }
   }
 
   // find pid for process name
