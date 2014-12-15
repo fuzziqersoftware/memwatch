@@ -153,9 +153,6 @@ int freeze_region(pid_t pid, mach_vm_address_t addr, mach_vm_size_t size,
     const void* array_null_data, const void* array_null_data_mask,
     const char* name) {
 
-  // first unfreeze this address (in case it's already frozen)
-  unfreeze_by_addr(addr);
-
   // lock the freeze-list mutex so we can operate on it
   pthread_mutex_lock(&_mutex);
 
