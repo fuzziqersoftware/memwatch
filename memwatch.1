@@ -99,7 +99,7 @@ A single command (see the following sections) which will be executed instead of 
 .BR memwatch " implements a memory freezer, which repeatedly writes values to the target\'s memory at a very short interval, effectively fixing the variable's value in the target process. The following commands allow manipulation of frozen variables:"
 .TP
 .BI "freeze " "[\'name\'] address-or-result-id data"
-.RI "Sets a freeze on " address " with the given data. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any). If a previous frozen region has the same address as the new region, the previous region is unfrozen."
+.RI "Sets a freeze on " address " with the given data. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any)."
 .TP
 .BI "freeze " "[\'name\'] address:size"
 .RI "Identical to the above command, but uses the data already present in the process's memory. Size must be specified in hexadecimal."
