@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
   // only a few variables
   pid_t pid = 0;
   int showflags = 0;
-  int freeze_while_operating = 1;
+  int freeze_while_operating = 0;
   uint64_t max_results = 1024 * 1024 * 1024; // approx. 1 billion
   char process_name[PROCESS_NAME_LENGTH] = {0};
   char *input_command = NULL;
@@ -81,8 +81,8 @@ int main(int argc, char* argv[]) {
         use_color = 0;
 
       // -f, --no-freeze: don't freeze target while operating on it
-      if (!strcmp(argv[x], "-f") || !strcmp(argv[x], "--no-freeze"))
-        freeze_while_operating = 0;
+      if (!strcmp(argv[x], "-f") || !strcmp(argv[x], "--freeze"))
+        freeze_while_operating = 1;
 
       // -s, --showflags: determine how to display data
       else if (!strncmp(argv[x], "-s", 2))
@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
     pid = 0;
     operate_on_kernel = 1;
     if (freeze_while_operating) {
-      printf("warning: operating on the kernel; -f is implied\n");
+      printf("warning: operating on the kernel; -f may not be used\n");
       freeze_while_operating = 0;
     }
   }
@@ -161,7 +161,7 @@ int main(int argc, char* argv[]) {
 
   // warn user if pid is memwatch itself
   if (pid == getpid()) {
-    printf("warning: memwatch is operating on itself; -f is implied\n");
+    printf("warning: memwatch is operating on itself; -f may not be used\n");
     freeze_while_operating = 0;
   }
 

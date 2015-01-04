@@ -17,8 +17,8 @@ The following command-line options are accepted:
 .B \-c, --no-color
 By default, memwatch sometimes uses color escape sequences when printing to the terminal (for example, to highlight differences between data in repeated reads). This option disables that behavior.
 .TP
-.B \-f, --no-freeze
-By default, the target process will be suspended while its memory is being read or written. If this flag is specified, the target will not be paused during these operations. This can result in instability or unexpected behavior in the target process.
+.B \-f, --freeze
+By default, the target process will not be suspended while its memory is being read or written. If this flag is specified, the target will be paused during these operations. This can result in instability or unexpected behavior in the target process, especially if it relies on precise timing (e.g. emulators).
 .TP
 .B \-nX, --max-results=X
 By default, memwatch limits the number of results in iterative searches to 1073741824 (that's 2^30). This option overrides this limit. Setting the limit to zero allows an unlimited number of results, but this can be dangerous - for example, when performing a search that yields lots of results, memwatch's memory usage may increase to several times that of the target process.
