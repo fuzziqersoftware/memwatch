@@ -15,39 +15,32 @@ int use_color = 1;
 // cancel, then quit
 
 int* cancel_var = NULL;
-int recent_cancel = 0;
+int recent_cancel_time = 0;
 int recent_cancel_count = 0;
 
 extern int ignore_match;
 
-void sigint(int signum) {
+void sigint_handler(int signum) {
   if (cancel_var) {
     printf(" -- canceling operation\n");
     *cancel_var = 0;
     cancel_var = NULL;
   } else {
-    if (recent_cancel == time(NULL)) {
+    if (recent_cancel_time == time(NULL)) {
       if (recent_cancel_count > 1) {
         printf(" -- no operation to cancel - terminating\n");
         exit(0);
       } else
         recent_cancel_count++;
     } else {
-      recent_cancel = time(NULL);
+      recent_cancel_time = time(NULL);
       recent_cancel_count = 0;
     }
   }
 }
 
-// prints the process pid and name
-// called by enum_processes, where invoked below
-int print_process(pid_t pid, const char* proc, void* param) {
-  printf("%6u - %s\n", pid, proc);
-  return 0;
-}
-
 void print_usage() {
-  printf("usage: memwatch [ -c ] [ -f ] pid_or_name [command ...]\n");
+  printf("usage: memwatch [-c] [-f] [-nX] pid_or_name [command ...]\n");
   printf("see `man memwatch` for more information\n");
 }
 
@@ -58,11 +51,10 @@ int main(int argc, char* argv[]) {
   printf("fuzziqer software memwatch\n\n");
 
   // install our ctrl+c handler
-  signal(SIGINT, sigint);
+  signal(SIGINT, sigint_handler);
 
   // only a few variables
   pid_t pid = 0;
-  int showflags = 0;
   int freeze_while_operating = 0;
   uint64_t max_results = 1024 * 1024 * 1024; // approx. 1 billion
   char process_name[PROCESS_NAME_LENGTH] = {0};
@@ -83,12 +75,6 @@ int main(int argc, char* argv[]) {
       // -f, --no-freeze: don't freeze target while operating on it
       if (!strcmp(argv[x], "-f") || !strcmp(argv[x], "--freeze"))
         freeze_while_operating = 1;
-
-      // -s, --showflags: determine how to display data
-      else if (!strncmp(argv[x], "-s", 2))
-        showflags = atoi(&argv[x][2]);
-      else if (!strncmp(argv[x], "--showflags=", 12))
-        showflags = atoi(&argv[x][12]);
 
       // -n, --max-results: set maximum number of results
       else if (!strncmp(argv[x], "-n", 2))
