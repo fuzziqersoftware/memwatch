@@ -1,6 +1,6 @@
 CC=gcc
 OBJECTS=memwatch.o vmmap.o memory_search.o search_data.o vmmap_data.o process_utils.o parse_utils.o freeze_region.o search_data_list.o
-CFLAGS=-O3 -Wall -D__MACOSX
+CFLAGS=-O3 -Wall -Werror -D__MACOSX
 LDFLAGS=-lreadline
 EXECUTABLES=memwatch
 
