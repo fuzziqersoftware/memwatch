@@ -10,7 +10,7 @@ memwatch: $(OBJECTS)
 	gcc $(LDFLAGS) -o memwatch $^
 
 install: memwatch
-	cp memwatch /usr/bin/memwatch
+	cp memwatch /usr/local/bin/memwatch
 	cp memwatch.1 /usr/local/share/man/man1/memwatch.1
 
 tests:
