@@ -36,7 +36,7 @@ void DeleteSearchList(MemorySearchDataList* list) {
 int AddSearchToList(MemorySearchDataList* list, MemorySearchData* data) {
 
   // no name? can't add it to the list
-  if (!data->name || !data->name[0])
+  if (!data->name[0])
     return 0;
 
   // see if there's a search with the same name; if so, replace it
