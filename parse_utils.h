@@ -32,10 +32,7 @@
 #define FORMAT_BG_GRAY     47
 #define FORMAT_BG_WHITE    48
 
-#define FLAG_SHOW_WORDS    1
-#define FLAG_SHOW_DWORDS   2
-#define FLAG_SHOW_QWORDS   4
-#define FLAG_SHOW_OWORDS   8
+#define FLAG_USE_COLOR    1
 
 static inline void bswap_int8_t(void* a) { }
 
@@ -71,10 +68,10 @@ static inline void bswap_int64_t(void* a) {
 
 void bswap(void* a, int size);
 
-void change_color(int color, ...);
+void change_color(FILE* stream, int color, ...);
 
-void print_data(unsigned long long address, const void* ds, const void* diff,
-    unsigned long long data_size, int flags);
+void print_data(FILE* stream, unsigned long long address, const void* ds,
+    const void* diff, unsigned long long data_size, int flags);
 
 unsigned long long read_string_data(const char* in_buffer, void** vdata,
     void** vmask);

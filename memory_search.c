@@ -312,7 +312,7 @@ static int command_read(struct state* st, const char* command) {
         char time_str[0x80];
         get_current_time_string(time_str);
         printf("%s @ %016llX:%016llX // %s\n", st->process_name, addr, size, time_str);
-        print_data(addr, read_data, times ? read_data_prev : NULL, size, 0);
+        print_data(stdout, addr, read_data, times ? read_data_prev : NULL, size, 0);
         printf("\n");
       }
     }
@@ -374,9 +374,9 @@ static int command_data(struct state* st, const char* command) {
   uint64_t size = read_string_data(command, &data, &mask);
 
   printf("read %llu (0x%llX) bytes:\n", size, size);
-  print_data(0, data, NULL, size, 0);
+  print_data(stdout, 0, data, NULL, size, 0);
   printf("wildcard mask:\n");
-  print_data(0, mask, NULL, size, 0);
+  print_data(stdout, 0, mask, NULL, size, 0);
 
   // clean up & return
   free(data);
@@ -1041,10 +1041,10 @@ static int command_close(struct state* st, const char* command) {
   do { \
     int diff = ((prev) && ((state)->regname != (prev)->regname)); \
     if (diff) \
-      change_color(FORMAT_BOLD, FORMAT_FG_RED, FORMAT_END); \
+      change_color(stdout, FORMAT_BOLD, FORMAT_FG_RED, FORMAT_END); \
     printf((str), (state)->regname); \
     if (diff) \
-      change_color(FORMAT_NORMAL, FORMAT_END); \
+      change_color(stdout, FORMAT_NORMAL, FORMAT_END); \
   } while (0);
 
 // prints the register contents in a thread state
@@ -1299,7 +1299,7 @@ static int command_read_stacks(struct state* st, const char* command) {
         if (error2)
           printf("failed to read data from process (error %d)\n", error2);
         else
-          print_data(addr, read_data, NULL, size, 0);
+          print_data(stdout, addr, read_data, NULL, size, 0);
         printf("\n");
 
         if (st->freeze_while_operating)

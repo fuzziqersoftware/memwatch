@@ -358,18 +358,18 @@ void print_frozen_regions(int print_mode) {
               _frozen[x].name);
         if (print_mode == FZN_PRINT_DATA) {
           printf("data:\n");
-          print_data(0, _frozen[x].data, NULL, _frozen[x].size, 0);
+          print_data(stdout, 0, _frozen[x].data, NULL, _frozen[x].size, 0);
           if (_frozen[x].array_data_mask) {
             printf("data mask:\n");
-            print_data(0, _frozen[x].array_data_mask, NULL, _frozen[x].size, 0);
+            print_data(stdout, 0, _frozen[x].array_data_mask, NULL, _frozen[x].size, 0);
           }
           if (_frozen[x].array_null_data) {
             printf("null data:\n");
-            print_data(0, _frozen[x].array_null_data, NULL, _frozen[x].size, 0);
+            print_data(stdout, 0, _frozen[x].array_null_data, NULL, _frozen[x].size, 0);
           }
           if (_frozen[x].array_null_data_mask) {
             printf("null data mask:\n");
-            print_data(0, _frozen[x].array_null_data_mask, NULL, _frozen[x].size, 0);
+            print_data(stdout, 0, _frozen[x].array_null_data_mask, NULL, _frozen[x].size, 0);
           }
         }
       }

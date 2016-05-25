@@ -13,7 +13,6 @@
 
 #include "parse_utils.h"
 
-extern int use_color;
 
 void bswap(void* a, int size) {
   if (size == 1)
@@ -27,7 +26,7 @@ void bswap(void* a, int size) {
 }
 
 // outputs control characters to the console to change color/formatting
-void change_color(int color, ...) {
+void change_color(FILE* stream, int color, ...) {
 
   char fmt[0x40] = "\033";
   int fmt_len = strlen(fmt);
@@ -45,10 +44,10 @@ void change_color(int color, ...) {
   fmt[fmt_len] = 'm';
   fmt[fmt_len + 1] = 0;
 
-  printf("%s", fmt);
+  fprintf(stream, "%s", fmt);
 }
 
-void print_data(unsigned long long address, const void* _data,
+void print_data(FILE* stream, unsigned long long address, const void* _data,
     const void* _prev, unsigned long long data_size, int flags) {
 
   if (data_size == 0)
@@ -56,7 +55,7 @@ void print_data(unsigned long long address, const void* _data,
 
   // if color is disabled or no diff source is given, disable diffing
   const uint8_t* data = (const uint8_t*)_data;
-  const uint8_t* prev = (const uint8_t*)((_prev && use_color) ? _prev : _data);
+  const uint8_t* prev = (const uint8_t*)((_prev && (flags & FLAG_USE_COLOR)) ? _prev : _data);
 
   char data_ascii[20];
   char prev_ascii[20]; // actually only 16 is necessary but w/e
@@ -68,12 +67,12 @@ void print_data(unsigned long long address, const void* _data,
 
   // if nonzero, print the address here (the loop won't do it for the 1st line)
   if (start_offset)
-    printf("%016llX | ", address);
+    fprintf(stream, "%016llX | ", address);
 
   // print initial spaces, if any
   unsigned long long x, y;
   for (x = 0; x < start_offset; x++) {
-    printf("   ");
+    fputs("   ", stream);
     data_ascii[x] = ' ';
     prev_ascii[x] = ' ';
   }
@@ -88,61 +87,61 @@ void print_data(unsigned long long address, const void* _data,
 
     // first byte on the line? then print the address
     if ((x & 0x0F) == 0)
-      printf("%016llX | ", address + x);
+      fprintf(stream, "%016llX | ", address + x);
 
     // print the byte itself
-    if (prev[data_offset] != data[data_offset])
-      change_color(FORMAT_BOLD, FORMAT_FG_RED, FORMAT_END);
-    printf("%02X ", data[data_offset]);
-    if (prev[data_offset] != data[data_offset])
-      change_color(FORMAT_NORMAL, FORMAT_END);
+    if ((prev[data_offset] != data[data_offset]) && (flags & FLAG_USE_COLOR))
+      change_color(stream, FORMAT_BOLD, FORMAT_FG_RED, FORMAT_END);
+    fprintf(stream, "%02X ", data[data_offset]);
+    if ((prev[data_offset] != data[data_offset]) && (flags & FLAG_USE_COLOR))
+      change_color(stream, FORMAT_NORMAL, FORMAT_END);
 
     // last byte on the line? then print the ascii view and a \n
     if ((x & 0x0F) == 0x0F) {
-      printf("| ");
+      fputs("| ", stream);
       for (y = 0; y < 16; y++) {
-        if (prev_ascii[y] != data_ascii[y])
-          change_color(FORMAT_FG_RED, FORMAT_END);
+        if ((prev_ascii[y] != data_ascii[y]) && (flags & FLAG_USE_COLOR))
+          change_color(stream, FORMAT_FG_RED, FORMAT_END);
 
         if (data_ascii[y] < 0x20 || data_ascii[y] == 0x7F) {
-          if (use_color)
-            change_color(FORMAT_INVERSE, FORMAT_END);
-          putc(' ', stdout);
-          if (use_color)
-            change_color(FORMAT_NORMAL, FORMAT_END);
+          if (flags & FLAG_USE_COLOR)
+            change_color(stream, FORMAT_INVERSE, FORMAT_END);
+          fputc(' ', stream);
+          if (flags & FLAG_USE_COLOR)
+            change_color(stream, FORMAT_NORMAL, FORMAT_END);
         } else
-          putc(data_ascii[y], stdout);
+          fputc(data_ascii[y], stream);
 
-        if (prev_ascii[y] != data_ascii[y])
-          change_color(FORMAT_NORMAL, FORMAT_END);
+        if ((prev_ascii[y] != data_ascii[y]) && (flags & FLAG_USE_COLOR))
+          change_color(stream, FORMAT_NORMAL, FORMAT_END);
       }
 
-      printf("\n");
+      fputc('\n', stream);
     }
   }
 
   // if the last line is a partial line, print the remaining ascii chars
   if (x & 0x0F) {
     for (y = x; y & 0x0F; y++)
-      printf("   ");
-    printf("| ");
+      fprintf(stream, "   ");
+    fprintf(stream, "| ");
     for (y = 0; y < (x & 0x0F); y++) {
-      if (prev_ascii[y] != data_ascii[y])
-        change_color(FORMAT_FG_RED, FORMAT_END);
+      if ((prev_ascii[y] != data_ascii[y]) && (flags & FLAG_USE_COLOR))
+        change_color(stream, FORMAT_FG_RED, FORMAT_END);
 
       if (data_ascii[y] < 0x20 || data_ascii[y] == 0x7F) {
-        if (use_color)
-          change_color(FORMAT_INVERSE, FORMAT_END);
-        putc(' ', stdout);
-        if (use_color)
-          change_color(FORMAT_NORMAL, FORMAT_END);
+        if (flags & FLAG_USE_COLOR)
+          change_color(stream, FORMAT_INVERSE, FORMAT_END);
+        putc(' ', stream);
+        if (flags & FLAG_USE_COLOR)
+          change_color(stream, FORMAT_NORMAL, FORMAT_END);
       } else
-        putc(data_ascii[y], stdout);
+        putc(data_ascii[y], stream);
 
-      if (prev_ascii[y] != data_ascii[y])
-        change_color(FORMAT_NORMAL, FORMAT_END);
+      if ((prev_ascii[y] != data_ascii[y]) && (flags & FLAG_USE_COLOR))
+        change_color(stream, FORMAT_NORMAL, FORMAT_END);
     }
-    printf("\n");
+    putc('\n', stream);
   }
 }
 
