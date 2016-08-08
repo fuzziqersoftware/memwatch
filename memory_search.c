@@ -625,8 +625,8 @@ static int command_open(struct state* st, const char* command) {
 
 // copies a search
 static int command_fork(struct state* st, const char* command) {
-  // fork <name> forks current search into new search and selects it
-  // fork <name1> <name2> forks one search into another and does not select it
+  // fork <name> forks current search into new search
+  // fork <name1> <name2> forks one search into another, even if not current
 
   // interactive mode only
   if (!st->interactive) {
@@ -643,11 +643,11 @@ static int command_fork(struct state* st, const char* command) {
       return 2;
     }
 
-    MemorySearchData* s = CopySearch(st->searches, st->search->name, command);
+    MemorySearchData* s = CopySearch(st->searches, this_search_name, command);
     if (!s)
       printf("failed to fork search\n");
     else
-      printf("forked search %s into %s\n", st->search->name, s->name);
+      printf("forked search %s into %s\n", this_search_name, s->name);
 
   } else {
     // this is the first form: forking the current search
@@ -662,11 +662,8 @@ static int command_fork(struct state* st, const char* command) {
     MemorySearchData* s = CopySearch(st->searches, st->search->name, command);
     if (!s)
       printf("failed to fork search\n");
-    else {
-      printf("forked search %s into %s and switched to new search\n",
-          st->search->name, s->name);
-      st->search = s;
-    }
+    else
+      printf("forked search %s into %s\n", st->search->name, s->name);
   }
 
   return 0;
