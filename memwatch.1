@@ -51,12 +51,12 @@ A single command (see the following sections) which will be executed instead of 
 .BR memwatch "\'s interactive interface implements the following commands for reading, writing, and manipulating virtual memory:"
 .TP
 .BI "access " "mode address"
-.RI "Changes the virtual memory protection mode on the region containing " address .
+.RI "Changes the virtual memory protection mode on the region containing " address ". The access mode is a 3-bit value where bit 0 represents read access, bit 1 represents write access, and bit 2 represents execute access. So a read-only, non-executable region's access mode would be 1, for example, while a read-only, executable region's access mode would be 5."
 .TP
 .BI "list"
 .RI "Lists memory regions allocated in the target process\'s address space."
 .TP
-.BI "dump " "filename"
+.BI "dump " "[filename]"
 .RI "If " filename " is given, dumps all readable memory in the target process to files named " filename "_address. If " filename " is not given, only determines which regions are readable."
 .TP
 .BI "read " "address" " " "size" " " "[filename]"
