@@ -1,6 +1,3 @@
-// array_test.c, by Martin Michelsen, 2014
-// simple app that repeatedly prints the contents of an integer array
-
 #include <sys/types.h>
 #include <sys/ptrace.h>
 #include <stdint.h>
@@ -8,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
 
 int main(int argc, char* argv[]) {
 

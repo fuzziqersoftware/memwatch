@@ -1,4 +1,6 @@
 *.o
+*.dSYM
+array_test
 register_test32
 register_test64
 value_test

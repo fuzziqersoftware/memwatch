@@ -1,11 +1,11 @@
-.TH memwatch 1 "29 Dec 2013"
+.TH memwatch 1 "16 Oct 2016"
 .SH NAME
 memwatch \- find and modify variables in other processes
 .SH SYNOPSIS
 .B memwatch
-[ -c ] [ -f ] [ -nX ]
+[-c] [-p] [-P] [-nX]
 .I pid_or_name
-[ command ]
+[command [\\; command ...]]
 .SH DESCRIPTION
 .B memwatch
 provides an interactive interface to find and modify variables in the memory of a running process. This is done by repeatedly searching the process\' address space for values that follow the rules given by the user, narrowing down the result set until it includes only the desired variable. After finding this variable, memwatch can monitor it, change its value, "freeze" its value, and more. This functionality is similar to that provided by scanmem(1).
@@ -17,8 +17,11 @@ The following command-line options are accepted:
 .B \-c, --no-color
 By default, memwatch sometimes uses color escape sequences when printing to the terminal (for example, to highlight differences between data in repeated reads). This option disables that behavior.
 .TP
-.B \-f, --freeze
+.B \-p, --pause-target
 By default, the target process will not be suspended while its memory is being read or written. If this flag is specified, the target will be paused during these operations. This can result in instability or unexpected behavior in the target process, especially if it relies on precise timing (e.g. emulators).
+.TP
+.B \-P, --allow-parent
+By default, memwatch will skip its own pid and the parent's pid when searching processes by name, since this is unlikely to be what the user wants. This option allows memwatch to operate on its direct parent.
 .TP
 .B \-nX, --max-results=X
 By default, memwatch limits the number of results in iterative searches to 1073741824 (that's 2^30). This option overrides this limit. Setting the limit to zero allows an unlimited number of results, but this can be dangerous - for example, when performing a search that yields lots of results, memwatch's memory usage may increase to several times that of the target process.
@@ -35,14 +38,14 @@ A single command (see the following sections) which will be executed instead of 
 .BI "help"
 .RI "Displays this manual page."
 .TP
-.BI "attach " [pid_or_name]
+.BI "attach [" pid_or_name "]"
 .RI "Attaches to a new process by PID or by name. If no argument is given, attaches to a process with the same name as the currently-attached process."
 .TP
 .BI "data " data_string
 .RI "Parses the data string and displays the raw values returned from the parser. You can use this to test complex data strings before writing them to be sure the correct data will be written."
 .TP
-.BI "state " "[field_name value]"
-.RI "With no arguments, displays simple variables from memwatch's internal state. This includes variables from command-line options, like use_color and freeze_while_operating. With arguments, sets the internal variable " field_name " to " value "."
+.BI "state [" "field_name value" "]"
+.RI "With no arguments, displays simple variables from memwatch's internal state. This includes variables from command-line options, like use_color and pause_target. With arguments, sets the internal variable " field_name " to " value "."
 .TP
 .BI "quit"
 .RI "Exits memwatch."
@@ -50,19 +53,19 @@ A single command (see the following sections) which will be executed instead of 
 .SH "MEMORY ACCESS COMMANDS"
 .BR memwatch "\'s interactive interface implements the following commands for reading, writing, and manipulating virtual memory:"
 .TP
-.BI "access " "mode address"
-.RI "Changes the virtual memory protection mode on the region containing " address ". The access mode is a 3-bit value where bit 0 represents read access, bit 1 represents write access, and bit 2 represents execute access. So a read-only, non-executable region's access mode would be 1, for example, while a read-only, executable region's access mode would be 5."
+.BI "access " address " [" mode "]"
+.RI "Changes the virtual memory protection mode on the region containing " address ". The access mode is a string consisting of the r, w, or x characters, or some combination thereof. To remove all access to a memory region, use - for the access mode."
 .TP
 .BI "list"
 .RI "Lists memory regions allocated in the target process\'s address space."
 .TP
-.BI "dump " "[filename]"
-.RI "If " filename " is given, dumps all readable memory in the target process to files named " filename "_address. If " filename " is not given, only determines which regions are readable."
+.BI "dump [" filename_prefix "]"
+.RI "If " filename " is given, dumps all readable memory in the target process to files named " filename_prefix ".address1.address2.bin, along with an index file. If " filename_prefix " is not given, only determines which regions are readable."
 .TP
-.BI "read " "address" " " "size" " " "[filename]"
-.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " is specified in hexadecimal, and " size " is specified in decimal. To specify " size " in hexadecimal, use the syntax " "address:size" " instead of " "address size" ". If a filename is given, writes the data to the given file instead of printing to the console. The " read " command may be prepended with " watch " to repeat the read every second until Ctrl+C is pressed."
+.BI "read " "address" " " "size" " [" "filename" "]"
+.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " and " size " are specified in hexadecimal. If a filename is given, writes the data to the given file instead of printing to the console. The " read " command may be prepended with " watch " to repeat the read every second until Ctrl+C is pressed."
 .TP
-.BI "write " "address-or-result-id data"
+.BI "write " "address-or-result-id" " " "data"
 .RI "Writes " data " to " address " in the target process\'s memory. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. See the DATA FORMAT section for information on how to specify the data string."
 
 .SH "MEMORY SEARCH COMMANDS"
@@ -71,25 +74,25 @@ A single command (see the following sections) which will be executed instead of 
 .BI "find " data
 .RI "Finds all occurrences of " data " in readable regions of the target\'s memory. See the DATA FORMAT section for more information on how to specify the search string. Searches done with this command do not affect the current search results."
 .TP
-.BI "open " "type name"
-.RI "Opens a search for a variable of the given type in writable memory regions. " type " may be prepended with a ! to search all readable memory instead of only writable memory. See the SEARCH TYPES section for valid search types. If " name " is not given, the search will be unnamed and cannot be resumed after another search is opened."
+.BI "open " type " [" name "]"
+.RI "Opens a search for a variable of the given type in writable memory regions. " type " may be suffixed with a ! to search all readable memory instead of only writable memory. See the SEARCH TYPES section for valid search types. If " name " is not given, the search will be unnamed and cannot be resumed after another search is opened."
 .TP
 .BI "open " name
 .RI "If " name " is given, reopens a previous search. If " name " is not given, lists all open searches."
 .TP
-.BI "close " name
+.BI "close [" name "]"
 .RI "If " name " is given, closes the specified search. If " name " is not given, closes the current search."
 .TP
-.BI "fork " name " " [name2]
+.BI "fork " name " [" name2 "]"
 .RI "If " name2 " is given, makes a copy of the search named " name " as " name2 ". Otherwise, makes a copy of the current search as " name .
 .TP
-.BI "search " "[search_name] operator value"
+.BI "search [" "search_name" "] "operator value"
 .RI "Reads the values of variables in the current list of results (or the named search's results, if a name is given), and filters out the results for which (new value " "operator prev value" ") is false. If " value " is not given, uses the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
 .TP
-.BI "results " "[search_name]"
+.BI "results [" search_name "]"
 .RI "Displays the current list of results. If search_name is given, displays the results for that search. The command may be prepended with " watch " to read new values every second."
 .TP
-.BI "delete " "addr1 [addr2]"
+.BI "delete " addr1 " [" addr2 "]"
 .RI "If " addr2 " is given, deletes all results between " addr1 " and " addr2 ". If " addr2 " is not given, deletes the search result at " addr1 .
 .TP
 .BI "set " value
@@ -98,19 +101,16 @@ A single command (see the following sections) which will be executed instead of 
 .SH "MEMORY FREEZE COMMANDS"
 .BR memwatch " implements a memory freezer, which repeatedly writes values to the target\'s memory at a very short interval, effectively fixing the variable's value in the target process. The following commands allow manipulation of frozen variables:"
 .TP
-.BI "freeze " "[\'name\'] address-or-result-id data"
-.RI "Sets a freeze on " address " with the given data. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any)."
+.BI "freeze [n" "name" "] @" address-or-result-id " x" data
+.RI "Sets a freeze on " address " with the given data. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any). " data " may not contain spaces."
 .TP
-.BI "freeze " "[\'name\'] address:size"
-.RI "Identical to the above command, but uses the data already present in the process's memory. Size must be specified in hexadecimal."
+.BI "freeze [n" "name" "] @" address-or-result-id " s" size
+.RI "Identical to the above command, but uses the data already present in the process's memory. Size is specified in hexadecimal."
 .TP
-.BI "freeze " "[\'name\']" " array " "max-entries [null] address-or-result-id data [null-data]"
-.RI "Sets a freeze on an array of " max-entries " items starting at " address " with the given data. If " data " is not present in the array, the first null entry in the array is overwritten with " data ". Null entries are those whose contents are entirely zeroes, or whose contents match " null-data " if " null " and " null-data " are given. The size of each array element is assumed to be the size of " data ". " data " and " null-data " must have equal sizes."
+.BI "freeze [n" "name" "] @" address-or-result-id " m" max-entries " x" data " [N" null-data "]"
+.RI "Sets a freeze on an array of " max-entries " items starting at " address " with the given data. If " data " is not present in the array, the first null entry in the array is overwritten with " data ". Null entries are those whose contents are entirely zeroes, or whose contents match " null-data " if " null-data " is given. The size of each array element is assumed to be the size of " data ". " data " and " null-data " must have equal sizes."
 .TP
-.BI "freeze " "[\'name\']" " array " "max-entries [null] address:size [null-data]"
-.RI "Identical to the above command, but uses the data already present in the process's memory. Size must be specified in hexadecimal."
-.TP
-.BI "unfreeze " "id"
+.BI "unfreeze [" "id" "]"
 .RI "If " id " is not given, displays the list of currently-frozen regions. Otherwise, " id " may be the index, address, or name of the region to unfreeze. If a name is given and multiple regions have the same name, unfreezes all of them."
 .TP
 .BI "frozen [data | commands]"
@@ -125,34 +125,28 @@ A single command (see the following sections) which will be executed instead of 
 .BR "resume" " (or " + )
 .RI "Unpauses the target process."
 .TP
-.BR "kill"
-.RI "Kills the target process and exits memwatch."
-.TP
 .BI "signal " signum
 .RI "Sends the Unix signal " signum " to the target process. See " "signal(3)" " for a list of signals."
 .TP
 .BI "regs"
 .RI "Reads the register state for all threads in the target process. If the process is not paused, thread registers might not represent an actual overall state of the process at any point in time."
 .TP
-.BI "wregs" " value reg [thread_id]"
-.RI "Writes " value " to " reg " in all threads of the target process. If " thread_id " is given, writes the register\'s value only in that thread. " thread_id " should match one of the thread indices printed by the regs command."
+.BI "wregs " "thread_id value reg"
+.RI "Writes " value " to " reg " in one thread of the target process. " thread_id " should match one of the thread IDs shows by the regs command."
 .TP
-.BI "stacks" " [size]"
-.RI "Reads " size " bytes from the stack of each thread. If not given, " size " defaults to 0x100."
-.TP
-.BI "break" " type address"
-.RI "Sets a " type " breakpoint on " address ". " type " may contain the characters x (break on execute), r (break on read), w (break on read/write), or i (break on I/O), as well as 1, 2, 4, or 8 (specifying the size of the region to watch)."
+.BI "stacks [" size "]"
+.RI "Reads " size " bytes from the stack of each thread. If not given, " size " defaults to 0x100 (256 bytes)."
 
 .SH "SEARCH TYPES"
-.BR memwatch " supports searching for the following types of variables. Any type except 'a' may be prefixed by the letter 'l' to perform reverse-endian searches (that is, to search for big-endian values on a little-endian architecture, or vice versa)."
+.BR memwatch " supports searching for the following types of variables. Any type except 'str' may be prefixed by the letter 'r' to perform reverse-endian searches (that is, to search for big-endian values on a little-endian architecture, or vice versa)."
 .TP
-.BR a
+.BR s, str, string
 Search for any string. Values are specified in immediate data format (see the DATA FORMAT section for more information).
 .TP
-.BR f
+.BR f, flt, float
 Search for a 32-bit floating-point value.
 .TP
-.BR d
+.BR d, dbl, double
 Search for a 64-bit floating-point value.
 .TP
 .B u8, u16, u32, u64
@@ -217,7 +211,7 @@ memwatch:90732/DOSBox 1s/0f bombs(378052) # s = 2
 .br
 results: 167
 
-That's still too many results... use another bomb and search again:
+Use another bomb and search again:
 
 memwatch:90732/DOSBox 1s/0f bombs(167) # s = 1
 .br

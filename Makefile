@@ -1,13 +1,12 @@
-CC=gcc
-OBJECTS=memwatch.o vmmap.o memory_search.o search_data.o vmmap_data.o process_utils.o parse_utils.o freeze_region.o search_data_list.o
-CFLAGS=-O3 -Wall -Werror -D__MACOSX
-LDFLAGS=-lreadline
+OBJECTS=Main.o MemwatchShell.o MemorySearch.o ProcessMemoryAdapter.o RegionFreezer.o Signalable.o
+CXXFLAGS=-O3 -g -Wall -Werror -std=c++14 -I/usr/local/include
+LDFLAGS=-lreadline -L/usr/local/lib -lphosg
 EXECUTABLES=memwatch
 
 all: memwatch tests
 
 memwatch: $(OBJECTS)
-	gcc $(LDFLAGS) -o memwatch $^
+	g++ $(LDFLAGS) -o memwatch $^
 
 install: memwatch
 	cp memwatch /usr/local/bin/memwatch
