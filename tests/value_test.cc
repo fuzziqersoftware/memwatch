@@ -21,8 +21,8 @@ int main(int argc, char* argv[]) {
     scanf("%lld", &s64);
     rs8 = s8 = s16 = s32 = s64;
     rs16 = bswap16(s16);
-    rs32 = bswap16(s32);
-    rs64 = bswap16(s64);
+    rs32 = bswap32(s32);
+    rs64 = bswap64(s64);
 
     printf("s8/s16/s32/s64     =  %02hhX / %04hX / %08X / %016llX\n",
            s8, s16, s32, s64);
