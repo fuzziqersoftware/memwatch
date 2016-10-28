@@ -251,22 +251,6 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
   const auto& type_config = search_type_configs.at((size_t)this->type);
   string data = data_c;
 
-  // byteswap the input value if needed
-  if (!data.empty()) {
-    char* data_ptr = const_cast<char*>(data.data());
-    if ((this->type == Type::UINT16_RE) || (this->type == Type::INT16_RE)) {
-      *(uint16_t*)data_ptr = bswap16(*(uint16_t*)data_ptr);
-
-    } else if ((this->type == Type::UINT32_RE) || (this->type == Type::INT32_RE) ||
-               (this->type == Type::FLOAT_RE)) {
-      *(uint32_t*)data_ptr = bswap32(*(uint32_t*)data_ptr);
-
-    } else if ((this->type == Type::UINT64_RE) || (this->type == Type::INT64_RE) ||
-               (this->type == Type::DOUBLE_RE)) {
-      *(uint64_t*)data_ptr = bswap64(*(uint64_t*)data_ptr);
-    }
-  }
-
   auto evaluator = type_config.evaluators[(size_t)predicate];
 
   // if this is the first search, we need to check every address
