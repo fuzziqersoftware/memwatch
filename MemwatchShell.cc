@@ -1201,25 +1201,6 @@ void MemwatchShell::dispatch_command(const string& args_str) {
   handler(*this, args_str.substr(args_begin));
 }
 
-  std::shared_ptr<ProcessMemoryAdapter> adapter;
-  std::shared_ptr<RegionFreezer> freezer;
-
-  pid_t pid;
-  string process_name;
-
-  bool pause_target;
-  bool watch; // set to 1 to repeat commands
-  bool interactive; // 0 if run from the shell; 1 if from the memwatch prompt
-  bool run; // set to 0 to exit the memory search interface
-  bool use_color;
-  uint64_t num_commands_run;
-
-  uint64_t max_results;
-  map<string, MemorySearch> name_to_search;
-  string current_search_name;
-
-  vector<uint64_t> find_results;
-
 MemwatchShell::MemwatchShell(pid_t pid, uint64_t max_results, bool pause_target,
     bool interactive, bool use_color) : adapter(new ProcessMemoryAdapter(pid)),
     freezer(new RegionFreezer(this->adapter)), pid(pid),
