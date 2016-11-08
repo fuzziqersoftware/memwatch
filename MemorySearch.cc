@@ -470,7 +470,7 @@ const char* MemorySearch::name_for_search_predicate(MemorySearch::Predicate pred
     case Predicate::GREATER:          return ">";
     case Predicate::LESS_OR_EQUAL:    return "<=";
     case Predicate::GREATER_OR_EQUAL: return ">=";
-    case Predicate::EQUAL:            return "=";
+    case Predicate::EQUAL:            return "==";
     case Predicate::NOT_EQUAL:        return "!=";
     case Predicate::FLAG:             return "$";
     case Predicate::ALL:              return ".";
@@ -478,50 +478,26 @@ const char* MemorySearch::name_for_search_predicate(MemorySearch::Predicate pred
   return "unknown";
 }
 
+static const unordered_map<string, MemorySearch::Predicate> search_predicate_names = {
+  {"<",   MemorySearch::Predicate::LESS},
+  {">",   MemorySearch::Predicate::GREATER},
+  {"<=",  MemorySearch::Predicate::LESS_OR_EQUAL},
+  {">=",  MemorySearch::Predicate::GREATER_OR_EQUAL},
+  {"=",   MemorySearch::Predicate::EQUAL},
+  {"==",  MemorySearch::Predicate::EQUAL},
+  {"===", MemorySearch::Predicate::EQUAL}, // lol javascript
+  {"!=",  MemorySearch::Predicate::NOT_EQUAL},
+  {"<>",  MemorySearch::Predicate::NOT_EQUAL},
+  {"$",   MemorySearch::Predicate::FLAG},
+  {".",   MemorySearch::Predicate::ALL},
+};
+
 MemorySearch::Predicate MemorySearch::search_predicate_for_name(const char* name) {
-  // check for greater/less predicates
-  if (name[0] == '>') {
-    if (name[1] == '=') {
-      return Predicate::GREATER_OR_EQUAL;
-    }
-    return Predicate::GREATER;
+  try {
+    return search_predicate_names.at(name);
+  } catch (const out_of_range& e) {
+    throw out_of_range(string_printf("no predicate with name %s", name));
   }
-  if (name[0] == '<') {
-    if (name[1] == '=') {
-      return Predicate::LESS_OR_EQUAL;
-    }
-    return Predicate::LESS;
-  }
-
-  // check for equal-type opers
-  // we'll allow => and =< and =!, even though they're nonstandard
-  if (name[0] == '=') {
-    if (name[1] == '>') {
-      return Predicate::GREATER_OR_EQUAL;
-    } else if (name[1] == '<') {
-      return Predicate::LESS_OR_EQUAL;
-    } else if (name[1] == '!') {
-      return Predicate::NOT_EQUAL;
-    }
-    return Predicate::EQUAL;
-  }
-
-  // check for !=
-  if (name[0] == '!' && name[1] == '=') {
-    return Predicate::NOT_EQUAL;
-  }
-
-  // check for flag search
-  if (name[0] == '$') {
-    return Predicate::FLAG;
-  }
-
-  // check for null predicate
-  if (name[0] == '.') {
-    return Predicate::ALL;
-  }
-
-  throw out_of_range(string_printf("no predicate with name %s", name));
 }
 
 // returns 1 if the given type is an integral search type
