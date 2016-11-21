@@ -28,6 +28,7 @@ public:
   size_t unfreeze_name(const std::string& name);
   size_t unfreeze_addr(mach_vm_address_t addr);
   bool unfreeze_index(size_t index);
+  size_t unfreeze_all();
 
   size_t frozen_count() const;
 

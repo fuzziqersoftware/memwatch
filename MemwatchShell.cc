@@ -468,7 +468,12 @@ static void command_unfreeze(MemwatchShell& sh, const string& args) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
-  if (!args.empty()) {
+  if (args == "*") {
+    size_t num_regions = sh.freezer->unfreeze_all();
+    printf("%lu regions unfrozen\n", num_regions);
+
+  } else if (!args.empty()) {
+
     // first try to unfreeze by name
     size_t num_regions = sh.freezer->unfreeze_name(args);
     if (num_regions == 1) {

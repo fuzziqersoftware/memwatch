@@ -112,6 +112,15 @@ bool RegionFreezer::unfreeze_index(size_t index) {
   return true;
 }
 
+size_t RegionFreezer::unfreeze_all() {
+  rw_guard g(this->lock, true);
+  size_t num_regions = this->regions_by_index.size();
+  this->regions_by_name.clear();
+  this->regions_by_name.clear();
+  this->regions_by_index.clear();
+  return num_regions;
+}
+
 size_t RegionFreezer::frozen_count() const {
   return this->regions_by_index.size();
 }
