@@ -1,7 +1,0 @@
-memwatch is an interactive memory search and modification utility for Mac OS X.
-See the man page (memwatch.1) for more information on usage.
-
-Building & installing
-1. Build and install phosg (https://github.com/fuzziqersoftware/phosg).
-2. `make`
-3. `sudo make install`

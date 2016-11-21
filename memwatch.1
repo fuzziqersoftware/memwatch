@@ -60,10 +60,10 @@ A single command (see the following sections) which will be executed instead of 
 .RI "Lists memory regions allocated in the target process\'s address space."
 .TP
 .BI "dump [" filename_prefix "]"
-.RI "If " filename " is given, dumps all readable memory in the target process to files named " filename_prefix ".address1.address2.bin, along with an index file. If " filename_prefix " is not given, only determines which regions are readable."
+.RI "If " filename_prefix " is given, dumps all readable memory in the target process to files named " filename_prefix ".address1.address2.bin, along with an index file. If " filename_prefix " is not given, only determines which regions are readable."
 .TP
 .BI "read " "address" " " "size" " [" "filename" "]"
-.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " and " size " are specified in hexadecimal. If a filename is given, writes the data to the given file instead of printing to the console. The " read " command may be prepended with " watch " to repeat the read every second until Ctrl+C is pressed."
+.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " and " size " are specified in hexadecimal. If a filename is given, writes the data to the given file instead of printing to the terminal. The " read " command may be prepended with " watch " to repeat the read every second until Ctrl+C is pressed."
 .TP
 .BI "write " "address-or-result-id" " " "data"
 .RI "Writes " data " to " address " in the target process\'s memory. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. See the DATA FORMAT section for information on how to specify the data string."
@@ -77,7 +77,7 @@ A single command (see the following sections) which will be executed instead of 
 .BI "open " type " [" name "]"
 .RI "Opens a search for a variable of the given type in writable memory regions. " type " may be suffixed with a ! to search all readable memory instead of only writable memory. See the SEARCH TYPES section for valid search types. If " name " is not given, the search will be unnamed and cannot be resumed after another search is opened."
 .TP
-.BI "open " name
+.BI "open [" name "]"
 .RI "If " name " is given, reopens a previous search. If " name " is not given, lists all open searches."
 .TP
 .BI "close [" name "]"
@@ -87,7 +87,7 @@ A single command (see the following sections) which will be executed instead of 
 .RI "If " name2 " is given, makes a copy of the search named " name " as " name2 ". Otherwise, makes a copy of the current search as " name .
 .TP
 .BI "search [" "search_name" "] "operator value"
-.RI "Reads the values of variables in the current list of results (or the named search's results, if a name is given), and filters out the results for which (new value " "operator prev value" ") is false. If " value " is not given, uses the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
+.RI "Reads the values of variables in the current list of results (or the named search's results, if a name is given), and filters out the results for which (new value " "operator prev value" ") is false. If " value " is not given, uses the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), and $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
 .TP
 .BI "results [" search_name "]"
 .RI "Displays the current list of results. If search_name is given, displays the results for that search. The command may be prepended with " watch " to read new values every second."
@@ -132,7 +132,7 @@ A single command (see the following sections) which will be executed instead of 
 .RI "Reads the register state for all threads in the target process. If the process is not paused, thread registers might not represent an actual overall state of the process at any point in time."
 .TP
 .BI "wregs " "thread_id value reg"
-.RI "Writes " value " to " reg " in one thread of the target process. " thread_id " should match one of the thread IDs shows by the regs command."
+.RI "Writes " value " to " reg " in one thread of the target process. " thread_id " should match one of the thread IDs shown by the regs command."
 .TP
 .BI "stacks [" size "]"
 .RI "Reads " size " bytes from the stack of each thread. If not given, " size " defaults to 0x100 (256 bytes)."
