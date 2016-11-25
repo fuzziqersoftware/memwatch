@@ -149,8 +149,21 @@ int main(int argc, char* argv[]) {
       int index = 0;
       for (const auto& proc : pids) {
         printf("  (%d) %6d - %s\n", index, proc, processes[proc].c_str());
+        index++;
       }
-      return 2;
+
+      printf("> ");
+      fflush(stdout);
+
+      char choice[10];
+      fgets(choice, sizeof(choice), stdin);
+      int choice_index = atoi(choice);
+      if (choice_index < 0 || choice_index >= pids.size()) {
+        printf("invalid choice\n");
+        return 2;
+      }
+
+      pid = pids[choice_index];
 
     } else {
       pid = pids[0];
