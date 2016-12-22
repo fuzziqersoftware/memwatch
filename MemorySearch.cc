@@ -195,7 +195,8 @@ static const vector<SearchTypeConfig> search_type_configs({
 
 
 MemorySearch::MemorySearch(MemorySearch::Type type, bool all_memory) :
-    type(type), all_memory(all_memory), memory(), prev_size(0), results() { }
+    type(type), results_valid(false), all_memory(all_memory), memory(),
+    prev_size(0), results() { }
 
 MemorySearch::Type MemorySearch::get_type() const {
   return this->type;
@@ -203,6 +204,10 @@ MemorySearch::Type MemorySearch::get_type() const {
 
 bool MemorySearch::has_memory() const {
   return (bool)this->memory;
+}
+
+bool MemorySearch::has_valid_results() const {
+  return this->results_valid;
 }
 
 bool MemorySearch::is_all_memory() const {
@@ -253,13 +258,24 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
 
   auto evaluator = type_config.evaluators[(size_t)predicate];
 
-  // if this is the first search, we need to check every address
-  if (!this->memory) {
+  // if this is the first search or the results are invalid, we need to check
+  // every address (the results can be invalid even if memory is valid if the
+  // initial search was an unknown-value search)
+
+  // if this is the first search for an unknown-value search, don't iterate at
+  // all - just save the memory for use in the next search
+  if (!this->memory && (predicate == Predicate::ALL)) {
+    this->memory = new_memory;
+    return;
+
+  // if this is the first search of a known-value search, evaluate the predicate
+  // for all cells in all regions
+  } else if (!this->memory) {
 
     for (const auto& region : *new_memory) {
 
       // if the region has no data, skip it
-      if (!region.data.get()) {
+      if (region.data.empty()) {
         continue;
       }
 
@@ -267,7 +283,7 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
       for (uint64_t y = 0; (y < region.size - data.size()) && (this->results.size() < max_results); y += type_config.field_size) {
 
         // do the comparison; skip it if it fails
-        if (!evaluator(region.data->data() + y, data.data(), data.size())) {
+        if (!evaluator(region.data.data() + y, data.data(), data.size())) {
           continue;
         }
 
@@ -280,6 +296,59 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
         }
       }
     }
+    this->results_valid = true;
+
+  // if this is the second search on an unknown initial value search, evaluate
+  // the predicate comparing the data to the previous region set. note that we
+  // support, but don't optimize for, the case where data is given here - this
+  // case is a misuse of the program, since it renders the initial ALL predicate
+  // search useless.
+  } else if (!this->results_valid) {
+
+    // for each cell, run comparison and add it to the result list if the
+    // comparison succeeds
+    size_t old_region_index = 0;
+    for (const auto& new_region : *new_memory) {
+
+      // scan over all of new_region and run comparisons where we can
+      for (uint64_t y = 0; y < new_region.size; y += type_config.field_size) {
+
+        // if this region has no data, skip it
+        if (new_region.data.empty()) {
+          continue;
+        }
+
+        // move the current old region until it's not entirely before the
+        // current address, skipping old regions that have no data
+        while ((old_region_index < this->memory->size()) &&
+            ((*this->memory)[old_region_index].data.empty() ||
+             ((*this->memory)[old_region_index].end_addr() <= new_region.addr + y))) {
+          old_region_index++;
+        }
+
+        // if there are no old regions left, we're done
+        if (old_region_index >= this->memory->size()) {
+          break;
+        }
+
+        // if the current address is outside of old_region, then old_region must
+        // start after the current address - skip ahead appropriately
+        const auto& old_region = (*this->memory)[old_region_index];
+        if (new_region.addr + y < old_region.addr) {
+          y = old_region.addr - new_region.addr - type_config.field_size;
+          continue;
+        }
+        uint64_t old_region_y = new_region.addr + y - old_region.addr;
+
+        // compare the current cell and add it to the results if we succeed
+        const void* current_data = (const void*)(y + (uint64_t)new_region.data.data());
+        const void* target_data = data.empty() ? (const void*)(old_region_y + (uint64_t)old_region.data.data()) : data.data();
+        if (evaluator(current_data, target_data, data.empty() ? this->prev_size : data.size())) {
+          results.emplace_back(new_region.addr + y);
+        }
+      }
+    }
+    this->results_valid = true;
 
   // this isn't the first search: we just need to verify the existing results
   } else {
@@ -297,11 +366,9 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
              ((*new_memory)[new_region_index].end_addr() <= result)) {
         new_region_index++;
       }
-      if (this->memory) {
-        while ((old_region_index < this->memory->size()) &&
-               ((*this->memory)[old_region_index].end_addr() <= result)) {
-          old_region_index++;
-        }
+      while ((old_region_index < this->memory->size()) &&
+             ((*this->memory)[old_region_index].end_addr() <= result)) {
+        old_region_index++;
       }
 
       // if there are no regions left, then the current result is invalid
@@ -325,15 +392,15 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
       // now the current result is within the current region - but if the
       // current region has no data (couldn't be read for some reason?) then
       // we'll have to delete this result
-      if (!new_region.data) {
+      if (new_region.data.empty()) {
         result = 0;
         num_inside_bad_regions++;
         continue;
       }
 
       // compare the current result and delete it if necessary
-      const void* current_data = (const void*)(result - new_region.addr + (uint64_t)new_region.data->data());
-      const void* target_data = data.empty() ? (const void*)(result - old_region.addr + (uint64_t)old_region.data->data()) : data.data();
+      const void* current_data = (const void*)(result - new_region.addr + (uint64_t)new_region.data.data());
+      const void* target_data = data.empty() ? (const void*)(result - old_region.addr + (uint64_t)old_region.data.data()) : data.data();
       if (!evaluator(current_data, target_data, data.empty() ? this->prev_size : data.size())) {
         result = 0;
       }

@@ -5,6 +5,7 @@
 #include <sys/types.h>
 
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -31,12 +32,12 @@ public:
     vm_behavior_t behavior;
     uint16_t wired_count;
 
-    std::shared_ptr<std::string> data;
+    std::string data;
 
     Region(mach_vm_address_t addr,
         mach_vm_size_t size, uint8_t protection, uint8_t max_protection,
         int inherit, int shared, int reserved, vm_behavior_t behavior,
-        uint16_t wired_count, std::shared_ptr<std::string> data = NULL);
+        uint16_t wired_count);
     ~Region() = default;
 
     mach_vm_address_t end_addr() const;
@@ -67,7 +68,9 @@ public:
   void attach(pid_t pid);
 
   Region get_region(mach_vm_address_t addr, bool read_data = false);
-  std::vector<Region> get_regions(bool read_data = false);
+  std::vector<Region> get_all_regions(bool read_data = false);
+  std::vector<Region> get_target_regions(
+      const std::vector<uint64_t>& target_addresses, bool read_data = false);
 
   mach_vm_address_t allocate(vm_address_t addr, mach_vm_size_t size);
   void deallocate(vm_address_t addr, mach_vm_size_t size);

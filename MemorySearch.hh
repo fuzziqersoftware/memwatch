@@ -12,7 +12,6 @@
  * known value search: memory and results always valid after 1st search
  * unknown value search: memory always valid after 1st search,
  *                       results invalid until 2nd search
- * make results always valid: null predicate is always TRUE
  */
 
 class MemorySearch {
@@ -56,6 +55,7 @@ public:
 
   Type get_type() const;
   bool has_memory() const;
+  bool has_valid_results() const;
   bool is_all_memory() const;
   const std::vector<uint64_t>& get_results() const;
 
@@ -75,6 +75,7 @@ public:
 
 private:
   Type type;
+  bool results_valid;
   bool all_memory;
   std::shared_ptr<std::vector<ProcessMemoryAdapter::Region>> memory;
   uint64_t prev_size;

@@ -108,10 +108,10 @@ void print_regions(FILE* stream, const vector<ProcessMemoryAdapter::Region>& reg
         (region.max_protection & Protection::READABLE) ? 'r' : '-',
         (region.max_protection & Protection::READABLE) ? 'w' : '-',
         (region.max_protection & Protection::READABLE) ? 'x' : '-',
-        region.data ? "" : " [data not read]");
+        region.data.empty() ? " [data not read]" : "");
 
     // increment the relevant counters
-    if (!region.data) {
+    if (region.data.empty()) {
       total_error += region.size;
       num_error++;
     }
@@ -195,7 +195,7 @@ static void command_list(MemwatchShell& sh, const string& args) {
   vector<ProcessMemoryAdapter::Region> regions;
   {
     PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-    regions = sh.adapter->get_regions();
+    regions = sh.adapter->get_all_regions();
   }
   print_regions(stdout, regions);
 }
@@ -212,7 +212,7 @@ static void command_dump(MemwatchShell& sh, const string& args) {
   vector<ProcessMemoryAdapter::Region> regions;
   {
     PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-    regions = sh.adapter->get_regions(true);
+    regions = sh.adapter->get_all_regions(true);
   }
 
   if (!args.empty()) {
@@ -222,10 +222,10 @@ static void command_dump(MemwatchShell& sh, const string& args) {
     }
 
     for (const auto& region : regions) {
-      if (region.data) {
+      if (!region.data.empty()) {
         string filename = string_printf("%s.%016llX.%016llX.bin", args.c_str(),
             region.addr);
-        save_file(filename, *region.data);
+        save_file(filename, region.data);
       }
     }
 
@@ -239,7 +239,7 @@ static void command_find(MemwatchShell& sh, const string& args) {
   vector<ProcessMemoryAdapter::Region> regions;
   {
     PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-    regions = sh.adapter->get_regions(true);
+    regions = sh.adapter->get_all_regions(true);
   }
 
   string mask;
@@ -251,7 +251,7 @@ static void command_find(MemwatchShell& sh, const string& args) {
   sh.find_results.clear();
 
   for (const auto& region : regions) {
-    if (!region.data) {
+    if (region.data.empty()) {
       continue;
     }
 
@@ -259,7 +259,7 @@ static void command_find(MemwatchShell& sh, const string& args) {
     int y, z;
     for (y = 0; y <= region.size - data.size(); y++) {
       for (z = 0; z < data.size(); z++) {
-        if (mask[z] && ((*region.data)[y + z] != data[z])) {
+        if (mask[z] && (region.data[y + z] != data[z])) {
           break;
         }
       }
@@ -623,20 +623,12 @@ static void command_fork(MemwatchShell& sh, const string& args_str) {
   }
 }
 
-static void print_search_results(MemwatchShell& sh, const MemorySearch& search,
-    size_t max_results) {
-
-  // if there's a max given, don't print results if there are more than that
-  // many of them
-  auto& results = search.get_results();
-  if (max_results && (results.size() > max_results)) {
-    printf("results: %lu\n", results.size());
-    return;
-  }
+static void print_search_results(MemwatchShell& sh,
+    const MemorySearch& search) {
 
   uint64_t x = 0;
   if (search.get_type() == MemorySearch::Type::DATA) {
-    for (uint64_t result : results) {
+    for (uint64_t result : search.get_results()) {
       printf("(%llu) %016llX\n", x, result);
       x++;
     }
@@ -646,7 +638,7 @@ static void print_search_results(MemwatchShell& sh, const MemorySearch& search,
 
     assert(size <= 8);
 
-    for (uint64_t result : results) {
+    for (uint64_t result : search.get_results()) {
       printf("(%llu) %016llX ", x, result);
       try {
         string data = sh.adapter->read(result, size);
@@ -729,7 +721,7 @@ static void command_results(MemwatchShell& sh, const string& args) {
 
   Signalable s;
   do {
-    print_search_results(sh, search, 0);
+    print_search_results(sh, search);
     if (sh.watch) {
       usleep(1000000); // wait a second, if we're repeating
     }
@@ -754,7 +746,9 @@ static void command_delete(MemwatchShell& sh, const string& args_str) {
   }
 
   search.delete_results(addr1, addr2);
-  print_search_results(sh, search, 20);
+  if (search.get_results().size() <= 20) {
+    print_search_results(sh, search);
+  }
 }
 
 // search [name] <predicate> [value]
@@ -797,11 +791,17 @@ static void command_search(MemwatchShell& sh, const string& args_str) {
   shared_ptr<vector<ProcessMemoryAdapter::Region>> regions(new vector<ProcessMemoryAdapter::Region>());
   {
     PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-    *regions = sh.adapter->get_regions(true);
+    if (search.has_valid_results()) {
+      *regions = sh.adapter->get_target_regions(search.get_results(), true);
+    } else {
+      *regions = sh.adapter->get_all_regions(true);
+    }
   }
 
   search.update(regions, predicate, value, sh.max_results);
-  print_search_results(sh, search, 20);
+  if (search.get_results().size() <= 20) {
+    print_search_results(sh, search);
+  }
 }
 
 // set <value>
@@ -1249,6 +1249,12 @@ int MemwatchShell::execute_commands() {
             this->process_name.c_str(), this->name_to_search.size(),
             this->freezer->frozen_count(), search_name,
             MemorySearch::name_for_search_type(s.get_type()));
+      } else if (!s.has_valid_results()) {
+        prompt = string_printf("memwatch:%u/%s %ds/%df %s:%s(+) # ", this->pid,
+            this->process_name.c_str(), this->name_to_search.size(),
+            this->freezer->frozen_count(), search_name,
+            MemorySearch::name_for_search_type(s.get_type()),
+            s.get_results().size());
       } else {
         prompt = string_printf("memwatch:%u/%s %ds/%df %s:%s(%llu) # ", this->pid,
             this->process_name.c_str(), this->name_to_search.size(),

@@ -14,10 +14,9 @@ using namespace std;
 ProcessMemoryAdapter::Region::Region(mach_vm_address_t addr,
     mach_vm_size_t size, uint8_t protection, uint8_t max_protection,
     int inherit, int shared, int reserved, vm_behavior_t behavior,
-    uint16_t wired_count, shared_ptr<string> data) : addr(addr), size(size),
-    protection(protection), max_protection(max_protection), inherit(inherit),
-    shared(shared), reserved(reserved), behavior(behavior),
-    wired_count(wired_count), data(data) { }
+    uint16_t wired_count) : addr(addr), size(size), protection(protection),
+    max_protection(max_protection), inherit(inherit), shared(shared),
+    reserved(reserved), behavior(behavior), wired_count(wired_count), data() { }
 
 mach_vm_address_t ProcessMemoryAdapter::Region::end_addr() const {
   return this->addr + this->size;
@@ -73,7 +72,7 @@ ProcessMemoryAdapter::Region ProcessMemoryAdapter::get_region(
   return r;
 }
 
-vector<ProcessMemoryAdapter::Region> ProcessMemoryAdapter::get_regions(
+vector<ProcessMemoryAdapter::Region> ProcessMemoryAdapter::get_all_regions(
     bool read_data) {
 
   vector<Region> ret;
@@ -82,7 +81,44 @@ vector<ProcessMemoryAdapter::Region> ProcessMemoryAdapter::get_regions(
   for (;;) {
     try {
       ret.emplace_back(this->get_region(addr, read_data));
-      addr = ret.back().addr + ret.back().size;
+      addr = ret.back().end_addr();
+    } catch (const out_of_range& e) {
+      break;
+    }
+  }
+
+  return ret;
+}
+
+vector<ProcessMemoryAdapter::Region> ProcessMemoryAdapter::get_target_regions(
+    const std::vector<uint64_t>& target_addresses, bool read_data) {
+
+  auto target_it = target_addresses.begin();
+  vector<Region> ret;
+
+  mach_vm_address_t addr = 0;
+  for (;;) {
+    if (target_it == target_addresses.end()) {
+      break;
+    }
+
+    try {
+      Region r = this->get_region(addr, false);
+      addr = r.end_addr();
+
+      // advance target_it until it's not before this region
+      for (; target_it != target_addresses.end() && *target_it < r.addr; target_it++);
+
+      // if there's a target address in this region, read the data and add it to
+      // the list
+      if (*target_it < r.end_addr()) {
+        if (read_data) {
+          try {
+            this->read(r);
+          } catch (const runtime_error& e) { }
+        }
+        ret.emplace_back(move(r));
+      }
     } catch (const out_of_range& e) {
       break;
     }
@@ -147,7 +183,6 @@ void ProcessMemoryAdapter::set_protection(mach_vm_address_t addr,
 }
 
 string ProcessMemoryAdapter::read(mach_vm_address_t addr, size_t size) {
-
   mach_vm_size_t result_size = size;
   string data(size, 0);
   vm_offset_t data_ptr = (vm_offset_t)const_cast<char*>(data.data());
@@ -167,7 +202,7 @@ void ProcessMemoryAdapter::read(Region& r) {
         Region::Protection::ALL_ACCESS);
   }
 
-  r.data.reset(new string(this->read(r.addr, r.size)));
+  r.data = this->read(r.addr, r.size);
 
   // if we made the region readable, restore its previous protection
   if (!(r.protection & Region::Protection::READABLE)) {
