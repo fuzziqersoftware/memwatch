@@ -89,6 +89,9 @@ A single command (see the following sections) which will be executed instead of 
 .BI "search [" "search_name" "] "operator value"
 .RI "Reads the values of variables in the current list of results (or the named search's results, if a name is given), and filters out the results for which (new value " "operator prev value" ") is false. If " value " is not given, uses the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), and $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
 .TP
+.BI "search [" "search_name" "] ."
+.RI "Begins a search for a variable with an unknown initial value. Once this is done, future searches can be done using the above operators."
+.TP
 .BI "results [" search_name "]"
 .RI "Displays the current list of results. If search_name is given, displays the results for that search. The command may be prepended with " watch " to read new values every second."
 .TP
@@ -188,42 +191,8 @@ Resulting data (Intel): 03 04 00 1E 7F 00 64 61 72 6B FF FF FF FF 63 00 6F 00 6C
 
 Resulting mask: FF 00 FF FF FF FF 00 00 00 00 FF FF FF FF FF FF FF FF FF FF FF FF
 
-.SH "EXAMPLE"
-You're playing Supaplex in DOSBox and you want to have infinite bombs. It's not obvious what the data size is for this variable, but the value is always small, so a u8 search should find it. 
-
-fuzziqersoftware@pointy:~$ sudo memwatch dosbox
-
-Open a search for this variable:
-
-memwatch:90732/DOSBox 0s/0f # open u8 bombs
-.br
-opened new u8 search named bombs
-
-Now start playing a level on which there are a lot of bombs. Collect a few of them (three is probably enough) and search for that:
-
-memwatch:90732/DOSBox 1s/0f bombs # search = 3
-.br
-results: 378052
-
-Now use one of the bombs and narrow down the result set to variables that were 3 during the initial search and 2 now:
-
-memwatch:90732/DOSBox 1s/0f bombs(378052) # s = 2
-.br
-results: 167
-
-Use another bomb and search again:
-
-memwatch:90732/DOSBox 1s/0f bombs(167) # s = 1
-.br
-(0) 000000000C34E37C 1 (0x01)
-
-You found it. Now you can freeze that address at a nonzero value (s0 refers to the first result in the current search):
-
-memwatch:90732/DOSBox 1s/0f bombs(1) # freeze s0 01
-.br
-region frozen
-
-Now you have infinite bombs as long as memwatch is running (and you don't unfreeze that variable).
+.SH "EXAMPLES"
+See README.md (included with memwatch) for usage examples.
 
 .SH "AUTHOR"
 Martin Michelsen <mjem@wildblue.net> is the original author and current maintainer of memwatch.
