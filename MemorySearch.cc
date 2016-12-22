@@ -415,8 +415,6 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
       }
     }
     this->results.resize(num_results);
-
-    // TODO: return num_inside_bad_regions and num_outside_regions somehow
   }
 
   // save the prev size and memory contents
