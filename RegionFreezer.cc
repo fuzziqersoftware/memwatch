@@ -1,5 +1,8 @@
+#define _STDC_FORMAT_MACROS
+
 #include "RegionFreezer.hh"
 
+#include <inttypes.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -160,8 +163,8 @@ RegionFreezer::Region::Region(const std::string& name, uint64_t index,
     addr(addr), data(data), error() { }
 
 void RegionFreezer::Region::print(FILE* stream, bool with_data) const {
-  fprintf(stream, "%4llu: %016llX:%016lX [%s] %s\n", this->index, this->addr,
-      this->data.size(), this->error.c_str(), this->name.c_str());
+  fprintf(stream, "%4" PRIu64 ": %016" PRIX64 ":%016zX [%s] %s\n", this->index,
+      this->addr, this->data.size(), this->error.c_str(), this->name.c_str());
   if (with_data) {
     fprintf(stream, "data:\n");
     print_data(stream, this->data.data(), this->data.size(), this->addr);
@@ -170,7 +173,7 @@ void RegionFreezer::Region::print(FILE* stream, bool with_data) const {
 
 void RegionFreezer::Region::print_command(FILE* stream) const {
   string data = format_data_string(this->data);
-  fprintf(stream, "f n%s @%016llX x%s\n", this->name.c_str(), this->addr,
+  fprintf(stream, "f n%s @%016" PRIX64 " x%s\n", this->name.c_str(), this->addr,
       data.c_str());
 }
 
@@ -197,9 +200,9 @@ RegionFreezer::ArrayRegion::ArrayRegion(const std::string& name, uint64_t index,
 }
 
 void RegionFreezer::ArrayRegion::print(FILE* stream, bool with_data) const {
-  fprintf(stream, "%4llu: %016llX:%016lX [array:%lu] [%s] %s\n", this->index,
-      this->addr, this->data.size(), this->num_items, this->error.c_str(),
-      this->name.c_str());
+  fprintf(stream, "%4" PRIu64 ": %016" PRIX64 ":%016zX [array:%zu] [%s] %s\n",
+      this->index, this->addr, this->data.size(), this->num_items,
+      this->error.c_str(), this->name.c_str());
   if (with_data) {
     fprintf(stream, "data:\n");
     print_data(stream, this->data.data(), this->data.size());
@@ -216,8 +219,8 @@ void RegionFreezer::ArrayRegion::print(FILE* stream, bool with_data) const {
 
 void RegionFreezer::ArrayRegion::print_command(FILE* stream) const {
   string data = format_data_string(this->data, &this->data_mask);
-  fprintf(stream, "f n%s @%016llX m%lu x%s", this->name.c_str(), this->addr,
-      this->num_items, data.c_str());
+  fprintf(stream, "f n%s @%016" PRIX64 " m%zu x%s", this->name.c_str(),
+      this->addr, this->num_items, data.c_str());
 
   if (!this->null_data.empty() && !this->null_data_mask.empty()) {
     string null_data = format_data_string(this->null_data, &this->null_data_mask);

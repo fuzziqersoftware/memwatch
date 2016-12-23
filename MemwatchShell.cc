@@ -1,6 +1,9 @@
+#define _STDC_FORMAT_MACROS
+
 #include "MemwatchShell.hh"
 
 #include <assert.h>
+#include <inttypes.h>
 #include <readline/readline.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -99,7 +102,7 @@ void print_regions(FILE* stream, const vector<ProcessMemoryAdapter::Region>& reg
 
   fprintf(stream, "# addr size access/max_access\n");
   for (const auto& region : regions) {
-    fprintf(stream, "%016llX %016llX %c%c%c/%c%c%c%s\n",
+    fprintf(stream, "%016" PRIX64 " %016" PRIX64 " %c%c%c/%c%c%c%s\n",
         region.addr,
         region.size,
         (region.protection & Protection::READABLE) ? 'r' : '-',
@@ -146,13 +149,13 @@ void print_regions(FILE* stream, const vector<ProcessMemoryAdapter::Region>& reg
   string total_executable_str = format_size(total_executable);
   string total_inaccessible_str = format_size(total_inaccessible);
 
-  fprintf(stream, "# %5lu regions, %s in total\n", regions.size(), total_bytes_str.c_str());
-  fprintf(stream, "# %5lu regions, %s unread by memwatch\n", num_error, total_error_str.c_str());
-  fprintf(stream, "# %5lu regions, %s accessible\n", num_accessible, total_accessible_str.c_str());
-  fprintf(stream, "# %5lu regions, %s readable\n", num_readable, total_readable_str.c_str());
-  fprintf(stream, "# %5lu regions, %s writable\n", num_writable, total_writable_str.c_str());
-  fprintf(stream, "# %5lu regions, %s executable\n", num_executable, total_executable_str.c_str());
-  fprintf(stream, "# %5lu regions, %s inaccessible\n", num_inaccessible, total_inaccessible_str.c_str());
+  fprintf(stream, "# %5zu regions, %s in total\n", regions.size(), total_bytes_str.c_str());
+  fprintf(stream, "# %5zu regions, %s unread by memwatch\n", num_error, total_error_str.c_str());
+  fprintf(stream, "# %5zu regions, %s accessible\n", num_accessible, total_accessible_str.c_str());
+  fprintf(stream, "# %5zu regions, %s readable\n", num_readable, total_readable_str.c_str());
+  fprintf(stream, "# %5zu regions, %s writable\n", num_writable, total_writable_str.c_str());
+  fprintf(stream, "# %5zu regions, %s executable\n", num_executable, total_executable_str.c_str());
+  fprintf(stream, "# %5zu regions, %s inaccessible\n", num_inaccessible, total_inaccessible_str.c_str());
 }
 
 uint64_t get_addr_from_command(MemwatchShell& sh, const string& args) {
@@ -223,8 +226,8 @@ static void command_dump(MemwatchShell& sh, const string& args) {
 
     for (const auto& region : regions) {
       if (!region.data.empty()) {
-        string filename = string_printf("%s.%016llX.%016llX.bin", args.c_str(),
-            region.addr);
+        string filename = string_printf("%s.%016" PRIX64 ".%016" PRIX64 ".bin",
+            args.c_str(), region.addr);
         save_file(filename, region.data);
       }
     }
@@ -265,7 +268,7 @@ static void command_find(MemwatchShell& sh, const string& args) {
       }
 
       if (z == data.size()) {
-        printf("(%lu) %016llX (%c%c%c)\n", sh.find_results.size(),
+        printf("(%zu) %016" PRIX64 " (%c%c%c)\n", sh.find_results.size(),
             region.addr + y,
             (region.protection & Protection::READABLE) ? 'r' : '-',
             (region.protection & Protection::WRITABLE) ? 'w' : '-',
@@ -324,18 +327,19 @@ static void command_read(MemwatchShell& sh, const string& args_str) {
 
       if (args.size() > 2) {
         save_file(args[2], data);
-        printf("%s @ %016llX:%016llX // %s > %s\n", sh.process_name.c_str(),
-            addr, size, time_str.c_str(), args[2].c_str());
+        printf("%s @ %016" PRIX64 ":%016" PRIX64 " // %s > %s\n",
+            sh.process_name.c_str(), addr, size, time_str.c_str(),
+            args[2].c_str());
       } else {
-        printf("%s @ %016llX:%016llX // %s\n", sh.process_name.c_str(),
-            addr, size, time_str.c_str());
+        printf("%s @ %016" PRIX64 ":%016" PRIX64 " // %s\n",
+            sh.process_name.c_str(), addr, size, time_str.c_str());
         print_data(stdout, data.data(), data.size(), addr,
             first_read ? NULL : prev_data->data(), sh.use_color);
         printf("\n");
       }
 
     } catch (const exception& e) {
-      printf("%s @ %016llX:%016llX // %s // failed [%s]\n",
+      printf("%s @ %016" PRIX64 ":%016" PRIX64 " // %s // failed [%s]\n",
           sh.process_name.c_str(), addr, size, time_str.c_str(), e.what());
     }
 
@@ -364,7 +368,7 @@ static void command_write(MemwatchShell& sh, const string& args) {
   try {
     PauseGuard g(sh.pause_target ? sh.adapter : NULL);
     sh.adapter->write(addr, data);
-    printf("wrote %lu (0x%lX) bytes\n", data.size(), data.size());
+    printf("wrote %zu (0x%zX) bytes\n", data.size(), data.size());
 
   } catch (const exception& e) {
     printf("failed to write data to process (%s)\n", e.what());
@@ -379,9 +383,9 @@ static void command_data(MemwatchShell& sh, const string& args) {
     throw invalid_argument("no data was specified");
   }
 
-  printf("read %lu (0x%lX) data bytes:\n", data.size(), data.size());
+  printf("read %zu (0x%zX) data bytes:\n", data.size(), data.size());
   print_data(stdout, data.data(), data.size());
-  printf("read %lu (0x%lX) mask bytes:\n", mask.size(), mask.size());
+  printf("read %zu (0x%zX) mask bytes:\n", mask.size(), mask.size());
   print_data(stdout, mask.data(), mask.size());
 }
 
@@ -470,7 +474,7 @@ static void command_unfreeze(MemwatchShell& sh, const string& args) {
 
   if (args == "*") {
     size_t num_regions = sh.freezer->unfreeze_all();
-    printf("%lu regions unfrozen\n", num_regions);
+    printf("%zu regions unfrozen\n", num_regions);
 
   } else if (!args.empty()) {
 
@@ -481,7 +485,7 @@ static void command_unfreeze(MemwatchShell& sh, const string& args) {
       return;
     }
     if (num_regions > 1) {
-      printf("%lu regions unfrozen\n", num_regions);
+      printf("%zu regions unfrozen\n", num_regions);
       return;
     }
 
@@ -544,14 +548,14 @@ static void command_open(MemwatchShell& sh, const string& args_str) {
       if (!it.second.has_memory()) {
         printf(" (initial search not done)");
       } else {
-        printf(" (%lu results)", it.second.get_results().size());
+        printf(" (%zu results)", it.second.get_results().size());
       }
       if (it.second.is_all_memory()) {
         printf(" (all memory)");
       }
       printf("\n");
     }
-    printf("total searches: %lu\n", sh.name_to_search.size());
+    printf("total searches: %zu\n", sh.name_to_search.size());
     return;
   }
 
@@ -629,7 +633,7 @@ static void print_search_results(MemwatchShell& sh,
   uint64_t x = 0;
   if (search.get_type() == MemorySearch::Type::DATA) {
     for (uint64_t result : search.get_results()) {
-      printf("(%llu) %016llX\n", x, result);
+      printf("(%" PRIu64 ") %016" PRIX64 "\n", x, result);
       x++;
     }
 
@@ -639,59 +643,59 @@ static void print_search_results(MemwatchShell& sh,
     assert(size <= 8);
 
     for (uint64_t result : search.get_results()) {
-      printf("(%llu) %016llX ", x, result);
+      printf("(%" PRIu64 ") %016" PRIX64 " ", x, result);
       try {
         string data = sh.adapter->read(result, size);
         PrimitiveValue* value = (PrimitiveValue*)data.data();
 
         switch (search.get_type()) {
           case MemorySearch::Type::UINT8:
-            printf("%hhu (0x%02hhX)\n", value->u8, value->u8);
+            printf("%" PRIu8 " (0x%02" PRIX8 ")\n", value->u8, value->u8);
             break;
           case MemorySearch::Type::UINT16_RE:
             value->u16 = bswap16(value->u16);
           case MemorySearch::Type::UINT16:
-            printf("%hu (0x%04hX)\n", value->u16, value->u16);
+            printf("%" PRIu16 " (0x%04" PRIX16 ")\n", value->u16, value->u16);
             break;
           case MemorySearch::Type::UINT32_RE:
             value->u32 = bswap32(value->u32);
           case MemorySearch::Type::UINT32:
-            printf("%u (0x%08X)\n", value->u32, value->u32);
+            printf("%" PRIu32 " (0x%08" PRIX32 ")\n", value->u32, value->u32);
             break;
           case MemorySearch::Type::UINT64_RE:
             value->u64 = bswap64(value->u64);
           case MemorySearch::Type::UINT64:
-            printf("%llu (0x%016llX)\n", value->u64, value->u64);
+            printf("%" PRIu64 " (0x%016" PRIX64 ")\n", value->u64, value->u64);
             break;
 
           case MemorySearch::Type::INT8:
-            printf("%hhd (0x%02hhX)\n", value->s8, value->s8);
+            printf("%" PRId8 " (0x%02" PRIX8 ")\n", value->s8, value->s8);
             break;
           case MemorySearch::Type::INT16_RE:
             value->u16 = bswap16(value->u16);
           case MemorySearch::Type::INT16:
-            printf("%hd (0x%04hX)\n", value->s16, value->s16);
+            printf("%" PRId16 " (0x%04" PRIX16 ")\n", value->s16, value->s16);
             break;
           case MemorySearch::Type::INT32_RE:
             value->u32 = bswap32(value->u32);
           case MemorySearch::Type::INT32:
-            printf("%d (0x%08X)\n", value->s32, value->s32);
+            printf("%" PRId32 " (0x%08" PRIX32 ")\n", value->s32, value->s32);
             break;
           case MemorySearch::Type::INT64_RE:
             value->u64 = bswap64(value->u64);
           case MemorySearch::Type::INT64:
-            printf("%lld (0x%016llX)\n", value->s64, value->s64);
+            printf("%" PRId64 " (0x%016" PRIX64 ")\n", value->s64, value->s64);
             break;
 
           case MemorySearch::Type::FLOAT_RE:
             value->u32 = bswap32(value->u32);
           case MemorySearch::Type::FLOAT:
-            printf("%f (0x%08X)\n", value->f, value->u32);
+            printf("%f (0x%08" PRIX32 ")\n", value->f, value->u32);
             break;
           case MemorySearch::Type::DOUBLE_RE:
             value->u64 = bswap64(value->u64);
           case MemorySearch::Type::DOUBLE:
-            printf("%lf (0x%016llX)\n", value->d, value->u64);
+            printf("%lf (0x%016" PRIX64 ")\n", value->d, value->u64);
             break;
 
           case MemorySearch::Type::DATA:
@@ -825,9 +829,10 @@ static void command_set(MemwatchShell& sh, const string& args) {
     for (uint64_t result : search.get_results()) {
       try {
         sh.adapter->write(result, data);
-        printf("%016llX: wrote %lu (0x%lX) bytes\n", result, data.size(), data.size());
+        printf("%016" PRIX64 ": wrote %zu (0x%zX) bytes\n", result, data.size(),
+            data.size());
       } catch (const exception& e) {
-        printf("%016llX: failed to write data (%s)\n", result, e.what());
+        printf("%016" PRIX64 ": failed to write data (%s)\n", result, e.what());
       }
     }
   }
@@ -880,66 +885,66 @@ static void print_thread_regs(MemwatchShell& sh, int tid,
 
   if (!state.is64) {
     printf("[%d: thread 32-bit @ ", tid);
-    print_reg_value("eip:%08X", state, prev, st32.__eip);
+    print_reg_value("eip:%08" PRIX32, state, prev, st32.__eip);
     printf("]\n");
-    print_reg_value("  eax: %08X", state, prev, st32.__eax);
-    print_reg_value("  ecx: %08X", state, prev, st32.__ecx);
-    print_reg_value("  edx: %08X", state, prev, st32.__edx);
-    print_reg_value("  ebx: %08X\n", state, prev, st32.__ebx);
-    print_reg_value("  ebp: %08X", state, prev, st32.__ebp);
-    print_reg_value("  esp: %08X", state, prev, st32.__esp);
-    print_reg_value("  esi: %08X", state, prev, st32.__esi);
-    print_reg_value("  edi: %08X\n", state, prev, st32.__edi);
-    print_reg_value("  eflags: %08X\n", state, prev, st32.__eflags);
-    print_reg_value("  cs:  %08X", state, prev, st32.__cs);
-    print_reg_value("  ds:  %08X", state, prev, st32.__ds);
-    print_reg_value("  es:  %08X", state, prev, st32.__es);
-    print_reg_value("  fs:  %08X\n", state, prev, st32.__fs);
-    print_reg_value("  gs:  %08X", state, prev, st32.__gs);
-    print_reg_value("  ss:  %08X\n", state, prev, st32.__ss);
+    print_reg_value("  eax: %08" PRIX32,         state, prev, st32.__eax);
+    print_reg_value("  ecx: %08" PRIX32,         state, prev, st32.__ecx);
+    print_reg_value("  edx: %08" PRIX32,         state, prev, st32.__edx);
+    print_reg_value("  ebx: %08" PRIX32 "\n",    state, prev, st32.__ebx);
+    print_reg_value("  ebp: %08" PRIX32,         state, prev, st32.__ebp);
+    print_reg_value("  esp: %08" PRIX32,         state, prev, st32.__esp);
+    print_reg_value("  esi: %08" PRIX32,         state, prev, st32.__esi);
+    print_reg_value("  edi: %08" PRIX32 "\n",    state, prev, st32.__edi);
+    print_reg_value("  eflags: %08" PRIX32 "\n", state, prev, st32.__eflags);
+    print_reg_value("  cs:  %08" PRIX32,         state, prev, st32.__cs);
+    print_reg_value("  ds:  %08" PRIX32,         state, prev, st32.__ds);
+    print_reg_value("  es:  %08" PRIX32,         state, prev, st32.__es);
+    print_reg_value("  fs:  %08" PRIX32 "\n",    state, prev, st32.__fs);
+    print_reg_value("  gs:  %08" PRIX32,         state, prev, st32.__gs);
+    print_reg_value("  ss:  %08" PRIX32 "\n",    state, prev, st32.__ss);
     // TODO: print floating state
-    print_reg_value("  dr0: %08X", state, prev, db32.__dr0);
-    print_reg_value("  dr1: %08X", state, prev, db32.__dr1);
-    print_reg_value("  dr2: %08X", state, prev, db32.__dr2);
-    print_reg_value("  dr3: %08X\n", state, prev, db32.__dr3);
-    print_reg_value("  dr4: %08X", state, prev, db32.__dr4);
-    print_reg_value("  dr5: %08X", state, prev, db32.__dr5);
-    print_reg_value("  dr6: %08X", state, prev, db32.__dr6);
-    print_reg_value("  dr7: %08X\n", state, prev, db32.__dr7);
+    print_reg_value("  dr0: %08" PRIX32,         state, prev, db32.__dr0);
+    print_reg_value("  dr1: %08" PRIX32,         state, prev, db32.__dr1);
+    print_reg_value("  dr2: %08" PRIX32,         state, prev, db32.__dr2);
+    print_reg_value("  dr3: %08" PRIX32 "\n",    state, prev, db32.__dr3);
+    print_reg_value("  dr4: %08" PRIX32,         state, prev, db32.__dr4);
+    print_reg_value("  dr5: %08" PRIX32,         state, prev, db32.__dr5);
+    print_reg_value("  dr6: %08" PRIX32,         state, prev, db32.__dr6);
+    print_reg_value("  dr7: %08" PRIX32 "\n",    state, prev, db32.__dr7);
 
   } else {
     printf("[%d: thread 64-bit @ ", tid);
-    print_reg_value("rip:%016llX", state, prev, st64.__rip);
+    print_reg_value("rip:%016" PRIX64, state, prev, st64.__rip);
     printf("]\n");
-    print_reg_value("  rax: %016llX",      state, prev, st64.__rax);
-    print_reg_value("  rcx: %016llX",      state, prev, st64.__rcx);
-    print_reg_value("  rdx: %016llX\n",    state, prev, st64.__rdx);
-    print_reg_value("  rbx: %016llX",      state, prev, st64.__rbx);
-    print_reg_value("  rbp: %016llX",      state, prev, st64.__rbp);
-    print_reg_value("  rsp: %016llX\n",    state, prev, st64.__rsp);
-    print_reg_value("  rsi: %016llX",      state, prev, st64.__rsi);
-    print_reg_value("  rdi: %016llX",      state, prev, st64.__rdi);
-    print_reg_value("  r8:  %016llX\n",    state, prev, st64.__r8);
-    print_reg_value("  r9:  %016llX",      state, prev, st64.__r9);
-    print_reg_value("  r10: %016llX",      state, prev, st64.__r10);
-    print_reg_value("  r11: %016llX\n",    state, prev, st64.__r11);
-    print_reg_value("  r12: %016llX",      state, prev, st64.__r12);
-    print_reg_value("  r13: %016llX",      state, prev, st64.__r13);
-    print_reg_value("  r14: %016llX\n",    state, prev, st64.__r14);
-    print_reg_value("  r15: %016llX  ",    state, prev, st64.__r15);
-    print_reg_value("  rflags: %016llX\n", state, prev, st64.__rflags);
+    print_reg_value("  rax: %016" PRIX64,         state, prev, st64.__rax);
+    print_reg_value("  rcx: %016" PRIX64,         state, prev, st64.__rcx);
+    print_reg_value("  rdx: %016" PRIX64 "\n",    state, prev, st64.__rdx);
+    print_reg_value("  rbx: %016" PRIX64,         state, prev, st64.__rbx);
+    print_reg_value("  rbp: %016" PRIX64,         state, prev, st64.__rbp);
+    print_reg_value("  rsp: %016" PRIX64 "\n",    state, prev, st64.__rsp);
+    print_reg_value("  rsi: %016" PRIX64,         state, prev, st64.__rsi);
+    print_reg_value("  rdi: %016" PRIX64,         state, prev, st64.__rdi);
+    print_reg_value("  r8:  %016" PRIX64 "\n",    state, prev, st64.__r8);
+    print_reg_value("  r9:  %016" PRIX64,         state, prev, st64.__r9);
+    print_reg_value("  r10: %016" PRIX64,         state, prev, st64.__r10);
+    print_reg_value("  r11: %016" PRIX64 "\n",    state, prev, st64.__r11);
+    print_reg_value("  r12: %016" PRIX64,         state, prev, st64.__r12);
+    print_reg_value("  r13: %016" PRIX64,         state, prev, st64.__r13);
+    print_reg_value("  r14: %016" PRIX64 "\n",    state, prev, st64.__r14);
+    print_reg_value("  r15: %016" PRIX64 "  ",    state, prev, st64.__r15);
+    print_reg_value("  rflags: %016" PRIX64 "\n", state, prev, st64.__rflags);
     // TODO: print floating state
-    print_reg_value("  cs:  %016llX",      state, prev, st64.__cs);
-    print_reg_value("  fs:  %016llX",      state, prev, st64.__fs);
-    print_reg_value("  gs:  %016llX\n",    state, prev, st64.__gs);
-    print_reg_value("  dr0: %016llX",      state, prev, db64.__dr0);
-    print_reg_value("  dr1: %016llX",      state, prev, db64.__dr1);
-    print_reg_value("  dr2: %016llX\n",    state, prev, db64.__dr2);
-    print_reg_value("  dr3: %016llX",      state, prev, db64.__dr3);
-    print_reg_value("  dr4: %016llX",      state, prev, db64.__dr4);
-    print_reg_value("  dr5: %016llX\n",    state, prev, db64.__dr5);
-    print_reg_value("  dr6: %016llX",      state, prev, db64.__dr6);
-    print_reg_value("  dr7: %016llX\n",    state, prev, db64.__dr7);
+    print_reg_value("  cs:  %016" PRIX64,         state, prev, st64.__cs);
+    print_reg_value("  fs:  %016" PRIX64,         state, prev, st64.__fs);
+    print_reg_value("  gs:  %016" PRIX64 "\n",    state, prev, st64.__gs);
+    print_reg_value("  dr0: %016" PRIX64,         state, prev, db64.__dr0);
+    print_reg_value("  dr1: %016" PRIX64,         state, prev, db64.__dr1);
+    print_reg_value("  dr2: %016" PRIX64 "\n",    state, prev, db64.__dr2);
+    print_reg_value("  dr3: %016" PRIX64,         state, prev, db64.__dr3);
+    print_reg_value("  dr4: %016" PRIX64,         state, prev, db64.__dr4);
+    print_reg_value("  dr5: %016" PRIX64 "\n",    state, prev, db64.__dr5);
+    print_reg_value("  dr6: %016" PRIX64,         state, prev, db64.__dr6);
+    print_reg_value("  dr7: %016" PRIX64 "\n",    state, prev, db64.__dr7);
   }
 }
 
@@ -956,7 +961,7 @@ static void command_read_regs(MemwatchShell& sh, const string& args_str) {
     }
 
     string time_str = format_time();
-    printf("%s [%lu threads] // %s\n", sh.process_name.c_str(), state.size(),
+    printf("%s [%zu threads] // %s\n", sh.process_name.c_str(), state.size(),
         time_str.c_str());
 
     for (const auto& it : state) {
@@ -1014,7 +1019,7 @@ static void command_read_stacks(MemwatchShell& sh, const string& args_str) {
       auto regs = sh.adapter->get_threads_registers();
       for (const auto& it : regs) {
         uint64_t addr = it.second.is64 ? it.second.st64.__rsp : it.second.st32.__esp;
-        printf("%s [Thread %d] @ %016llX:%016llX // %s\n",
+        printf("%s [Thread %d] @ %016" PRIX64 ":%016" PRIX64 " // %s\n",
             sh.process_name.c_str(), it.first, addr, size, time_str.c_str());
         try {
           string data = sh.adapter->read(addr, size);
@@ -1082,11 +1087,11 @@ static void command_state(MemwatchShell& sh, const string& args_str) {
     printf("pid = %d\n", sh.pid);
     printf("process_name = \"%s\"\n", sh.process_name.c_str());
     printf("pause_target = %d\n", sh.pause_target);
-    printf("max_results = %llu\n", sh.max_results);
+    printf("max_results = %" PRIu64 "\n", sh.max_results);
     printf("interactive = %d\n", sh.interactive);
     printf("run = %d\n", sh.run);
-    printf("num_commands_run = %llu\n", sh.num_commands_run);
-    printf("num_find_results = %lu\n", sh.find_results.size());
+    printf("num_commands_run = %" PRIu64 "\n", sh.num_commands_run);
+    printf("num_find_results = %zu\n", sh.find_results.size());
     return;
   }
 
@@ -1245,18 +1250,18 @@ int MemwatchShell::execute_commands() {
       MemorySearch& s = this->get_search();
       const char* search_name = this->current_search_name.empty() ? "(unnamed search)" : this->current_search_name.c_str();
       if (!s.has_memory()) {
-        prompt = string_printf("memwatch:%u/%s %ds/%df %s:%s # ", this->pid,
+        prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s # ", this->pid,
             this->process_name.c_str(), this->name_to_search.size(),
             this->freezer->frozen_count(), search_name,
             MemorySearch::name_for_search_type(s.get_type()));
       } else if (!s.has_valid_results()) {
-        prompt = string_printf("memwatch:%u/%s %ds/%df %s:%s(+) # ", this->pid,
+        prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s(+) # ", this->pid,
             this->process_name.c_str(), this->name_to_search.size(),
             this->freezer->frozen_count(), search_name,
             MemorySearch::name_for_search_type(s.get_type()),
             s.get_results().size());
       } else {
-        prompt = string_printf("memwatch:%u/%s %ds/%df %s:%s(%llu) # ", this->pid,
+        prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s(%llu) # ", this->pid,
             this->process_name.c_str(), this->name_to_search.size(),
             this->freezer->frozen_count(), search_name,
             MemorySearch::name_for_search_type(s.get_type()),
@@ -1264,7 +1269,7 @@ int MemwatchShell::execute_commands() {
       }
 
     } catch (const invalid_argument& e) {
-      prompt = string_printf("memwatch:%u/%s %ds/%df # ", this->pid,
+      prompt = string_printf("memwatch:%u/%s %zus/%zuf # ", this->pid,
           this->process_name.c_str(), this->name_to_search.size(),
           this->freezer->frozen_count());
     }

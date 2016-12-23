@@ -1,5 +1,8 @@
+#define _STDC_FORMAT_MACROS
+
 #include "ProcessMemoryAdapter.hh"
 
+#include <inttypes.h>
 #include <mach/mach.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -131,7 +134,7 @@ mach_vm_address_t ProcessMemoryAdapter::allocate(vm_address_t addr,
     mach_vm_size_t size) {
   kern_return_t ret = vm_allocate(this->task, &addr, size, (addr == 0));
   if (ret != KERN_SUCCESS) {
-    throw runtime_error(string_printf("can\'t allocate memory in process %d at %016llX:%016llX (%d)", this->pid, addr, size, ret));
+    throw runtime_error(string_printf("can\'t allocate memory in process %d at %016" PRIX64 ":%016" PRIX64 " (%d)", this->pid, addr, size, ret));
   }
   return addr;
 }
@@ -139,7 +142,7 @@ mach_vm_address_t ProcessMemoryAdapter::allocate(vm_address_t addr,
 void ProcessMemoryAdapter::deallocate(vm_address_t addr, mach_vm_size_t size) {
   kern_return_t ret = vm_deallocate(this->task, addr, size);
   if (ret != KERN_SUCCESS) {
-    throw runtime_error(string_printf("can\'t deallocate memory in process %d at %016llX:%016llX (%d)", this->pid, addr, size, ret));
+    throw runtime_error(string_printf("can\'t deallocate memory in process %d at %016" PRIX64 ":%016" PRIX64 " (%d)", this->pid, addr, size, ret));
   }
 }
 
@@ -153,7 +156,7 @@ void ProcessMemoryAdapter::set_protection(mach_vm_address_t addr,
   kern_return_t ret = mach_vm_region(this->task, &addr, &size,
       VM_REGION_BASIC_INFO_64, (vm_region_info_t)(&info), &info_count, &object_name);
   if (ret != KERN_SUCCESS) {
-    throw runtime_error(string_printf("can\'t read region in process %d at %016llX:%016llX (%d)", this->pid, addr, size, ret));
+    throw runtime_error(string_printf("can\'t read region in process %d at %016" PRIX64 ":%016" PRIX64 " (%d)", this->pid, addr, size, ret));
   }
 
   // get the attributes and return them
@@ -178,7 +181,7 @@ void ProcessMemoryAdapter::set_protection(mach_vm_address_t addr,
 
   ret = mach_vm_protect(this->task, addr, size, 0ULL, info.protection);
   if (ret != KERN_SUCCESS) {
-    throw runtime_error(string_printf("can\'t set protection in process %d at %016llX:%016llX (%d)", this->pid, addr, size, ret));
+    throw runtime_error(string_printf("can\'t set protection in process %d at %016" PRIX64 ":%016" PRIX64 " (%d)", this->pid, addr, size, ret));
   }
 }
 
@@ -189,7 +192,7 @@ string ProcessMemoryAdapter::read(mach_vm_address_t addr, size_t size) {
   kern_return_t ret = mach_vm_read_overwrite(this->task, addr, size,
       data_ptr, &result_size);
   if (ret != KERN_SUCCESS) {
-    throw runtime_error(string_printf("can\'t read from process %d at %016llX:%016llX (%d)", this->pid, addr, size, ret));
+    throw runtime_error(string_printf("can\'t read from process %d at %016" PRIX64 ":%016" PRIX64 " (%d)", this->pid, addr, size, ret));
   }
   data.resize(result_size);
   return data;
@@ -219,7 +222,7 @@ void ProcessMemoryAdapter::read(std::vector<Region>& regions) {
 void ProcessMemoryAdapter::write(mach_vm_address_t addr, const string& data) {
   kern_return_t ret = mach_vm_write(this->task, addr, (vm_offset_t)data.data(), data.size());
   if (ret != KERN_SUCCESS) {
-    throw runtime_error(string_printf("can\'t write to process %d at %016llX:%016llX (%d)", this->pid, addr, data.size(), ret));
+    throw runtime_error(string_printf("can\'t write to process %d at %016" PRIX64 ":%016" PRIX64 " (%d)", this->pid, addr, data.size(), ret));
   }
 }
 
