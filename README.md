@@ -91,6 +91,7 @@ Any non-recognized characters are ignored. The initial endian-ness of the output
 
 **Resulting data (Intel):**
 `03 04 00 1E 7F 00 64 61 72 6B FF FF FF FF 63 00 6F 00 6C 00 64 00`
+
 **Resulting mask:**
 `FF 00 FF FF FF FF 00 00 00 00 FF FF FF FF FF FF FF FF FF FF FF FF`
 
