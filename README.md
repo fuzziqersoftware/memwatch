@@ -138,7 +138,7 @@ Paper Mario for the Nintendo 64 has a glitch whereby we can replay earlier chapt
 
 In this example we're using sixtyforce, but this should work for any emulator. The Nintendo 64 uses 32-bit registers, so we assume the type we need is `float`. We start memwatch, open a search, and do an initial-value search:
 ```
-fuzziqersoftware@pointy:~$ sudo memwatch dosbox
+fuzziqersoftware@pointy:~$ sudo memwatch sixtyforce
 memwatch:91372/sixtyforce 0s/0f # open float y-coord
 memwatch:91372/sixtyforce 1s/0f y-coord:float # s .
 memwatch:91372/sixtyforce 1s/0f y-coord:float(+) #
