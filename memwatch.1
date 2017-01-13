@@ -62,8 +62,8 @@ A single command (see the following sections) which will be executed instead of 
 .BI "dump [" filename_prefix "]"
 .RI "If " filename_prefix " is given, dumps all readable memory in the target process to files named " filename_prefix ".address1.address2.bin, along with an index file. If " filename_prefix " is not given, only determines which regions are readable."
 .TP
-.BI "read " "address" " " "size" " [" "filename" "]"
-.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " and " size " are specified in hexadecimal. If a filename is given, writes the data to the given file instead of printing to the terminal. The " read " command may be prepended with " watch " to repeat the read every second until Ctrl+C is pressed."
+.BI "read " "address" " " "size" " [" "filename" "] [" "+format" "]"
+.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " and " size " are specified in hexadecimal. If a filename is given, writes the data to the given file instead of printing to the terminal. " format " is a short string specifying which additional interpretations of the data should be printed. It starts with '+' and includes any of the characters 'a' (text), 'f' (float), 'd' (double), and 'r' (reverse-endian); the default is '+a'. The " read " command may be prepended with " watch " to repeat the read every second until Ctrl+C is pressed."
 .TP
 .BI "write " "address-or-result-id" " " "data"
 .RI "Writes " data " to " address " in the target process\'s memory. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. See the DATA FORMAT section for information on how to specify the data string."

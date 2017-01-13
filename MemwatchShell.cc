@@ -305,9 +305,36 @@ static void command_access(MemwatchShell& sh, const string& args_str) {
 // read <addr> <size>
 static void command_read(MemwatchShell& sh, const string& args_str) {
 
-  auto args = split_args(args_str, 2, 3);
+  auto args = split_args(args_str, 2, 4);
   uint64_t addr = get_addr_from_command(sh, args[0]);
   uint64_t size = stoull(args[1], NULL, 16);
+
+  const string* filename = NULL;
+  uint64_t print_flags = PrintDataFlags::PrintAscii;
+  for (size_t x = 2; x < args.size(); x++) {
+    if (args[x].empty()) {
+      continue;
+    }
+    if (args[x][0] == '+') {
+      // TODO parse print options
+      print_flags = 0;
+      for (char ch : args[x]) {
+        if (ch == '+') {
+          continue;
+        } else if (ch == 'a') {
+          print_flags |= PrintDataFlags::PrintAscii;
+        } else if (ch == 'f') {
+          print_flags |= PrintDataFlags::PrintFloat;
+        } else if (ch == 'd') {
+          print_flags |= PrintDataFlags::PrintDouble;
+        } else if (ch == 'r') {
+          print_flags |= PrintDataFlags::ReverseEndian;
+        }
+      }
+    } else {
+      filename = &args[x];
+    }
+  }
 
   // allocate a local read buffer, and a buffer for the previous data if we're
   // repeating the read
@@ -325,16 +352,16 @@ static void command_read(MemwatchShell& sh, const string& args_str) {
         data = sh.adapter->read(addr, size);
       }
 
-      if (args.size() > 2) {
-        save_file(args[2], data);
+      if (filename) {
+        save_file(*filename, data);
         printf("%s @ %016" PRIX64 ":%016" PRIX64 " // %s > %s\n",
             sh.process_name.c_str(), addr, size, time_str.c_str(),
-            args[2].c_str());
+            filename->c_str());
       } else {
         printf("%s @ %016" PRIX64 ":%016" PRIX64 " // %s\n",
             sh.process_name.c_str(), addr, size, time_str.c_str());
         print_data(stdout, data.data(), data.size(), addr,
-            first_read ? NULL : prev_data->data(), sh.use_color);
+            first_read ? NULL : prev_data->data(), print_flags);
         printf("\n");
       }
 
