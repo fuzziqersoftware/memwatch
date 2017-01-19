@@ -310,7 +310,7 @@ static void command_read(MemwatchShell& sh, const string& args_str) {
   uint64_t size = stoull(args[1], NULL, 16);
 
   const string* filename = NULL;
-  uint64_t print_flags = PrintDataFlags::PrintAscii;
+  uint64_t print_flags = PrintDataFlags::PrintAscii | PrintDataFlags::UseColor;
   for (size_t x = 2; x < args.size(); x++) {
     if (args[x].empty()) {
       continue;
