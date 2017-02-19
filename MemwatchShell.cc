@@ -302,7 +302,7 @@ static void command_access(MemwatchShell& sh, const string& args_str) {
   sh.adapter->set_protection(addr, 0, prot, Protection::ALL_ACCESS);
 }
 
-// read <addr> <size>
+// read <addr> <size> [+format]
 static void command_read(MemwatchShell& sh, const string& args_str) {
 
   auto args = split_args(args_str, 2, 4);
@@ -316,7 +316,6 @@ static void command_read(MemwatchShell& sh, const string& args_str) {
       continue;
     }
     if (args[x][0] == '+') {
-      // TODO parse print options
       print_flags = 0;
       for (char ch : args[x]) {
         if (ch == '+') {
@@ -416,8 +415,8 @@ static void command_data(MemwatchShell& sh, const string& args) {
   print_data(stdout, mask.data(), mask.size());
 }
 
-// freeze [n<name>] @<address-or-result-id> <x<data>|s<size>>
-// freeze [n<name>] @<address-or-result-id> m<max-entries> <x<data>|s<size>> [Nnull-data]
+// freeze [+n<name>] <address-or-result-id> <data|+s<size>>
+// freeze [+n<name>] <address-or-result-id> +m<max-entries> <data|+s<size>> [+N null-data]
 static void command_freeze(MemwatchShell& sh, const string& args) {
 
   if (!sh.interactive) {
@@ -428,45 +427,61 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
   uint64_t addr = 0;
   uint64_t array_max_entries = 0;
   uint64_t read_size = 0;
-  string data;
-  string data_mask;
-  string null_data;
-  string null_data_mask;
+  string data_to_parse;
+  string null_data_to_parse;
+  bool reading_null_data_to_parse = false;
   for (string arg : split_args(args, 2, 0)) {
+    if (arg[0] == '+') {
+      switch (arg[1]) {
+        case 'n':
+          name = arg.substr(2);
+          break;
+        case 's':
+          read_size = stoull(arg.substr(2), NULL, 16);
+          break;
+        case 'm':
+          array_max_entries = stoull(arg.substr(2));
+          break;
+        case 'N':
+          reading_null_data_to_parse = true;
+          if (arg.size() > 2) {
+            null_data_to_parse += arg.substr(2);
+          }
+          break;
+        default:
+          throw invalid_argument("unknown option: " + arg);
+      }
 
-    if (arg[0] == 'n') {
-      name = arg.substr(1);
-    } else if (arg[0] == 's') {
-      read_size = stoull(arg.substr(1), NULL, 16);
-    } else if (arg[0] == 'm') {
-      array_max_entries = stoull(arg.substr(1));
-    } else if (arg[0] == 'N') {
-      null_data = parse_data_string(arg.substr(1), &null_data_mask);
-    } else if (arg[0] == 'x') {
-      data = parse_data_string(arg.substr(1), &data_mask);
-    } else if (arg[0] == '@') {
-      addr = get_addr_from_command(sh, arg.substr(1));
+    } else {
+      if (addr) {
+        if (reading_null_data_to_parse) {
+          null_data_to_parse += arg;
+        } else {
+          data_to_parse += arg;
+        }
+      } else {
+        addr = get_addr_from_command(sh, arg);
+      }
     }
   }
 
-  // check the arguments
-  if (data.empty() != (bool)read_size) {
-    throw invalid_argument("one of data or size must be given");
-  }
-  if (!null_data.empty() &&
-      ((null_data.size() != data.size()) || (null_data.size() != read_size))) {
-    throw invalid_argument("data and null data must have the same size");
-  }
+  // generate a name if none was given
   if (name.empty()) {
     try {
       sh.get_search();
       name = sh.current_search_name;
     } catch (const out_of_range& e) {
       name = "[no associated search]";
+    } catch (const invalid_argument& e) {
+      name = "[no associated search]";
     }
   }
 
-  // read the data if it wasn't given explicitly
+  // read the data or parse it
+  string data;
+  string data_mask;
+  string null_data;
+  string null_data_mask;
   if (read_size) {
     data.clear();
     data.resize(read_size);
@@ -476,6 +491,22 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
     {
       PauseGuard g(sh.pause_target ? sh.adapter : NULL);
       data = sh.adapter->read(addr, read_size);
+    }
+  } else {
+    data = parse_data_string(data_to_parse, &data_mask);
+    null_data = parse_data_string(null_data_to_parse, &null_data_mask);
+  }
+
+  // make sure the null args make sense
+  if (data.empty()) {
+    throw invalid_argument("no data was given");
+  }
+  if (!null_data.empty()) {
+    if (!array_max_entries) {
+      throw invalid_argument("+m must be used if null data is given");
+    }
+    if (null_data.size() != data.size()) {
+      throw invalid_argument("data and null data must have the same size");
     }
   }
 

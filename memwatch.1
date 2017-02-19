@@ -104,13 +104,13 @@ A single command (see the following sections) which will be executed instead of 
 .SH "MEMORY FREEZE COMMANDS"
 .BR memwatch " implements a memory freezer, which repeatedly writes values to the target\'s memory at a very short interval, effectively fixing the variable's value in the target process. The following commands allow manipulation of frozen variables:"
 .TP
-.BI "freeze [n" "name" "] @" address-or-result-id " x" data
-.RI "Sets a freeze on " address " with the given data. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any). " data " may not contain spaces."
+.BI "freeze [+n" "name" "] " address-or-result-id " " data
+.RI "Sets a freeze on " address " with the given data. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any)."
 .TP
-.BI "freeze [n" "name" "] @" address-or-result-id " s" size
+.BI "freeze [+n" "name" "] " address-or-result-id " +s" size
 .RI "Identical to the above command, but uses the data already present in the process's memory. Size is specified in hexadecimal."
 .TP
-.BI "freeze [n" "name" "] @" address-or-result-id " m" max-entries " x" data " [N" null-data "]"
+.BI "freeze [+n" "name" "] " address-or-result-id " +m" max-entries " " data " [+N " null-data "]"
 .RI "Sets a freeze on an array of " max-entries " items starting at " address " with the given data. If " data " is not present in the array, the first null entry in the array is overwritten with " data ". Null entries are those whose contents are entirely zeroes, or whose contents match " null-data " if " null-data " is given. The size of each array element is assumed to be the size of " data ". " data " and " null-data " must have equal sizes."
 .TP
 .BI "unfreeze [" "id" "]"
