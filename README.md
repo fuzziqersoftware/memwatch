@@ -126,7 +126,7 @@ memwatch:90732/DOSBox 1s/0f bombs(1) #
 
 This single result must be the variable that represents the number of bombs we have. Now we freeze that address at a nonzero value (`s0` refers to the first result in the current search):
 ```
-memwatch:90732/DOSBox 1s/0f bombs:uint8(1) # freeze @s0 x01
+memwatch:90732/DOSBox 1s/0f bombs:uint8(1) # freeze s0 01
 region frozen
 ```
 
