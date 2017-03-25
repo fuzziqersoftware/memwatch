@@ -1296,7 +1296,6 @@ int MemwatchShell::execute_commands() {
   stifle_history(HISTORY_FILE_LENGTH);
 
   // while we have stuff to do...
-  unique_ptr<char> command;
   while (this->run) {
 
     // decide what to prompt the user with (include the seearch name if a search
@@ -1334,20 +1333,26 @@ int MemwatchShell::execute_commands() {
 
     // read a command and add it to the command history
     // command can be NULL if ctrl+d was pressed - just exit in that case
-    command.reset(readline(prompt.c_str()));
-    if (!command.get()) {
+    char* command = readline(prompt.c_str());
+    if (!command) {
       printf(" -- exit\n");
       break;
     }
 
     // if there's a command, add it to the history
-    const char* command_to_execute = command.get() + skip_whitespace(command.get(), 0);
+    const char* command_to_execute = command + skip_whitespace(command, 0);
     if (command_to_execute && *command_to_execute) {
-      add_history(command.get());
+      add_history(command);
     }
 
     // dispatch the command
-    this->execute_command(command_to_execute);
+    try {
+      this->execute_command(command_to_execute);
+      free(command);
+    } catch (...) {
+      free(command);
+      throw;
+    }
   }
 
   write_history(history_filename.c_str());
