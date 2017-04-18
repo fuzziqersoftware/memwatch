@@ -478,42 +478,53 @@ static const unordered_map<string, MemorySearch::Type> search_type_names = {
   {"ruint64_t", MemorySearch::Type::UINT64_RE},
   {"s8",        MemorySearch::Type::INT8},
   {"i8",        MemorySearch::Type::INT8},
+  {"d8",        MemorySearch::Type::INT8},
   {"int8",      MemorySearch::Type::INT8},
   {"int8_t",    MemorySearch::Type::INT8},
   {"s16",       MemorySearch::Type::INT16},
   {"i16",       MemorySearch::Type::INT16},
+  {"d16",       MemorySearch::Type::INT16},
   {"int16",     MemorySearch::Type::INT16},
   {"int16_t",   MemorySearch::Type::INT16},
   {"rs16",      MemorySearch::Type::INT16_RE},
   {"ri16",      MemorySearch::Type::INT16_RE},
+  {"rd16",      MemorySearch::Type::INT16_RE},
   {"rint16",    MemorySearch::Type::INT16_RE},
   {"rint16_t",  MemorySearch::Type::INT16_RE},
   {"s32",       MemorySearch::Type::INT32},
   {"i32",       MemorySearch::Type::INT32},
+  {"d32",       MemorySearch::Type::INT32},
   {"int32",     MemorySearch::Type::INT32},
   {"int32_t",   MemorySearch::Type::INT32},
   {"rs32",      MemorySearch::Type::INT32_RE},
   {"ri32",      MemorySearch::Type::INT32_RE},
+  {"rd32",      MemorySearch::Type::INT32_RE},
   {"rint32",    MemorySearch::Type::INT32_RE},
   {"rint32_t",  MemorySearch::Type::INT32_RE},
   {"s64",       MemorySearch::Type::INT64},
   {"i64",       MemorySearch::Type::INT64},
+  {"d64",       MemorySearch::Type::INT64},
   {"int64",     MemorySearch::Type::INT64},
   {"int64_t",   MemorySearch::Type::INT64},
   {"rs64",      MemorySearch::Type::INT64_RE},
   {"ri64",      MemorySearch::Type::INT64_RE},
+  {"rd64",      MemorySearch::Type::INT64_RE},
   {"rint64",    MemorySearch::Type::INT64_RE},
   {"rint64_t",  MemorySearch::Type::INT64_RE},
   {"f",         MemorySearch::Type::FLOAT},
+  {"fl",        MemorySearch::Type::FLOAT},
   {"flt",       MemorySearch::Type::FLOAT},
   {"float",     MemorySearch::Type::FLOAT},
   {"rf",        MemorySearch::Type::FLOAT_RE},
+  {"rfl",       MemorySearch::Type::FLOAT_RE},
   {"rflt",      MemorySearch::Type::FLOAT_RE},
   {"rfloat",    MemorySearch::Type::FLOAT_RE},
   {"d",         MemorySearch::Type::DOUBLE},
+  {"db",        MemorySearch::Type::DOUBLE},
   {"dbl",       MemorySearch::Type::DOUBLE},
   {"double",    MemorySearch::Type::DOUBLE},
   {"rd",        MemorySearch::Type::DOUBLE_RE},
+  {"rdb",       MemorySearch::Type::DOUBLE_RE},
   {"rdbl",      MemorySearch::Type::DOUBLE_RE},
   {"rdouble",   MemorySearch::Type::DOUBLE_RE},
   {"s",         MemorySearch::Type::DATA},
@@ -545,15 +556,20 @@ const char* MemorySearch::name_for_search_predicate(MemorySearch::Predicate pred
 
 static const unordered_map<string, MemorySearch::Predicate> search_predicate_names = {
   {"<",   MemorySearch::Predicate::LESS},
+  {"!>=", MemorySearch::Predicate::LESS},
   {">",   MemorySearch::Predicate::GREATER},
+  {"!<=", MemorySearch::Predicate::GREATER},
   {"<=",  MemorySearch::Predicate::LESS_OR_EQUAL},
+  {"!>",  MemorySearch::Predicate::LESS_OR_EQUAL},
   {">=",  MemorySearch::Predicate::GREATER_OR_EQUAL},
+  {"!<",  MemorySearch::Predicate::GREATER_OR_EQUAL},
   {"=",   MemorySearch::Predicate::EQUAL},
   {"==",  MemorySearch::Predicate::EQUAL},
   {"===", MemorySearch::Predicate::EQUAL}, // lol javascript
   {"!=",  MemorySearch::Predicate::NOT_EQUAL},
   {"<>",  MemorySearch::Predicate::NOT_EQUAL},
   {"$",   MemorySearch::Predicate::FLAG},
+  {"&",   MemorySearch::Predicate::FLAG},
   {".",   MemorySearch::Predicate::ALL},
 };
 
@@ -565,12 +581,12 @@ MemorySearch::Predicate MemorySearch::search_predicate_for_name(const char* name
   }
 }
 
-// returns 1 if the given type is an integral search type
+// returns true if the given type is an integral search type
 bool MemorySearch::is_integer_search_type(MemorySearch::Type type) {
   return ((int)type >= 0) && ((int)type < (int)Type::FLOAT);
 }
 
-// returns 1 if the given type is a reverse-endian search type
+// returns true if the given type is a reverse-endian search type
 bool MemorySearch::is_reverse_endian_search_type(MemorySearch::Type type) {
   return (type == Type::UINT16_RE) || (type == Type::INT16_RE) ||
          (type == Type::UINT32_RE) || (type == Type::INT32_RE) ||
