@@ -790,7 +790,7 @@ static void command_results(MemwatchShell& sh, const string& args) {
   } while (sh.watch && !s.is_signaled());
 }
 
-// delete <addr1> [addr2]
+// delete <spec> [spec ...]
 static void command_delete(MemwatchShell& sh, const string& args_str) {
   if (!sh.interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
@@ -801,13 +801,30 @@ static void command_delete(MemwatchShell& sh, const string& args_str) {
   auto args = split_args(args_str, 1, 2);
 
   // read the addresses
-  uint64_t addr1 = get_addr_from_command(sh, args[0]);
-  uint64_t addr2 = (args.size() == 2) ? get_addr_from_command(sh, args[1]) : (addr1 + 1);
-  if (addr1 > addr2) {
-    throw invalid_argument("range is specified in decreasing order");
+  vector<pair<uint64_t, uint64_t>> to_delete;
+  to_delete.reserve(args.size());
+  for (const auto& arg : args) {
+    size_t dash_pos = arg.find('-');
+    uint64_t addr1, addr2;
+    if (dash_pos != string::npos) {
+      addr1 = get_addr_from_command(sh, arg.substr(0, dash_pos));
+      addr2 = get_addr_from_command(sh, arg.substr(dash_pos + 1));
+    } else {
+      addr1 = addr2 = get_addr_from_command(sh, arg);
+    }
+
+    if (addr1 > addr2) {
+      throw invalid_argument("range is specified in decreasing order");
+    }
+    to_delete.push_back(make_pair(addr1, addr2));
   }
 
-  search.delete_results(addr1, addr2);
+  // delete the search results
+  for (const auto& addr_pair : to_delete) {
+    search.delete_results(addr_pair.first, addr_pair.second);
+  }
+
+  // print the remaining results if there aren't too many
   if (search.get_results().size() <= 20) {
     print_search_results(sh, search);
   }

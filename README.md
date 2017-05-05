@@ -44,7 +44,7 @@ memwatch's interactive interface implements the following commands for searching
 - `search [search_name] <operator> <value>`: Reads the values of variables in the current list of results (or the named search's results, if a name is given), and filters out the results for which `new_value operator prev_value` is false. If `value` is not given, uses the value of the variable during the previous search. Valid operators are `<` (less than), `>` (greater than), `<=` (less-or-equal), `>=` (greater-or-equal), `=` (equal), `!=` (not equal), and `$` (flag search - true if the two arguments differ in only one bit). The `$` operator cannot be used in a search for a floating-point variable.
 - `search [search_name] .`: Begins a search for a variable with an unknown initial value. Once this is done, future searches can be done using the above operators.
 - `results [search_name]`: Displays the current list of results. If `search_name` is given, displays the results for that search. The command may be prepended with `watch` to read new values every second.
-- `delete <addr1> [addr2]`: If `addr2` is given, deletes all results between `addr1` and `addr2`. If `addr2` is not given, deletes the search result at `addr1`.
+- `delete <spec> [spec ...]`: Deletes specific search results. `<spec>` may be the address of a specific result to delete, or a range of addresses to delete, which is inclusive on both ends. Ranges are specified as a pair of addresses separated by a dash with no spaces. Result references like `s1` are acceptable for this command as well.
 - `set <value>`: Writes `value` to all addresses in the current result set.
 
 ### Memory freeze commands

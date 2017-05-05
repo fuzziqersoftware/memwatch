@@ -95,8 +95,8 @@ A single command (see the following sections) which will be executed instead of 
 .BI "results [" search_name "]"
 .RI "Displays the current list of results. If search_name is given, displays the results for that search. The command may be prepended with " watch " to read new values every second."
 .TP
-.BI "delete " addr1 " [" addr2 "]"
-.RI "If " addr2 " is given, deletes all results between " addr1 " and " addr2 ". If " addr2 " is not given, deletes the search result at " addr1 .
+.BI "delete " spec " [" "spec ..." "]"
+.RI "Deletes specific search results. " spec " may be the address of a specific result to delete, or a range of addresses to delete, which is inclusive on both ends. Ranges are specified as a pair of addresses separated by a dash with no spaces. Result references like " s1 " are acceptable for this command as well."
 .TP
 .BI "set " value
 .RI "Writes " value " to all addresses in the current result set."

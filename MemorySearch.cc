@@ -424,7 +424,7 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
 
 void MemorySearch::delete_results(uint64_t start, uint64_t end) {
   auto start_it = lower_bound(this->results.begin(), this->results.end(), start);
-  auto end_it = lower_bound(this->results.begin(), this->results.end(), end);
+  auto end_it = lower_bound(this->results.begin(), this->results.end(), end + 1);
   this->results.erase(start_it, end_it);
 }
 
