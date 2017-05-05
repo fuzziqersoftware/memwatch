@@ -37,7 +37,7 @@ void sigint_handler(int signum) {
 }
 
 void print_usage() {
-  printf("usage: memwatch [-c] [-p] [-nX] pid_or_name [command ...]\n");
+  printf("usage: memwatch [options] pid_or_name [command ...]\n");
   printf("see `man memwatch` for more information\n");
 }
 

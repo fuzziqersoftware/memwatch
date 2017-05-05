@@ -13,7 +13,7 @@ If it doesn't work on your system, let me know. It should build and run on all r
 
 ## Running
 
-Run `sudo memwatch <target_name_or_pid>`. If you give a name, memwatch will search the list of running processes to find one that matches this name (case-insensitive). If multiple processes match the name, it will fail - try giving a pid instead. See the man page (`man memwatch` after building and installing) for more options.
+Run `sudo memwatch <target_name_or_pid>`. If you give a name, memwatch will search the list of running processes to find one that matches this name (case-insensitive). If multiple processes match the name, it will ask you which one to operate on. See the man page (`man memwatch` after building and installing) for more options.
 
 Upon running memwatch, you'll see a debugger-like prompt like `memwatch:48536/VirtualBoxVM 0s/0f # `. This prompt shows the pid of the attached process, the process name, the number of open searches, and the number of frozen memory regions.
 
