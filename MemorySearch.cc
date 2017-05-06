@@ -454,6 +454,31 @@ const char* MemorySearch::name_for_search_type(MemorySearch::Type type) {
   return "unknown";
 }
 
+const char* MemorySearch::short_name_for_search_type(MemorySearch::Type type) {
+  switch (type) {
+    case Type::UINT8:     return "u8";
+    case Type::UINT16:    return "u16";
+    case Type::UINT16_RE: return "ru16";
+    case Type::UINT32:    return "u32";
+    case Type::UINT32_RE: return "ru32";
+    case Type::UINT64:    return "u64";
+    case Type::UINT64_RE: return "ru64";
+    case Type::INT8:      return "s8";
+    case Type::INT16:     return "s16";
+    case Type::INT16_RE:  return "rs16";
+    case Type::INT32:     return "s32";
+    case Type::INT32_RE:  return "rs32";
+    case Type::INT64:     return "s64";
+    case Type::INT64_RE:  return "rs64";
+    case Type::FLOAT:     return "f";
+    case Type::FLOAT_RE:  return "rf";
+    case Type::DOUBLE:    return "d";
+    case Type::DOUBLE_RE: return "rd";
+    case Type::DATA:      return "a";
+  }
+  return "unknown";
+}
+
 static const unordered_map<string, MemorySearch::Type> search_type_names = {
   {"u8",        MemorySearch::Type::UINT8},
   {"uint8",     MemorySearch::Type::UINT8},
@@ -515,18 +540,35 @@ static const unordered_map<string, MemorySearch::Type> search_type_names = {
   {"fl",        MemorySearch::Type::FLOAT},
   {"flt",       MemorySearch::Type::FLOAT},
   {"float",     MemorySearch::Type::FLOAT},
+  {"f32",       MemorySearch::Type::FLOAT},
+  {"fl32",      MemorySearch::Type::FLOAT},
+  {"flt32",     MemorySearch::Type::FLOAT},
+  {"float32",   MemorySearch::Type::FLOAT},
   {"rf",        MemorySearch::Type::FLOAT_RE},
   {"rfl",       MemorySearch::Type::FLOAT_RE},
   {"rflt",      MemorySearch::Type::FLOAT_RE},
   {"rfloat",    MemorySearch::Type::FLOAT_RE},
+  {"rf32",      MemorySearch::Type::FLOAT_RE},
+  {"rfl32",     MemorySearch::Type::FLOAT_RE},
+  {"rflt32",    MemorySearch::Type::FLOAT_RE},
+  {"rfloat32",  MemorySearch::Type::FLOAT_RE},
+  {"f64",       MemorySearch::Type::DOUBLE},
+  {"fl64",      MemorySearch::Type::DOUBLE},
+  {"flt64",     MemorySearch::Type::DOUBLE},
+  {"float64",   MemorySearch::Type::DOUBLE},
   {"d",         MemorySearch::Type::DOUBLE},
   {"db",        MemorySearch::Type::DOUBLE},
   {"dbl",       MemorySearch::Type::DOUBLE},
   {"double",    MemorySearch::Type::DOUBLE},
+  {"rf64",      MemorySearch::Type::DOUBLE_RE},
+  {"rfl64",     MemorySearch::Type::DOUBLE_RE},
+  {"rflt64",    MemorySearch::Type::DOUBLE_RE},
+  {"rfloat64",  MemorySearch::Type::DOUBLE_RE},
   {"rd",        MemorySearch::Type::DOUBLE_RE},
   {"rdb",       MemorySearch::Type::DOUBLE_RE},
   {"rdbl",      MemorySearch::Type::DOUBLE_RE},
   {"rdouble",   MemorySearch::Type::DOUBLE_RE},
+  {"a",         MemorySearch::Type::DATA},
   {"s",         MemorySearch::Type::DATA},
   {"str",       MemorySearch::Type::DATA},
   {"string",    MemorySearch::Type::DATA},

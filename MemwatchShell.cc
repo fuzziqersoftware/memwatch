@@ -1327,18 +1327,18 @@ int MemwatchShell::execute_commands() {
         prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s # ", this->pid,
             this->process_name.c_str(), this->name_to_search.size(),
             this->freezer->frozen_count(), search_name,
-            MemorySearch::name_for_search_type(s.get_type()));
+            MemorySearch::short_name_for_search_type(s.get_type()));
       } else if (!s.has_valid_results()) {
         prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s(+) # ", this->pid,
             this->process_name.c_str(), this->name_to_search.size(),
             this->freezer->frozen_count(), search_name,
-            MemorySearch::name_for_search_type(s.get_type()),
+            MemorySearch::short_name_for_search_type(s.get_type()),
             s.get_results().size());
       } else {
         prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s(%llu) # ", this->pid,
             this->process_name.c_str(), this->name_to_search.size(),
             this->freezer->frozen_count(), search_name,
-            MemorySearch::name_for_search_type(s.get_type()),
+            MemorySearch::short_name_for_search_type(s.get_type()),
             s.get_results().size());
       }
 

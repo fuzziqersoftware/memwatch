@@ -65,6 +65,7 @@ public:
   void delete_results(uint64_t start, uint64_t end);
 
   static const char* name_for_search_type(Type type);
+  static const char* short_name_for_search_type(Type type);
   static Type search_type_for_name(const char* name);
   static const char* name_for_search_predicate(Predicate pred);
   static Predicate search_predicate_for_name(const char* name);
