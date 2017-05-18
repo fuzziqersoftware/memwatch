@@ -798,7 +798,7 @@ static void command_delete(MemwatchShell& sh, const string& args_str) {
 
   MemorySearch& search = sh.get_search();
 
-  auto args = split_args(args_str, 1, 2);
+  auto args = split_args(args_str, 1);
 
   // read the addresses
   vector<pair<uint64_t, uint64_t>> to_delete;
