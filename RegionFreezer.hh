@@ -19,16 +19,21 @@ public:
   ~RegionFreezer();
 
   void freeze(const std::string& name, mach_vm_address_t addr,
-      const std::string& data);
+      const std::string& data, bool enable = true);
   void freeze_array(const std::string& name, mach_vm_address_t base_addr,
       size_t max_items, const std::string& data, const std::string& data_mask,
       const std::string* null_data = NULL,
-      const std::string* null_data_mask = NULL);
+      const std::string* null_data_mask = NULL, bool enable = true);
 
   size_t unfreeze_name(const std::string& name);
   size_t unfreeze_addr(mach_vm_address_t addr);
   bool unfreeze_index(size_t index);
   size_t unfreeze_all();
+
+  size_t enable_name(const std::string& name, bool enable);
+  size_t enable_addr(mach_vm_address_t addr, bool enable);
+  bool enable_index(size_t index, bool enable);
+  size_t enable_all(bool enable);
 
   size_t frozen_count() const;
 
@@ -44,9 +49,10 @@ private:
     mach_vm_address_t addr;
     std::string data;
     std::string error;
+    bool enable;
 
     Region(const std::string& name, uint64_t index, mach_vm_address_t addr,
-        const std::string& data);
+        const std::string& data, bool enable = true);
     virtual ~Region() = default;
 
     virtual void print(FILE* stream, bool with_data = false) const;
@@ -63,7 +69,8 @@ private:
 
     ArrayRegion(const std::string& name, uint64_t index, mach_vm_address_t addr,
         size_t num_items, const std::string& data, const std::string& data_mask,
-        const std::string* null_data, const std::string* null_data_mask);
+        const std::string* null_data, const std::string* null_data_mask,
+        bool enable = true);
     virtual ~ArrayRegion() = default;
 
     virtual void print(FILE* stream, bool with_data = false) const;

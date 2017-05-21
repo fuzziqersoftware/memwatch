@@ -430,6 +430,7 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
   string data_to_parse;
   string null_data_to_parse;
   bool reading_null_data_to_parse = false;
+  bool enable = true;
   for (string arg : split_args(args, 2, 0)) {
     if (arg[0] == '+') {
       switch (arg[1]) {
@@ -441,6 +442,9 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
           break;
         case 'm':
           array_max_entries = stoull(arg.substr(2));
+          break;
+        case 'd':
+          enable = false;
           break;
         case 'N':
           reading_null_data_to_parse = true;
@@ -513,13 +517,14 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
   // add it to the frozen-list
   if (array_max_entries) {
     if (null_data.empty()) {
-      sh.freezer->freeze_array(name, addr, array_max_entries, data, data_mask);
+      sh.freezer->freeze_array(name, addr, array_max_entries, data, data_mask,
+          NULL, NULL, enable);
     } else {
       sh.freezer->freeze_array(name, addr, array_max_entries, data, data_mask,
-          &null_data, &null_data_mask);
+          &null_data, &null_data_mask, enable);
     }
   } else {
-    sh.freezer->freeze(name, addr, data);
+    sh.freezer->freeze(name, addr, data, enable);
   }
 }
 
@@ -570,6 +575,66 @@ static void command_unfreeze(MemwatchShell& sh, const string& args) {
   } else {
     sh.freezer->print_regions(stdout);
   }
+}
+
+// <enable|disable> <<name>|<index>|<addr>>
+static void command_enable_disable(MemwatchShell& sh, const string& args,
+    bool enable) {
+
+  if (!sh.interactive) {
+    throw invalid_argument("this command can only be used in interactive mode");
+  }
+
+  if (args == "*") {
+    size_t num_regions = sh.freezer->enable_all(enable);
+    printf("%zu regions %s\n", num_regions, enable ? "enabled" : "disabled");
+
+  } else if (!args.empty()) {
+
+    // first try to enable/disable by name
+    size_t num_regions = sh.freezer->enable_name(args, enable);
+    if (num_regions == 1) {
+      printf("region %s\n", enable ? "enabled" : "disabled");
+      return;
+    }
+    if (num_regions > 1) {
+      printf("%zu regions %s\n", num_regions, enable ? "enabled" : "disabled");
+      return;
+    }
+
+    // if unfreezing by name didn't match any regions, enable/disable by address
+    uint64_t addr = get_addr_from_command(sh, args);
+    if (sh.freezer->enable_addr(addr, enable)) {
+      printf("region %s\n", enable ? "enabled" : "disabled");
+      return;
+    }
+
+    // if that didn't work either, try to enable/disable by index
+    size_t offset = 0;
+    uint64_t index = stoull(args, &offset);
+    if (offset == 0) {
+      throw invalid_argument("bad argument to enable/disable");
+    }
+    if (sh.freezer->enable_index(index, enable)) {
+      printf("region %s\n", enable ? "enabled" : "disabled");
+    } else {
+      throw out_of_range("no regions matched");
+    }
+
+  // else, print frozen regions
+  } else {
+    sh.freezer->print_regions(stdout);
+  }
+}
+
+// enable <<name>|<index>|<addr>>
+static void command_enable(MemwatchShell& sh, const string& args) {
+  command_enable_disable(sh, args, true);
+}
+
+// disable <<name>|<index>|<addr>>
+static void command_disable(MemwatchShell& sh, const string& args) {
+  command_enable_disable(sh, args, false);
 }
 
 // frozen [data|commands|cmds]
@@ -1209,8 +1274,16 @@ static const unordered_map<string, command_handler_t> command_handlers({
   {"data",     command_data},
   {"delete",   command_delete},
   {"del",      command_delete},
+  {"disable",  command_disable},
+  {"dis",      command_disable},
+  {"di",       command_disable},
+  {"d",        command_disable},
   {"dump",     command_dump},
-  {"d",        command_dump},
+  {"dmp",      command_dump},
+  {"enable",   command_enable},
+  {"ena",      command_enable},
+  {"en",       command_enable},
+  {"e",        command_enable},
   {"find",     command_find},
   {"fi",       command_find},
   {"fork",     command_fork},
@@ -1258,8 +1331,8 @@ static const unordered_map<string, command_handler_t> command_handlers({
   {"wr",       command_write},
   {"w",        command_write},
   {"x",        command_results},
-  {"-",        command_pause},
-  {"+",        command_resume},
+  {"-",        command_disable},
+  {"+",        command_enable},
 });
 
 

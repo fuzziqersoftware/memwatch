@@ -104,20 +104,26 @@ A single command (see the following sections) which will be executed instead of 
 .SH "MEMORY FREEZE COMMANDS"
 .BR memwatch " implements a memory freezer, which repeatedly writes values to the target\'s memory at a very short interval, effectively fixing the variable's value in the target process. The following commands allow manipulation of frozen variables:"
 .TP
-.BI "freeze [+n" "name" "] " address-or-result-id " " data
+.BI "freeze [+n" "name" "] " address-or-result-id " " data " " "[+d]"
 .RI "Sets a freeze on " address " with the given data. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any)."
 .TP
-.BI "freeze [+n" "name" "] " address-or-result-id " +s" size
+.BI "freeze [+n" "name" "] " address-or-result-id " +s" size " " "[+d]"
 .RI "Identical to the above command, but uses the data already present in the process's memory. Size is specified in hexadecimal."
 .TP
-.BI "freeze [+n" "name" "] " address-or-result-id " +m" max-entries " " data " [+N " null-data "]"
+.BI "freeze [+n" "name" "] " address-or-result-id " +m" max-entries " " data " [+N" null-data "] " "[+d]"
 .RI "Sets a freeze on an array of " max-entries " items starting at " address " with the given data. If " data " is not present in the array, the first null entry in the array is overwritten with " data ". Null entries are those whose contents are entirely zeroes, or whose contents match " null-data " if " null-data " is given. The size of each array element is assumed to be the size of " data ". " data " and " null-data " must have equal sizes."
 .TP
 .BI "unfreeze [" "id" "]"
 .RI "If " id " is not given, displays the list of currently-frozen regions. Otherwise, " id " may be the index, address, or name of the region to unfreeze. If a name is given and multiple regions have the same name, unfreezes all of them. If * is given, unfreezes all regions."
 .TP
+.BI "enable " id
+.RI "Enables the given frozen regions, so their values will be written. Values for " id " are specified in the same way as for the " unfreeze " command."
+.TP
+.BI "disable " id
+.RI "Disables the given frozen regions, so their values will not be written. Values for " id " are specified in the same way as for the " unfreeze " command."
+.TP
 .BI "frozen [data | commands]"
-.RB "Displays the list of currently-frozen regions. If run as " "frozen data" ", displays the data associated with each region as well. If run as " "frozen commands" ", displays for each frozen region a command to freeze that region (this is generally a more concise way to view frozen regions with their data)."
+.RI "Displays the list of currently-frozen regions. If run as " "frozen data" ", displays the data associated with each region as well. If run as " "frozen commands" ", displays for each frozen region a command to freeze that region (this is generally a more concise way to view frozen regions with their data)."
 
 .SH "EXECUTION STATE MANAGEMENT COMMANDS"
 .BR memwatch " implements experimental support for viewing and modifying execution state in the target process, implemented by the following commands:"
@@ -159,7 +165,7 @@ Search for an unsigned 8-bit, 16-bit, 32-bit, or 64-bit value.
 Search for a signed 8-bit, 16-bit, 32-bit, or 64-bit value.
 
 .SH "DATA FORMAT"
-.RB "Input data for raw data searches and the " find ", " write ", and " freeze " commands is specified in a custom format, described here. You can try using this format with the " data " command (see above). Every pair of hexadecimal digits represents one byte, with special control sequences as follows:"
+.RI "Input data for raw data searches and the " find ", " write ", and " freeze " commands is specified in a custom format, described here. You can try using this format with the " data " command (see above). Every pair of hexadecimal digits represents one byte, with special control sequences as follows:"
 .TP
 .B Decimal integers
 A decimal integer may be specified by preceding it with # signs (# for a single byte, ## for a 16-bit int, ### for a 32-bit int, or #### for a 64-bit int).
@@ -177,7 +183,7 @@ A string enclosed in < > will be treated as a filename, and will be replaced wit
 A dollar sign ($) inverts the endianness of the data following it. This applies to unicode string literals, integers specified with # signs, and floating-point numbers.
 .TP
 .B Wildcard
-.RB "Any data between question marks (?) will match any byte when searching with the " find " command or freezing array entries with the " "freeze array" " command. This is not yet implemented for the " search " command."
+.RI "Any data between question marks (?) will match any byte when searching with the " find " command or freezing array entries with the " "freeze array" " command. This is not yet implemented for the " search " command."
 .TP
 .B Comments
 Comments are formatted in C-style blocks; anything between /* and */ will be omitted from the output string, as well as anything between // and a newline (though this format is rarely used since commands are delimited by newlines). Comments cannot be nested.

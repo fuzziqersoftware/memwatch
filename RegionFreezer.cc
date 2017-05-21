@@ -46,22 +46,23 @@ RegionFreezer::~RegionFreezer() {
 }
 
 void RegionFreezer::freeze(const string& name, mach_vm_address_t addr,
-    const string& data) {
-  shared_ptr<Region> rgn(new Region(name, this->next_index++, addr, data));
+    const string& data, bool enable) {
+  shared_ptr<Region> rgn(new Region(name, this->next_index++, addr, data,
+      enable));
   this->add_region(rgn);
 }
 
 void RegionFreezer::freeze_array(const string& name,
     mach_vm_address_t base_addr, size_t max_items, const string& data,
     const string& data_mask, const string* null_data,
-    const string* null_data_mask) {
+    const string* null_data_mask, bool enable) {
   shared_ptr<Region> rgn(new ArrayRegion(name, this->next_index++, base_addr,
-      max_items, data, data_mask, null_data, null_data_mask));
+      max_items, data, data_mask, null_data, null_data_mask, enable));
   this->add_region(rgn);
 }
 
 template <typename K, typename V>
-void erase_by_value(unordered_multimap<K, V>& m, K& k, V& v) {
+static void erase_by_value(unordered_multimap<K, V>& m, K& k, V& v) {
   auto its = m.equal_range(k);
   for (auto it = its.first; it != its.second;) {
     if (it->second == v) {
@@ -124,6 +125,67 @@ size_t RegionFreezer::unfreeze_all() {
   return num_regions;
 }
 
+size_t RegionFreezer::enable_name(const string& name, bool enable) {
+  size_t num_changed = 0;
+
+  rw_guard g(this->lock, true);
+  auto its = this->regions_by_name.equal_range(name);
+  for (auto it = its.first; it != its.second; it++) {
+    if (it->second->enable == enable) {
+      continue;
+    }
+    it->second->enable = enable;
+    num_changed++;
+  }
+
+  return num_changed;
+}
+
+size_t RegionFreezer::enable_addr(mach_vm_address_t addr, bool enable) {
+  size_t num_changed = 0;
+
+  rw_guard g(this->lock, true);
+  auto its = this->regions_by_addr.equal_range(addr);
+  for (auto it = its.first; it != its.second; it++) {
+    if (it->second->enable == enable) {
+      continue;
+    }
+    it->second->enable = enable;
+    num_changed++;
+  }
+
+  return num_changed;
+}
+
+bool RegionFreezer::enable_index(size_t index, bool enable) {
+  try {
+    rw_guard g(this->lock, true);
+    auto rgn = this->regions_by_index.at(index);
+    if (rgn->enable == enable) {
+      return false;
+    }
+    rgn->enable = enable;
+    return true;
+  } catch (const out_of_range& e) {
+    return false;
+  }
+}
+
+size_t RegionFreezer::enable_all(bool enable) {
+  size_t num_changed = 0;
+
+  rw_guard g(this->lock, true);
+  for (auto& it : this->regions_by_index) {
+    if (it.second->enable == enable) {
+      continue;
+    }
+    it.second->enable = enable;
+    num_changed++;
+  }
+
+  return num_changed;
+}
+
 size_t RegionFreezer::frozen_count() const {
   return this->regions_by_index.size();
 }
@@ -159,12 +221,13 @@ void RegionFreezer::print_regions_commands(FILE* stream) const {
 
 
 RegionFreezer::Region::Region(const std::string& name, uint64_t index,
-    mach_vm_address_t addr, const std::string& data) : name(name), index(index),
-    addr(addr), data(data), error() { }
+    mach_vm_address_t addr, const std::string& data, bool enable) : name(name),
+    index(index), addr(addr), data(data), error(), enable(enable) { }
 
 void RegionFreezer::Region::print(FILE* stream, bool with_data) const {
-  fprintf(stream, "%4" PRIu64 ": %016" PRIX64 ":%016zX [%s] %s\n", this->index,
-      this->addr, this->data.size(), this->error.c_str(), this->name.c_str());
+  fprintf(stream, "%4" PRIu64 ": %016" PRIX64 ":%016zX [%s] %s%s\n",
+      this->index, this->addr, this->data.size(), this->error.c_str(),
+      this->name.c_str(), this->enable ? "" : " (disabled)");
   if (with_data) {
     fprintf(stream, "data:\n");
     print_data(stream, this->data.data(), this->data.size(), this->addr);
@@ -173,8 +236,8 @@ void RegionFreezer::Region::print(FILE* stream, bool with_data) const {
 
 void RegionFreezer::Region::print_command(FILE* stream) const {
   string data = format_data_string(this->data);
-  fprintf(stream, "f n%s @%016" PRIX64 " x%s\n", this->name.c_str(), this->addr,
-      data.c_str());
+  fprintf(stream, "f +n%s %016" PRIX64 " %s%s\n", this->name.c_str(), this->addr,
+      data.c_str(), this->enable ? "" : " +d");
 }
 
 void RegionFreezer::Region::write(shared_ptr<ProcessMemoryAdapter> adapter) {
@@ -191,8 +254,9 @@ void RegionFreezer::Region::write(shared_ptr<ProcessMemoryAdapter> adapter) {
 RegionFreezer::ArrayRegion::ArrayRegion(const std::string& name, uint64_t index,
     mach_vm_address_t addr, size_t num_items, const std::string& data,
     const std::string& data_mask, const std::string* null_data,
-    const std::string* null_data_mask) : Region(name, index, addr, data),
-    num_items(num_items), data_mask(data_mask), null_data(), null_data_mask() {
+    const std::string* null_data_mask, bool enable) :
+    Region(name, index, addr, data, enable), num_items(num_items),
+    data_mask(data_mask), null_data(), null_data_mask() {
   if (null_data && null_data_mask) {
     this->null_data = *null_data;
     this->null_data_mask = *null_data_mask;
@@ -200,9 +264,10 @@ RegionFreezer::ArrayRegion::ArrayRegion(const std::string& name, uint64_t index,
 }
 
 void RegionFreezer::ArrayRegion::print(FILE* stream, bool with_data) const {
-  fprintf(stream, "%4" PRIu64 ": %016" PRIX64 ":%016zX [array:%zu] [%s] %s\n",
+  fprintf(stream, "%4" PRIu64 ": %016" PRIX64 ":%016zX [array:%zu] [%s] %s%s\n",
       this->index, this->addr, this->data.size(), this->num_items,
-      this->error.c_str(), this->name.c_str());
+      this->error.c_str(), this->name.c_str(),
+      this->enable ? "" : " (disabled)");
   if (with_data) {
     fprintf(stream, "data:\n");
     print_data(stream, this->data.data(), this->data.size());
@@ -219,8 +284,8 @@ void RegionFreezer::ArrayRegion::print(FILE* stream, bool with_data) const {
 
 void RegionFreezer::ArrayRegion::print_command(FILE* stream) const {
   string data = format_data_string(this->data, &this->data_mask);
-  fprintf(stream, "f n%s @%016" PRIX64 " m%zu x%s", this->name.c_str(),
-      this->addr, this->num_items, data.c_str());
+  fprintf(stream, "f n%s @%016" PRIX64 " m%zu x%s%s", this->name.c_str(),
+      this->addr, this->num_items, data.c_str(), this->enable ? "" : " +d");
 
   if (!this->null_data.empty() && !this->null_data_mask.empty()) {
     string null_data = format_data_string(this->null_data, &this->null_data_mask);
@@ -293,7 +358,9 @@ void RegionFreezer::run_write_thread() {
     {
       rw_guard g(this->lock, true);
       for (auto& it : this->regions_by_index) {
-        it.second->write(this->adapter);
+        if (it.second->enable) {
+          it.second->write(this->adapter);
+        }
       }
     }
     usleep(10000);
