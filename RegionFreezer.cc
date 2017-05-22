@@ -284,14 +284,14 @@ void RegionFreezer::ArrayRegion::print(FILE* stream, bool with_data) const {
 
 void RegionFreezer::ArrayRegion::print_command(FILE* stream) const {
   string data = format_data_string(this->data, &this->data_mask);
-  fprintf(stream, "f n%s @%016" PRIX64 " m%zu x%s%s", this->name.c_str(),
+  fprintf(stream, "f +n%s %016" PRIX64 " +m%zu %s%s", this->name.c_str(),
       this->addr, this->num_items, data.c_str(), this->enable ? "" : " +d");
 
   if (!this->null_data.empty() && !this->null_data_mask.empty()) {
     string null_data = format_data_string(this->null_data, &this->null_data_mask);
-    fprintf(stream, " N%s", null_data.c_str());
+    fprintf(stream, " +N%s", null_data.c_str());
   }
-  printf("\n");
+  fputc('\n', stream);
 }
 
 void RegionFreezer::ArrayRegion::write(shared_ptr<ProcessMemoryAdapter> adapter) {

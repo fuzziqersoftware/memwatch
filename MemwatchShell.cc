@@ -475,9 +475,9 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
       sh.get_search();
       name = sh.current_search_name;
     } catch (const out_of_range& e) {
-      name = "[no associated search]";
+      name = "";
     } catch (const invalid_argument& e) {
-      name = "[no associated search]";
+      name = "";
     }
   }
 
