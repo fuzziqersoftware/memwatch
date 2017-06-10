@@ -101,111 +101,106 @@ Any non-recognized characters are ignored. The initial endian-ness of the output
 
 ### Known-value search
 We're playing Supaplex in DOSBox and we want to have infinite bombs. The number of bombs that we have is displayed on the screen at all times, so we can always know how many the game thinks we have. We start memwatch and open an unsigned, small integer search:
-```
-fuzziqersoftware@pointy:~$ sudo memwatch dosbox
-memwatch:90732/DOSBox 0s/0f # open u8 bombs
-opened new u8 search named bombs
-```
+
+    fuzziqersoftware@pointy:~$ sudo memwatch dosbox
+    memwatch:90732/DOSBox 0s/0f # open u8 bombs
+    opened new u8 search named bombs
 
 Now we start playing a level on which there are a lot of bombs. We collect a few of them and search for the number we collected:
-```
-memwatch:90732/DOSBox 1s/0f bombs:uint8 # search = 3
-memwatch:90732/DOSBox 1s/0f bombs:uint8(378052) #
-```
+
+    memwatch:90732/DOSBox 1s/0f bombs:u8 # search = 3
+    memwatch:90732/DOSBox 1s/0f bombs:u8(378052) #
 
 Now we use one of the bombs, and narrow down the result set to variables that had the value 3 during the initial search but have the value 2 now:
-```
-memwatch:90732/DOSBox 1s/0f bombs:uint8(378052) # s = 2
-memwatch:90732/DOSBox 1s/0f bombs:uint8(167) #
-```
+
+    memwatch:90732/DOSBox 1s/0f bombs:u8(378052) # s = 2
+    memwatch:90732/DOSBox 1s/0f bombs:u8(167) #
 
 We use one more bomb and search again:
-```
-memwatch:90732/DOSBox 1s/0f bombs(167) # s = 1
-(0) 000000000C34E37C 1 (0x01)
-memwatch:90732/DOSBox 1s/0f bombs(1) #
-```
+
+    memwatch:90732/DOSBox 1s/0f bombs:u8(167) # s = 1
+    (0) 000000000C34E37C 1 (0x01)
+    memwatch:90732/DOSBox 1s/0f bombs:u8(1) #
 
 This single result must be the variable that represents the number of bombs we have. Now we freeze that address at a nonzero value (`s0` refers to the first result in the current search):
-```
-memwatch:90732/DOSBox 1s/0f bombs:uint8(1) # freeze s0 01
-region frozen
-```
+
+    memwatch:90732/DOSBox 1s/0f bombs:u8(1) # freeze s0 01
+    region frozen
 
 Now we have infinite bombs as long as memwatch is running, and we don't unfreeze that variable.
 
 ### Unknown-value search
 
-Paper Mario for the Nintendo 64 has a glitch whereby we can replay earlier chapters of the game, but keep all of our items and upgrades from later chapters. To trigger the glitch, we need to fall under the floor in a specific room. This is possible to do without memory editing, but very difficult to pull off without spending a lot of time setting up the necessary glitches. Instead, we can use memwatch to change our Y coordinate within the emulator.
+Paper Mario for the Nintendo 64 has a glitch whereby we can replay earlier chapters of the game, but keep all of our items and upgrades from later chapters. To trigger the glitch, we need to fall under the floor in a specific room. This is possible to do without memory editing, but very difficult to pull off without spending a lot of time setting up the necessary glitches. Instead, we can use memwatch to directly change our Y coordinate within the emulator.
 
 In this example we're using sixtyforce, but this should work for any emulator. The Nintendo 64 uses 32-bit registers, so we assume the type we need is `float`. We start memwatch, open a search, and do an initial-value search:
-```
-fuzziqersoftware@pointy:~$ sudo memwatch sixtyforce
-memwatch:91372/sixtyforce 0s/0f # open float y-coord
-memwatch:91372/sixtyforce 1s/0f y-coord:float # s .
-memwatch:91372/sixtyforce 1s/0f y-coord:float(+) #
-```
-This creates a reference point for the next search, but doesn't generate any results yet - the `+` indicates that a reference point exists for the current search. Now we jump up onto a ledge (which should increase our Y coordinate within the game) and search for increased values:
-```
-memwatch:91372/sixtyforce 1s/0f y-coord:float(+) # s >
-memwatch:91372/sixtyforce 1s/0f y-coord:float(192462) #
-```
+
+    fuzziqersoftware@pointy:~$ sudo memwatch sixtyforce
+    memwatch:91372/sixtyforce 0s/0f # open float y-coord
+    memwatch:91372/sixtyforce 1s/0f y-coord:f # s .
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(+) #
+
+This creates a reference point for the next search, but doesn't generate any results yet - `(+)` indicates that a reference point exists for the current search. Now we jump up onto a ledge (which should increase our Y coordinate within the game) and search for increased values:
+
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(+) # s >
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(192462) #
+
 Unknown-value searches tend to take longer to converge to the variables we want. We jump onto ledges, jump down, jump up again, etc., repeating until we get a manageable number of search results:
-```
-memwatch:91372/sixtyforce 1s/0f y-coord:float(192462) # s <
-memwatch:91372/sixtyforce 1s/0f y-coord:float(55813) # s >
-memwatch:91372/sixtyforce 1s/0f y-coord:float(24824) # s >
-memwatch:91372/sixtyforce 1s/0f y-coord:float(5594) # s >
-memwatch:91372/sixtyforce 1s/0f y-coord:float(1336) # s >
-memwatch:91372/sixtyforce 1s/0f y-coord:float(327) # s >
-memwatch:91372/sixtyforce 1s/0f y-coord:float(82) # s <
-memwatch:91372/sixtyforce 1s/0f y-coord:float(72) # s =
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # s >
-(0) 00000001070177A0 50.000000 (0x42480000)
-(1) 00000001082B60C0 50.000000 (0x42480000)
-(2) 00000001082F3DC0 166.129028 (0x43262108)
-(3) 00000001082F3DE4 50.000000 (0x42480000)
-(4) 00000001082F4214 50.000000 (0x42480000)
-(5) 00000001082F4228 50.000000 (0x42480000)
-(6) 0000000108350FF4 50.000000 (0x42480000)
-(7) 000000010839C580 50.000000 (0x42480000)
-(8) 00000001085534E4 50.000000 (0x42480000)
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) #
-```
+
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(192462) # s <
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(55813) # s >
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(24824) # s >
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(5594) # s >
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(1336) # s >
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(327) # s >
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(82) # s <
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(72) # s =
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # s >
+    (0) 00000001070177A0 50.000000 (0x42480000)
+    (1) 00000001082B60C0 50.000000 (0x42480000)
+    (2) 00000001082F3DC0 166.129028 (0x43262108)
+    (3) 00000001082F3DE4 50.000000 (0x42480000)
+    (4) 00000001082F4214 50.000000 (0x42480000)
+    (5) 00000001082F4228 50.000000 (0x42480000)
+    (6) 0000000108350FF4 50.000000 (0x42480000)
+    (7) 000000010839C580 50.000000 (0x42480000)
+    (8) 00000001085534E4 50.000000 (0x42480000)
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) #
+
 Now we can try changing each of these individually to see if they have any effect in the game:
-```
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # w s0 %100
-wrote 4 (0x4) bytes
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # w s1 %100
-wrote 4 (0x4) bytes
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # w s2 %100
-wrote 4 (0x4) bytes
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # w s3 %100
-wrote 4 (0x4) bytes
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # w s4 %100
-wrote 4 (0x4) bytes
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # w s5 %100
-wrote 4 (0x4) bytes
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # w s6 %100
-wrote 4 (0x4) bytes
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # w s7 %100
-wrote 4 (0x4) bytes
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # w s8 %100
-wrote 4 (0x4) bytes
-```
+
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s0 %100
+    wrote 4 (0x4) bytes
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s1 %100
+    wrote 4 (0x4) bytes
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s2 %100
+    wrote 4 (0x4) bytes
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s3 %100
+    wrote 4 (0x4) bytes
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s4 %100
+    wrote 4 (0x4) bytes
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s5 %100
+    wrote 4 (0x4) bytes
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s6 %100
+    wrote 4 (0x4) bytes
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s7 %100
+    wrote 4 (0x4) bytes
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s8 %100
+    wrote 4 (0x4) bytes
+
 When we wrote to `s6`, we suddenly jumped up into the air within the game - this must be our Y coordinate. Now that we know this, we go to the place where we want to fall under the floor, check the value at that place, and set it to a smaller value:
-```
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # x
-(0) 00000001070177A0 0.000000 (0x00000000)
-(1) 00000001082B60C0 0.000000 (0x00000000)
-(2) 00000001082F3DC0 116.129028 (0x42E84210)
-(3) 00000001082F3DE4 0.000000 (0x00000000)
-(4) 00000001082F4214 0.000000 (0x00000000)
-(5) 00000001082F4228 0.000000 (0x00000000)
-(6) 0000000108350FF4 0.000000 (0x00000000)
-(7) 000000010839C580 0.000000 (0x00000000)
-(8) 00000001085534E4 0.000000 (0x00000000)
-memwatch:91372/sixtyforce 1s/0f y-coord:float(9) # w s6 %-20
-wrote 4 (0x4) bytes
-```
+
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # x
+    (0) 00000001070177A0 0.000000 (0x00000000)
+    (1) 00000001082B60C0 0.000000 (0x00000000)
+    (2) 00000001082F3DC0 116.129028 (0x42E84210)
+    (3) 00000001082F3DE4 0.000000 (0x00000000)
+    (4) 00000001082F4214 0.000000 (0x00000000)
+    (5) 00000001082F4228 0.000000 (0x00000000)
+    (6) 0000000108350FF4 0.000000 (0x00000000)
+    (7) 000000010839C580 0.000000 (0x00000000)
+    (8) 00000001085534E4 0.000000 (0x00000000)
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s6 %-20
+    wrote 4 (0x4) bytes
+
 This causes us to fall under the floor and trigger the beginning of the story again.
