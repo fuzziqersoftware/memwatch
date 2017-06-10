@@ -949,9 +949,23 @@ static void command_search(MemwatchShell& sh, const string& args_str) {
 }
 
 // set <value>
+// set s<result-index> <value>
 static void command_set(MemwatchShell& sh, const string& args) {
   if (!sh.interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
+  }
+
+  string value_arg;
+  int64_t result_index = -1;
+  if (args[0] == 's') {
+    size_t space_pos = args.find(' ');
+    if (space_pos == string::npos) {
+      throw invalid_argument("no data was specified");
+    }
+    result_index = stoll(args.substr(1, space_pos - 1), NULL, 0);
+    value_arg = args.substr(space_pos + 1);
+  } else {
+    value_arg = args;
   }
 
   MemorySearch& search = sh.get_search();
@@ -959,14 +973,25 @@ static void command_set(MemwatchShell& sh, const string& args) {
     throw invalid_argument("no initial search performed");
   }
 
-  string data = read_typed_value(search.get_type(), args);
+  string data = read_typed_value(search.get_type(), value_arg);
   if (data.empty()) {
     throw invalid_argument("no data was specified");
   }
 
   {
     PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-    for (uint64_t result : search.get_results()) {
+    if (result_index < 0) {
+      for (uint64_t result : search.get_results()) {
+        try {
+          sh.adapter->write(result, data);
+          printf("%016" PRIX64 ": wrote %zu (0x%zX) bytes\n", result, data.size(),
+              data.size());
+        } catch (const exception& e) {
+          printf("%016" PRIX64 ": failed to write data (%s)\n", result, e.what());
+        }
+      }
+    } else {
+      uint64_t result = search.get_results().at(result_index);
       try {
         sh.adapter->write(result, data);
         printf("%016" PRIX64 ": wrote %zu (0x%zX) bytes\n", result, data.size(),

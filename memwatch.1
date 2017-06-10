@@ -100,6 +100,9 @@ A single command (see the following sections) which will be executed instead of 
 .TP
 .BI "set " value
 .RI "Writes " value " to all addresses in the current result set."
+.TP
+.BI "set " result-id " " value
+.RI "Writes " value " to one address in the current result set. " result-id " is of the form s## (like for the " write " command)."
 
 .SH "MEMORY FREEZE COMMANDS"
 .BR memwatch " implements a memory freezer, which repeatedly writes values to the target\'s memory at a very short interval, effectively fixing the variable's value in the target process. The following commands allow manipulation of frozen variables:"

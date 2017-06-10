@@ -46,6 +46,7 @@ memwatch's interactive interface implements the following commands for searching
 - `results [search_name]`: Displays the current list of results. If `search_name` is given, displays the results for that search. The command may be prepended with `watch` to read new values every second.
 - `delete <spec> [spec ...]`: Deletes specific search results. `<spec>` may be the address of a specific result to delete, or a range of addresses to delete, which is inclusive on both ends. Ranges are specified as a pair of addresses separated by a dash with no spaces. Result references like `s1` are acceptable for this command as well.
 - `set <value>`: Writes `value` to all addresses in the current result set.
+- `set <result-id> <value>`: Writes `value` to one address in the current result set. `result-id` should be of the form `s0`, `s1`, etc. (as for the `write` command).
 
 ### Memory freeze commands
 
@@ -169,23 +170,23 @@ Unknown-value searches tend to take longer to converge to the variables we want.
 
 Now we can try changing each of these individually to see if they have any effect in the game:
 
-    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s0 %100
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # set s0 100
     wrote 4 (0x4) bytes
-    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s1 %100
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # set s1 100
     wrote 4 (0x4) bytes
-    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s2 %100
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # set s2 100
     wrote 4 (0x4) bytes
-    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s3 %100
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # set s3 100
     wrote 4 (0x4) bytes
-    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s4 %100
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # set s4 100
     wrote 4 (0x4) bytes
-    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s5 %100
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # set s5 100
     wrote 4 (0x4) bytes
-    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s6 %100
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # set s6 100
     wrote 4 (0x4) bytes
-    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s7 %100
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # set s7 100
     wrote 4 (0x4) bytes
-    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s8 %100
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # set s8 100
     wrote 4 (0x4) bytes
 
 When we wrote to `s6`, we suddenly jumped up into the air within the game - this must be our Y coordinate. Now that we know this, we go to the place where we want to fall under the floor, check the value at that place, and set it to a smaller value:
@@ -200,7 +201,7 @@ When we wrote to `s6`, we suddenly jumped up into the air within the game - this
     (6) 0000000108350FF4 0.000000 (0x00000000)
     (7) 000000010839C580 0.000000 (0x00000000)
     (8) 00000001085534E4 0.000000 (0x00000000)
-    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # w s6 %-20
+    memwatch:91372/sixtyforce 1s/0f y-coord:f(9) # set s6 -20
     wrote 4 (0x4) bytes
 
 This causes us to fall under the floor and trigger the beginning of the story again.
