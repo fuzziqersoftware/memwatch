@@ -942,7 +942,7 @@ static void command_search(MemwatchShell& sh, const string& args_str) {
     }
   }
 
-  search.update(regions, predicate, value, sh.max_results);
+  search.update(regions, predicate, value, sh.max_results, stderr);
   if (search.get_results().size() <= 20) {
     print_search_results(sh, search);
   }

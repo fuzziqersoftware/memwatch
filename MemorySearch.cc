@@ -1,5 +1,6 @@
 #include "MemorySearch.hh"
 
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -189,7 +190,7 @@ static const vector<SearchTypeConfig> search_type_configs({
   {INFIX_FUNCTION_POINTERS_FOR_TYPE_RE_NOFLAG(float),  4},
   {INFIX_FUNCTION_POINTERS_FOR_TYPE_NOFLAG(double),    8},
   {INFIX_FUNCTION_POINTERS_FOR_TYPE_RE_NOFLAG(double), 8},
-  {INFIX_FUNCTION_POINTERS_FOR_TYPE(data),             0},
+  {INFIX_FUNCTION_POINTERS_FOR_TYPE(data),             1},
 });
 
 
@@ -249,7 +250,8 @@ void MemorySearch::check_can_update(Predicate predicate, const string& data_c) {
 }
 
 void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_memory,
-    Predicate predicate, const string& data_c, size_t max_results) {
+    Predicate predicate, const string& data_c, size_t max_results,
+    FILE* progress_file) {
 
   this->check_can_update(predicate, data_c);
 
@@ -272,6 +274,17 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
   // for all cells in all regions
   } else if (!this->memory) {
 
+    // if progress is requested, we'll need to know the total size
+    size_t bytes_scanned = 0;
+    string total_size_str;
+    if (progress_file) {
+      size_t total_bytes = 0;
+      for (const auto& region : *new_memory) {
+        total_bytes += region.size;
+      }
+      total_size_str = format_size(total_bytes);
+    }
+
     for (const auto& region : *new_memory) {
 
       // if the region has no data, skip it
@@ -280,7 +293,16 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
       }
 
       // for every cell in the region...
-      for (uint64_t y = 0; (y < region.size - data.size()) && (this->results.size() < max_results); y += type_config.field_size) {
+      for (uint64_t y = 0;
+           (y < region.size - data.size()) && (this->results.size() < max_results);
+           y += type_config.field_size, bytes_scanned += type_config.field_size) {
+
+        // print progress at regular intervals if requested
+        if (((y & 0x0000000000000FFF) == 0) && progress_file) {
+          string here_size_str = format_size(bytes_scanned);
+          fprintf(progress_file, "... %016" PRIX64 " [%s / %s]\r",
+              region.addr + y, here_size_str.c_str(), total_size_str.c_str());
+        }
 
         // do the comparison; skip it if it fails
         if (!evaluator(region.data.data() + y, data.data(), data.size())) {
@@ -305,17 +327,36 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
   // search useless.
   } else if (!this->results_valid) {
 
+    // if progress is requested, we'll need to know the total size
+    size_t bytes_scanned = 0;
+    string total_size_str;
+    if (progress_file) {
+      size_t total_bytes = 0;
+      for (const auto& region : *new_memory) {
+        total_bytes += region.size;
+      }
+      total_size_str = format_size(total_bytes);
+    }
+
     // for each cell, run comparison and add it to the result list if the
     // comparison succeeds
     size_t old_region_index = 0;
     for (const auto& new_region : *new_memory) {
 
       // scan over all of new_region and run comparisons where we can
-      for (uint64_t y = 0; y < new_region.size; y += type_config.field_size) {
+      for (uint64_t y = 0; y < new_region.size;
+           y += type_config.field_size, bytes_scanned += type_config.field_size) {
 
         // if this region has no data, skip it
         if (new_region.data.empty()) {
           continue;
+        }
+
+        // print progress at regular intervals if requested
+        if (((y & 0x0000000000000FFF) == 0) && progress_file) {
+          string here_size_str = format_size(bytes_scanned);
+          fprintf(progress_file, "... %016" PRIX64 " [%s / %s]\r",
+              new_region.addr + y, here_size_str.c_str(), total_size_str.c_str());
         }
 
         // move the current old region until it's not entirely before the
@@ -359,7 +400,13 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
     size_t new_region_index = 0;
     size_t num_outside_regions = 0;
     size_t num_inside_bad_regions = 0;
-    for (auto& result : this->results) {
+    for (size_t x = 0; x < this->results.size(); x++) {
+      uint64_t& result = this->results[x];
+
+      // print progress at regular intervals if requested
+      if (((x % 100) == 0) && progress_file) {
+        fprintf(progress_file, "... [%zu / %zu]\r", x, this->results.size());
+      }
 
       // move the current region until we're inside it, for both maps
       while ((new_region_index < new_memory->size()) &&
@@ -420,6 +467,14 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
   // save the prev size and memory contents
   this->prev_size = data.size();
   this->memory = new_memory;
+
+  // if we printed progress, print a done message (this message should be longer
+  // than the \r message above)
+  if (progress_file) {
+    fprintf(progress_file,
+        "... search complete; %zu regions scanned, %zu results\n",
+        this->memory->size(), this->results.size());
+  }
 }
 
 void MemorySearch::delete_results(uint64_t start, uint64_t end) {

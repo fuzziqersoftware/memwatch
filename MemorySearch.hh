@@ -61,7 +61,8 @@ public:
 
   void check_can_update(Predicate predicate, const std::string& data_c);
   void update(std::shared_ptr<std::vector<ProcessMemoryAdapter::Region>> new_memory,
-      Predicate predicate, const std::string& data, size_t max_results);
+      Predicate predicate, const std::string& data, size_t max_results,
+      FILE* progress_file = NULL);
   void delete_results(uint64_t start, uint64_t end);
 
   static const char* name_for_search_type(Type type);
