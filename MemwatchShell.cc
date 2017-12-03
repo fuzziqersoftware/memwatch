@@ -1177,7 +1177,6 @@ static void command_read_stacks(MemwatchShell& sh, const string& args_str) {
 
   Signalable s;
   do {
-    string read_data(size, 0);
     {
       PauseGuard g(sh.pause_target ? sh.adapter : NULL);
       string time_str = format_time();
@@ -1188,7 +1187,7 @@ static void command_read_stacks(MemwatchShell& sh, const string& args_str) {
             sh.process_name.c_str(), it.first, addr, size, time_str.c_str());
         try {
           string data = sh.adapter->read(addr, size);
-          print_data(stdout, read_data.data(), read_data.size(), addr);
+          print_data(stdout, data.data(), data.size(), addr);
         } catch (const exception& e) {
           printf("failed to read data (%s)\n", e.what());
         }
