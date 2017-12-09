@@ -86,7 +86,7 @@ A single command (see the following sections) which will be executed instead of 
 .BI "fork " name " [" name2 "]"
 .RI "If " name2 " is given, makes a copy of the search named " name " as " name2 ". Otherwise, makes a copy of the current search as " name .
 .TP
-.BI "search [" "search_name" "] "operator value"
+.BI "search [" "search_name" "] " operator " [" value "]"
 .RI "Reads the values of variables in the current list of results (or the named search's results, if a name is given), and filters out the results for which (new value " "operator prev value" ") is false. If " value " is not given, uses the value of the variable during the previous search. Valid operators are < (less than), > (greater than), <= (less-or-equal), >= (greater-or-equal), = (equal), != (not equal), and $ (flag search - true if the two arguments differ in only one bit). The $ operator cannot be used in a search for a floating-point variable."
 .TP
 .BI "search [" "search_name" "] ."
