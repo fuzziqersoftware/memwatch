@@ -47,8 +47,8 @@ union PrimitiveValue {
   double d;
 };
 
-static vector<string> split_args(const string& args_str, size_t min_args = 0,
-    size_t max_args = 0) {
+vector<string> MemwatchShell::split_args(const string& args_str,
+    size_t min_args, size_t max_args) {
 
   vector<string> args = split(args_str, ' ');
   if (args.size() < min_args) {
@@ -60,7 +60,8 @@ static vector<string> split_args(const string& args_str, size_t min_args = 0,
   return args;
 }
 
-static string read_typed_value(MemorySearch::Type type, const string& s) {
+string MemwatchShell::read_typed_value(MemorySearch::Type type,
+    const string& s) {
   string data_buffer(sizeof(PrimitiveValue), 0);
   PrimitiveValue* value = (PrimitiveValue*)data_buffer.data();
   if (MemorySearch::is_integer_search_type(type)) {
@@ -92,7 +93,8 @@ static string read_typed_value(MemorySearch::Type type, const string& s) {
   return data_buffer;
 }
 
-void print_regions(FILE* stream, const vector<ProcessMemoryAdapter::Region>& regions) {
+void MemwatchShell::print_regions(FILE* stream,
+    const vector<ProcessMemoryAdapter::Region>& regions) {
 
   // initialize the counters
   size_t total_error = 0, total_readable = 0, total_writable = 0,
@@ -159,9 +161,9 @@ void print_regions(FILE* stream, const vector<ProcessMemoryAdapter::Region>& reg
   fprintf(stream, "# %5zu regions, %s inaccessible\n", num_inaccessible, total_inaccessible_str.c_str());
 }
 
-uint64_t get_addr_from_command(MemwatchShell& sh, const string& args) {
+uint64_t MemwatchShell::get_addr_from_command(const string& args) {
   if (args[0] == 'x' || args[0] == 's') {
-    const auto& s = sh.get_search();
+    const auto& s = this->get_search();
 
     uint64_t index = stoull(args.substr(1));
     if (index >= s.get_results().size()) {
@@ -171,10 +173,10 @@ uint64_t get_addr_from_command(MemwatchShell& sh, const string& args) {
 
   } else if (args[0] == 't') {
     uint64_t index = stoull(args.substr(1));
-    if (index >= sh.find_results.size()) {
+    if (index >= this->find_results.size()) {
       throw invalid_argument("search does not have enough results");
     }
-    return sh.find_results[index];
+    return this->find_results[index];
   }
 
   return stoull(args, NULL, 16);
@@ -185,7 +187,7 @@ uint64_t get_addr_from_command(MemwatchShell& sh, const string& args) {
 // command handlers
 
 // help (no arguments)
-static void command_help(MemwatchShell& sh, const string& args) {
+void MemwatchShell::command_help(const string& args) {
   // this is cheating but it means I don't have to maintain two very similar
   // sets of documentation
   int retcode = system("man memwatch");
@@ -195,28 +197,28 @@ static void command_help(MemwatchShell& sh, const string& args) {
 }
 
 // list (no arguments)
-static void command_list(MemwatchShell& sh, const string& args) {
+void MemwatchShell::command_list(const string& args) {
   vector<ProcessMemoryAdapter::Region> regions;
   {
-    PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-    regions = sh.adapter->get_all_regions();
+    PauseGuard g(this->pause_target ? this->adapter : NULL);
+    regions = this->adapter->get_all_regions();
   }
-  print_regions(stdout, regions);
+  this->print_regions(stdout, regions);
 }
 
 // watch <command> [args...]
-static void command_watch(MemwatchShell& sh, const string& args) {
-  sh.watch = 1;
-  sh.execute_command(args);
-  sh.watch = 0;
+void MemwatchShell::command_watch(const string& args) {
+  this->watch = 1;
+  this->execute_command(args);
+  this->watch = 0;
 }
 
 // dump [filename_prefix]
-static void command_dump(MemwatchShell& sh, const string& args) {
+void MemwatchShell::command_dump(const string& args) {
   vector<ProcessMemoryAdapter::Region> regions;
   {
-    PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-    regions = sh.adapter->get_all_regions(true);
+    PauseGuard g(this->pause_target ? this->adapter : NULL);
+    regions = this->adapter->get_all_regions(true);
   }
 
   if (!args.empty()) {
@@ -239,11 +241,11 @@ static void command_dump(MemwatchShell& sh, const string& args) {
 }
 
 // find <data>
-static void command_find(MemwatchShell& sh, const string& args) {
+void MemwatchShell::command_find(const string& args) {
   vector<ProcessMemoryAdapter::Region> regions;
   {
-    PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-    regions = sh.adapter->get_all_regions(true);
+    PauseGuard g(this->pause_target ? this->adapter : NULL);
+    regions = this->adapter->get_all_regions(true);
   }
 
   string mask;
@@ -252,7 +254,7 @@ static void command_find(MemwatchShell& sh, const string& args) {
     throw invalid_argument("no data was specified");
   }
 
-  sh.find_results.clear();
+  this->find_results.clear();
 
   for (const auto& region : regions) {
     if (region.data.empty()) {
@@ -269,21 +271,21 @@ static void command_find(MemwatchShell& sh, const string& args) {
       }
 
       if (z == data.size()) {
-        printf("(%zu) %016" PRIX64 " (%c%c%c)\n", sh.find_results.size(),
+        printf("(%zu) %016" PRIX64 " (%c%c%c)\n", this->find_results.size(),
             region.addr + y,
             (region.protection & Protection::READABLE) ? 'r' : '-',
             (region.protection & Protection::WRITABLE) ? 'w' : '-',
             (region.protection & Protection::EXECUTABLE) ? 'x' : '-');
-        sh.find_results.emplace_back(region.addr + y);
+        this->find_results.emplace_back(region.addr + y);
       }
     }
   }
 }
 
 // access <addr> [mode]
-static void command_access(MemwatchShell& sh, const string& args_str) {
+void MemwatchShell::command_access(const string& args_str) {
 
-  auto args = split_args(args_str, 1, 2);
+  auto args = this->split_args(args_str, 1, 2);
 
   uint8_t prot = Protection::ALL_ACCESS;
   if (args.size() > 1) {
@@ -299,15 +301,15 @@ static void command_access(MemwatchShell& sh, const string& args_str) {
     }
   }
 
-  uint64_t addr = get_addr_from_command(sh, args[0]);
-  sh.adapter->set_protection(addr, 0, prot, Protection::ALL_ACCESS);
+  uint64_t addr = this->get_addr_from_command(args[0]);
+  this->adapter->set_protection(addr, 0, prot, Protection::ALL_ACCESS);
 }
 
 // read <addr> <size> [+format]
-static void command_read(MemwatchShell& sh, const string& args_str) {
+void MemwatchShell::command_read(const string& args_str) {
 
-  auto args = split_args(args_str, 2, 4);
-  uint64_t addr = get_addr_from_command(sh, args[0]);
+  auto args = this->split_args(args_str, 2, 4);
+  uint64_t addr = this->get_addr_from_command(args[0]);
   uint64_t size = stoull(args[1], NULL, 16);
 
   const string* filename = NULL;
@@ -339,7 +341,7 @@ static void command_read(MemwatchShell& sh, const string& args_str) {
   // allocate a local read buffer, and a buffer for the previous data if we're
   // repeating the read
   string data(size, 0);
-  unique_ptr<string> prev_data(sh.watch ? new string(size, 0) : NULL);
+  unique_ptr<string> prev_data(this->watch ? new string(size, 0) : NULL);
 
   // go ahead and read the target's memory
   bool first_read = true;
@@ -348,18 +350,18 @@ static void command_read(MemwatchShell& sh, const string& args_str) {
     string time_str = format_time();
     try {
       {
-        PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-        data = sh.adapter->read(addr, size);
+        PauseGuard g(this->pause_target ? this->adapter : NULL);
+        data = this->adapter->read(addr, size);
       }
 
       if (filename) {
         save_file(*filename, data);
         printf("%s @ %016" PRIX64 ":%016" PRIX64 " // %s > %s\n",
-            sh.process_name.c_str(), addr, size, time_str.c_str(),
+            this->process_name.c_str(), addr, size, time_str.c_str(),
             filename->c_str());
       } else {
         printf("%s @ %016" PRIX64 ":%016" PRIX64 " // %s\n",
-            sh.process_name.c_str(), addr, size, time_str.c_str());
+            this->process_name.c_str(), addr, size, time_str.c_str());
         print_data(stdout, data.data(), data.size(), addr,
             first_read ? NULL : prev_data->data(), print_flags);
         printf("\n");
@@ -367,10 +369,10 @@ static void command_read(MemwatchShell& sh, const string& args_str) {
 
     } catch (const exception& e) {
       printf("%s @ %016" PRIX64 ":%016" PRIX64 " // %s // failed [%s]\n",
-          sh.process_name.c_str(), addr, size, time_str.c_str(), e.what());
+          this->process_name.c_str(), addr, size, time_str.c_str(), e.what());
     }
 
-    if (sh.watch) {
+    if (this->watch) {
       usleep(1000000); // wait a second before repeating the read
     }
 
@@ -379,12 +381,12 @@ static void command_read(MemwatchShell& sh, const string& args_str) {
     }
     first_read = false;
 
-  } while (sh.watch && !s.is_signaled());
+  } while (this->watch && !s.is_signaled());
 }
 
 // write <addr> <data>
-static void command_write(MemwatchShell& sh, const string& args) {
-  uint64_t addr = get_addr_from_command(sh, args);
+void MemwatchShell::command_write(const string& args) {
+  uint64_t addr = this->get_addr_from_command(args);
 
   size_t offset = skip_whitespace(args, skip_non_whitespace(args, 0));
   string data = parse_data_string(args.substr(offset));
@@ -393,8 +395,8 @@ static void command_write(MemwatchShell& sh, const string& args) {
   }
 
   try {
-    PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-    sh.adapter->write(addr, data);
+    PauseGuard g(this->pause_target ? this->adapter : NULL);
+    this->adapter->write(addr, data);
     printf("wrote %zu (0x%zX) bytes\n", data.size(), data.size());
 
   } catch (const exception& e) {
@@ -403,7 +405,7 @@ static void command_write(MemwatchShell& sh, const string& args) {
 }
 
 // data <data>
-static void command_data(MemwatchShell& sh, const string& args) {
+void MemwatchShell::command_data(const string& args) {
   string mask;
   string data = parse_data_string(args, &mask);
   if (data.empty()) {
@@ -418,9 +420,9 @@ static void command_data(MemwatchShell& sh, const string& args) {
 
 // freeze [+n<name>] <address-or-result-id> <data|+s<size>>
 // freeze [+n<name>] <address-or-result-id> +m<max-entries> <data|+s<size>> [+N null-data]
-static void command_freeze(MemwatchShell& sh, const string& args) {
+void MemwatchShell::command_freeze(const string& args) {
 
-  if (!sh.interactive) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
@@ -432,7 +434,7 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
   string null_data_to_parse;
   bool reading_null_data_to_parse = false;
   bool enable = true;
-  for (string arg : split_args(args, 2, 0)) {
+  for (string arg : this->split_args(args, 2, 0)) {
     if (arg[0] == '+') {
       switch (arg[1]) {
         case 'n':
@@ -465,7 +467,7 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
           data_to_parse += arg;
         }
       } else {
-        addr = get_addr_from_command(sh, arg);
+        addr = this->get_addr_from_command(arg);
       }
     }
   }
@@ -473,8 +475,8 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
   // generate a name if none was given
   if (name.empty()) {
     try {
-      sh.get_search();
-      name = sh.current_search_name;
+      this->get_search();
+      name = this->current_search_name;
     } catch (const out_of_range& e) {
       name = "";
     } catch (const invalid_argument& e) {
@@ -494,8 +496,8 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
     data_mask.resize(read_size, 0xFF);
 
     {
-      PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-      data = sh.adapter->read(addr, read_size);
+      PauseGuard g(this->pause_target ? this->adapter : NULL);
+      data = this->adapter->read(addr, read_size);
     }
   } else {
     data = parse_data_string(data_to_parse, &data_mask);
@@ -518,32 +520,32 @@ static void command_freeze(MemwatchShell& sh, const string& args) {
   // add it to the frozen-list
   if (array_max_entries) {
     if (null_data.empty()) {
-      sh.freezer->freeze_array(name, addr, array_max_entries, data, data_mask,
-          NULL, NULL, enable);
+      this->freezer->freeze_array(name, addr, array_max_entries, data,
+          data_mask, NULL, NULL, enable);
     } else {
-      sh.freezer->freeze_array(name, addr, array_max_entries, data, data_mask,
-          &null_data, &null_data_mask, enable);
+      this->freezer->freeze_array(name, addr, array_max_entries, data,
+          data_mask, &null_data, &null_data_mask, enable);
     }
   } else {
-    sh.freezer->freeze(name, addr, data, enable);
+    this->freezer->freeze(name, addr, data, enable);
   }
 }
 
 // unfreeze <<name>|<index>|<addr>>
-static void command_unfreeze(MemwatchShell& sh, const string& args) {
+void MemwatchShell::command_unfreeze(const string& args) {
 
-  if (!sh.interactive) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
   if (args == "*") {
-    size_t num_regions = sh.freezer->unfreeze_all();
+    size_t num_regions = this->freezer->unfreeze_all();
     printf("%zu regions unfrozen\n", num_regions);
 
   } else if (!args.empty()) {
 
     // first try to unfreeze by name
-    size_t num_regions = sh.freezer->unfreeze_name(args);
+    size_t num_regions = this->freezer->unfreeze_name(args);
     if (num_regions == 1) {
       printf("region unfrozen\n");
       return;
@@ -554,8 +556,8 @@ static void command_unfreeze(MemwatchShell& sh, const string& args) {
     }
 
     // if unfreezing by name didn't match any regions, unfreeze by address
-    uint64_t addr = get_addr_from_command(sh, args);
-    if (sh.freezer->unfreeze_addr(addr)) {
+    uint64_t addr = this->get_addr_from_command(args);
+    if (this->freezer->unfreeze_addr(addr)) {
       printf("region unfrozen\n");
       return;
     }
@@ -566,7 +568,7 @@ static void command_unfreeze(MemwatchShell& sh, const string& args) {
     if (offset == 0) {
       throw invalid_argument("bad argument to unfreeze");
     }
-    if (sh.freezer->unfreeze_index(index)) {
+    if (this->freezer->unfreeze_index(index)) {
       printf("region unfrozen\n");
     } else {
       throw out_of_range("no regions matched");
@@ -574,26 +576,26 @@ static void command_unfreeze(MemwatchShell& sh, const string& args) {
 
   // else, print frozen regions
   } else {
-    sh.freezer->print_regions(stdout);
+    this->freezer->print_regions(stdout);
   }
 }
 
 // <enable|disable> <<name>|<index>|<addr>>
-static void command_enable_disable(MemwatchShell& sh, const string& args,
+void MemwatchShell::command_enable_disable(const string& args,
     bool enable) {
 
-  if (!sh.interactive) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
   if (args == "*") {
-    size_t num_regions = sh.freezer->enable_all(enable);
+    size_t num_regions = this->freezer->enable_all(enable);
     printf("%zu regions %s\n", num_regions, enable ? "enabled" : "disabled");
 
   } else if (!args.empty()) {
 
     // first try to enable/disable by name
-    size_t num_regions = sh.freezer->enable_name(args, enable);
+    size_t num_regions = this->freezer->enable_name(args, enable);
     if (num_regions == 1) {
       printf("region %s\n", enable ? "enabled" : "disabled");
       return;
@@ -604,8 +606,8 @@ static void command_enable_disable(MemwatchShell& sh, const string& args,
     }
 
     // if unfreezing by name didn't match any regions, enable/disable by address
-    uint64_t addr = get_addr_from_command(sh, args);
-    if (sh.freezer->enable_addr(addr, enable)) {
+    uint64_t addr = this->get_addr_from_command(args);
+    if (this->freezer->enable_addr(addr, enable)) {
       printf("region %s\n", enable ? "enabled" : "disabled");
       return;
     }
@@ -616,7 +618,7 @@ static void command_enable_disable(MemwatchShell& sh, const string& args,
     if (offset == 0) {
       throw invalid_argument("bad argument to enable/disable");
     }
-    if (sh.freezer->enable_index(index, enable)) {
+    if (this->freezer->enable_index(index, enable)) {
       printf("region %s\n", enable ? "enabled" : "disabled");
     } else {
       throw out_of_range("no regions matched");
@@ -624,54 +626,51 @@ static void command_enable_disable(MemwatchShell& sh, const string& args,
 
   // else, print frozen regions
   } else {
-    sh.freezer->print_regions(stdout);
+    this->freezer->print_regions(stdout);
   }
 }
 
 // enable <<name>|<index>|<addr>>
-static void command_enable(MemwatchShell& sh, const string& args) {
-  command_enable_disable(sh, args, true);
+void MemwatchShell::command_enable(const string& args) {
+  this->command_enable_disable(args, true);
 }
 
 // disable <<name>|<index>|<addr>>
-static void command_disable(MemwatchShell& sh, const string& args) {
-  command_enable_disable(sh, args, false);
+void MemwatchShell::command_disable(const string& args) {
+  this->command_enable_disable(args, false);
 }
 
 // frozen [data|commands|cmds]
-static void command_frozen(MemwatchShell& sh, const string& args) {
+void MemwatchShell::command_frozen(const string& args) {
 
-  if (!sh.interactive) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
   if (args == "data") {
-    sh.freezer->print_regions(stdout, true);
+    this->freezer->print_regions(stdout, true);
   } else if ((args == "cmds") || (args == "commands")) {
-    sh.freezer->print_regions_commands(stdout);
+    this->freezer->print_regions_commands(stdout);
   } else {
-    sh.freezer->print_regions(stdout);
+    this->freezer->print_regions(stdout);
   }
 }
-
-// forward declaration so command_open can call this
-static void command_search(MemwatchShell& sh, const string& args_str);
 
 // open
 // open <name>
 // open <type> [name]
 // open <type> name .
 // open <type> name operator value
-static void command_open(MemwatchShell& sh, const string& args_str) {
+void MemwatchShell::command_open(const string& args_str) {
 
-  if (!sh.interactive) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
-  vector<string> args = split_args(args_str, 0, 4);
+  vector<string> args = this->split_args(args_str, 0, 4);
 
   if (args.size() == 0) {
-    for (const auto& it : sh.name_to_search) {
+    for (const auto& it : this->name_to_search) {
       printf("  %s %s", MemorySearch::name_for_search_type(it.second.get_type()),
           it.first.c_str());
       if (!it.second.has_memory()) {
@@ -684,17 +683,17 @@ static void command_open(MemwatchShell& sh, const string& args_str) {
       }
       printf("\n");
     }
-    printf("total searches: %zu\n", sh.name_to_search.size());
+    printf("total searches: %zu\n", this->name_to_search.size());
     return;
   }
 
   // if the first argument is the name of a search, switch to that search
-  if (sh.name_to_search.count(args[0]) && (args.size() == 1)) {
-    sh.current_search_name = args[0];
-    if (!sh.current_search_name.empty()) {
-      sh.name_to_search.erase("");
+  if (this->name_to_search.count(args[0]) && (args.size() == 1)) {
+    this->current_search_name = args[0];
+    if (!this->current_search_name.empty()) {
+      this->name_to_search.erase("");
     }
-    printf("switched to search %s\n", sh.current_search_name.c_str());
+    printf("switched to search %s\n", this->current_search_name.c_str());
     return;
   }
 
@@ -709,15 +708,15 @@ static void command_open(MemwatchShell& sh, const string& args_str) {
   string name = (args.size() >= 2) ? args[1] : "";
   bool all_memory = (args[0].find('!') != string::npos);
 
-  sh.name_to_search.erase(name);
-  sh.name_to_search.emplace(piecewise_construct, make_tuple(name),
+  this->name_to_search.erase(name);
+  this->name_to_search.emplace(piecewise_construct, make_tuple(name),
       make_tuple(type, all_memory));
-  sh.current_search_name = name;
-  if (!sh.current_search_name.empty()) {
-    sh.name_to_search.erase("");
+  this->current_search_name = name;
+  if (!this->current_search_name.empty()) {
+    this->name_to_search.erase("");
   }
 
-  if (sh.current_search_name.empty()) {
+  if (this->current_search_name.empty()) {
     printf("opened new %s search (unnamed)\n", MemorySearch::name_for_search_type(type));
   } else {
     printf("opened new %s search named %s\n", MemorySearch::name_for_search_type(type), name.c_str());
@@ -726,38 +725,38 @@ static void command_open(MemwatchShell& sh, const string& args_str) {
   // if more arguments were given, perform the initial search
   if (args.size() > 2) {
     if (args.size() == 3) {
-      command_search(sh, args[2]);
+      this->command_search(args[2]);
     } else {
-      command_search(sh, args[2] + " " + args[3]);
+      this->command_search(args[2] + " " + args[3]);
     }
   }
 }
 
 // fork <name>
 // fork <name1> <name2>
-static void command_fork(MemwatchShell& sh, const string& args_str) {
-  if (!sh.interactive) {
+void MemwatchShell::command_fork(const string& args_str) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
-  auto args = split_args(args_str, 1, 2);
+  auto args = this->split_args(args_str, 1, 2);
   if (args.size() == 1) {
     // fork the current search into a new one and switch to it
-    if (args[0] == sh.current_search_name) {
+    if (args[0] == this->current_search_name) {
       throw invalid_argument("can\'t fork a search into itself");
     }
-    const MemorySearch& current_search = sh.get_search();
+    const MemorySearch& current_search = this->get_search();
 
-    sh.name_to_search.erase(args[0]);
-    sh.name_to_search.emplace(args[0], current_search);
-    printf("forked search %s into %s\n", sh.current_search_name.c_str(),
+    this->name_to_search.erase(args[0]);
+    this->name_to_search.emplace(args[0], current_search);
+    printf("forked search %s into %s\n", this->current_search_name.c_str(),
         args[0].c_str());
-    sh.current_search_name = args[0];
+    this->current_search_name = args[0];
 
   } else {
     try {
-      sh.name_to_search.erase(args[1]);
-      sh.name_to_search.emplace(args[1], sh.name_to_search.at(args[0]));
+      this->name_to_search.erase(args[1]);
+      this->name_to_search.emplace(args[1], this->name_to_search.at(args[0]));
       printf("forked search %s into %s\n", args[0].c_str(), args[1].c_str());
     } catch (const out_of_range& e) {
       throw out_of_range("no search named " + args[0]);
@@ -765,8 +764,7 @@ static void command_fork(MemwatchShell& sh, const string& args_str) {
   }
 }
 
-static void print_search_results(MemwatchShell& sh,
-    const MemorySearch& search) {
+void MemwatchShell::print_search_results(const MemorySearch& search) {
 
   uint64_t x = 0;
   if (search.get_type() == MemorySearch::Type::DATA) {
@@ -783,7 +781,7 @@ static void print_search_results(MemwatchShell& sh,
     for (uint64_t result : search.get_results()) {
       printf("(%" PRIu64 ") %016" PRIX64 " ", x, result);
       try {
-        string data = sh.adapter->read(result, size);
+        string data = this->adapter->read(result, size);
         PrimitiveValue* value = (PrimitiveValue*)data.data();
 
         switch (search.get_type()) {
@@ -850,12 +848,12 @@ static void print_search_results(MemwatchShell& sh,
 }
 
 // results [search_name]
-static void command_results(MemwatchShell& sh, const string& args) {
-  if (!sh.interactive) {
+void MemwatchShell::command_results(const string& args) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
-  MemorySearch& search = sh.get_search(args.empty() ? NULL : &args);
+  MemorySearch& search = this->get_search(args.empty() ? NULL : &args);
 
   if (!search.has_memory()) {
     throw invalid_argument("search not found, or no search currently open");
@@ -863,22 +861,22 @@ static void command_results(MemwatchShell& sh, const string& args) {
 
   Signalable s;
   do {
-    print_search_results(sh, search);
-    if (sh.watch) {
+    this->print_search_results(search);
+    if (this->watch) {
       usleep(1000000); // wait a second, if we're repeating
     }
-  } while (sh.watch && !s.is_signaled());
+  } while (this->watch && !s.is_signaled());
 }
 
 // delete <spec> [spec ...]
-static void command_delete(MemwatchShell& sh, const string& args_str) {
-  if (!sh.interactive) {
+void MemwatchShell::command_delete(const string& args_str) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
-  MemorySearch& search = sh.get_search();
+  MemorySearch& search = this->get_search();
 
-  auto args = split_args(args_str, 1);
+  auto args = this->split_args(args_str, 1);
 
   // read the addresses
   vector<pair<uint64_t, uint64_t>> to_delete;
@@ -887,10 +885,10 @@ static void command_delete(MemwatchShell& sh, const string& args_str) {
     size_t dash_pos = arg.find('-');
     uint64_t addr1, addr2;
     if (dash_pos != string::npos) {
-      addr1 = get_addr_from_command(sh, arg.substr(0, dash_pos));
-      addr2 = get_addr_from_command(sh, arg.substr(dash_pos + 1));
+      addr1 = this->get_addr_from_command(arg.substr(0, dash_pos));
+      addr2 = this->get_addr_from_command(arg.substr(dash_pos + 1));
     } else {
-      addr1 = addr2 = get_addr_from_command(sh, arg);
+      addr1 = addr2 = this->get_addr_from_command(arg);
     }
 
     if (addr1 > addr2) {
@@ -906,19 +904,19 @@ static void command_delete(MemwatchShell& sh, const string& args_str) {
 
   // print the remaining results if there aren't too many
   if (search.get_results().size() <= 20) {
-    print_search_results(sh, search);
+    this->print_search_results(search);
   }
 }
 
 // search [name] <predicate> [value]
-static void command_search(MemwatchShell& sh, const string& args_str) {
-  if (!sh.interactive) {
+void MemwatchShell::command_search(const string& args_str) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
-  auto args = split_args(args_str, 1, 3);
+  auto args = this->split_args(args_str, 1, 3);
 
-  string name = sh.current_search_name;
+  string name = this->current_search_name;
   MemorySearch::Predicate predicate;
   string value;
   try {
@@ -938,35 +936,35 @@ static void command_search(MemwatchShell& sh, const string& args_str) {
     }
   }
 
-  MemorySearch& search = sh.get_search(&name);
+  MemorySearch& search = this->get_search(&name);
 
   // convert the value into something we can search for
   if (!value.empty()) {
-    value = read_typed_value(search.get_type(), value);
+    value = this->read_typed_value(search.get_type(), value);
   }
 
   search.check_can_update(predicate, value);
 
   shared_ptr<vector<ProcessMemoryAdapter::Region>> regions(new vector<ProcessMemoryAdapter::Region>());
   {
-    PauseGuard g(sh.pause_target ? sh.adapter : NULL);
+    PauseGuard g(this->pause_target ? this->adapter : NULL);
     if (search.has_valid_results()) {
-      *regions = sh.adapter->get_target_regions(search.get_results(), true);
+      *regions = this->adapter->get_target_regions(search.get_results(), true);
     } else {
-      *regions = sh.adapter->get_all_regions(true);
+      *regions = this->adapter->get_all_regions(true);
     }
   }
 
-  search.update(regions, predicate, value, sh.max_results, stderr);
+  search.update(regions, predicate, value, this->max_results, stderr);
   if (search.get_results().size() <= 20) {
-    print_search_results(sh, search);
+    this->print_search_results(search);
   }
 }
 
 // set <value>
 // set s<result-index> <value>
-static void command_set(MemwatchShell& sh, const string& args) {
-  if (!sh.interactive) {
+void MemwatchShell::command_set(const string& args) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
@@ -983,22 +981,22 @@ static void command_set(MemwatchShell& sh, const string& args) {
     value_arg = args;
   }
 
-  MemorySearch& search = sh.get_search();
+  MemorySearch& search = this->get_search();
   if (!search.has_memory()) {
     throw invalid_argument("no initial search performed");
   }
 
-  string data = read_typed_value(search.get_type(), value_arg);
+  string data = this->read_typed_value(search.get_type(), value_arg);
   if (data.empty()) {
     throw invalid_argument("no data was specified");
   }
 
   {
-    PauseGuard g(sh.pause_target ? sh.adapter : NULL);
+    PauseGuard g(this->pause_target ? this->adapter : NULL);
     if (result_index < 0) {
       for (uint64_t result : search.get_results()) {
         try {
-          sh.adapter->write(result, data);
+          this->adapter->write(result, data);
           printf("%016" PRIX64 ": wrote %zu (0x%zX) bytes\n", result, data.size(),
               data.size());
         } catch (const exception& e) {
@@ -1008,7 +1006,7 @@ static void command_set(MemwatchShell& sh, const string& args) {
     } else {
       uint64_t result = search.get_results().at(result_index);
       try {
-        sh.adapter->write(result, data);
+        this->adapter->write(result, data);
         printf("%016" PRIX64 ": wrote %zu (0x%zX) bytes\n", result, data.size(),
             data.size());
       } catch (const exception& e) {
@@ -1019,23 +1017,23 @@ static void command_set(MemwatchShell& sh, const string& args) {
 }
 
 // close [name]
-static void command_close(MemwatchShell& sh, const string& args) {
-  if (!sh.interactive) {
+void MemwatchShell::command_close(const string& args) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
   if (args.empty()) {
-    if (!sh.name_to_search.erase(sh.current_search_name)) {
+    if (!this->name_to_search.erase(this->current_search_name)) {
       throw invalid_argument("no search currently open");
     }
-    sh.current_search_name.clear();
+    this->current_search_name.clear();
 
   } else {
-    if (!sh.name_to_search.erase(args)) {
+    if (!this->name_to_search.erase(args)) {
       throw invalid_argument("no open search named " + args);
     }
-    if (sh.current_search_name == args) {
-      sh.current_search_name.clear();
+    if (this->current_search_name == args) {
+      this->current_search_name.clear();
     }
   }
 }
@@ -1043,18 +1041,18 @@ static void command_close(MemwatchShell& sh, const string& args) {
 #define print_reg_value(str, state, prev, regname) \
   do { \
     int diff = ((prev) && ((state).regname != (prev)->regname)); \
-    if (sh.use_color && diff) { \
+    if (this->use_color && diff) { \
       print_color_escape(stdout, TerminalFormat::BOLD, TerminalFormat::FG_RED, \
           TerminalFormat::END); \
     } \
     printf((str), (state).regname); \
-    if (sh.use_color && diff) { \
+    if (this->use_color && diff) { \
       print_color_escape(stdout, TerminalFormat::NORMAL, TerminalFormat::END); \
     } \
   } while (0);
 
 // prints the register contents in a thread state
-static void print_thread_regs(MemwatchShell& sh, int tid,
+void MemwatchShell::print_thread_regs(int tid,
     const ProcessMemoryAdapter::ThreadState& state,
     const ProcessMemoryAdapter::ThreadState* prev) {
 
@@ -1129,79 +1127,79 @@ static void print_thread_regs(MemwatchShell& sh, int tid,
 }
 
 // regs
-static void command_read_regs(MemwatchShell& sh, const string& args_str) {
+void MemwatchShell::command_read_regs(const string& args_str) {
 
   Signalable s;
   do {
     unordered_map<mach_port_t, ProcessMemoryAdapter::ThreadState> state;
     unordered_map<mach_port_t, ProcessMemoryAdapter::ThreadState> prev;
     {
-      PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-      state = sh.adapter->get_threads_registers();
+      PauseGuard g(this->pause_target ? this->adapter : NULL);
+      state = this->adapter->get_threads_registers();
     }
 
     string time_str = format_time();
-    printf("%s [%zu threads] // %s\n", sh.process_name.c_str(), state.size(),
+    printf("%s [%zu threads] // %s\n", this->process_name.c_str(), state.size(),
         time_str.c_str());
 
     for (const auto& it : state) {
       try {
-        print_thread_regs(sh, it.first, it.second, &prev.at(it.first));
+        this->print_thread_regs(it.first, it.second, &prev.at(it.first));
       } catch (const out_of_range& e) {
-        print_thread_regs(sh, it.first, it.second, NULL);
+        this->print_thread_regs(it.first, it.second, NULL);
       }
     }
 
     state.swap(prev);
     state.clear();
 
-    if (sh.watch) {
+    if (this->watch) {
       usleep(1000000); // wait a second, if the read is repeating
     }
-  } while (sh.watch && !s.is_signaled());
+  } while (this->watch && !s.is_signaled());
 }
 
 // wregs <tid> <reg> <value>
-static void command_write_regs(MemwatchShell& sh, const string& args_str) {
-  if (!sh.interactive) {
+void MemwatchShell::command_write_regs(const string& args_str) {
+  if (!this->interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
-  auto args = split_args(args_str, 3, 3);
+  auto args = this->split_args(args_str, 3, 3);
 
   int tid = stoi(args[0]);
   auto& regname = args[1];
   uint64_t value = stoull(args[2]);
 
   {
-    PauseGuard g(sh.pause_target ? sh.adapter : NULL);
-    auto data = sh.adapter->get_threads_registers();
+    PauseGuard g(this->pause_target ? this->adapter : NULL);
+    auto data = this->adapter->get_threads_registers();
     try {
       data.at(tid).set_register_by_name(regname.c_str(), value);
     } catch (const out_of_range& e) {
       throw out_of_range("no such thread/register");
     }
-    sh.adapter->set_threads_registers(data);
+    this->adapter->set_threads_registers(data);
   }
 }
 
 // stacks [size]
-static void command_read_stacks(MemwatchShell& sh, const string& args_str) {
+void MemwatchShell::command_read_stacks(const string& args_str) {
 
   uint64_t size = args_str.empty() ? 0x100 : stoull(args_str, NULL, 16);
 
   Signalable s;
   do {
     {
-      PauseGuard g(sh.pause_target ? sh.adapter : NULL);
+      PauseGuard g(this->pause_target ? this->adapter : NULL);
       string time_str = format_time();
-      auto regs = sh.adapter->get_threads_registers();
+      auto regs = this->adapter->get_threads_registers();
       for (const auto& it : regs) {
         uint64_t addr = it.second.is64 ? it.second.st64.__rsp : it.second.st32.__esp;
         printf("%s [Thread %d] @ %016" PRIX64 ":%016" PRIX64 " // %s\n",
-            sh.process_name.c_str(), it.first, addr, size, time_str.c_str());
+            this->process_name.c_str(), it.first, addr, size, time_str.c_str());
         try {
-          string data = sh.adapter->read(addr, size);
+          string data = this->adapter->read(addr, size);
           print_data(stdout, data.data(), data.size(), addr);
         } catch (const exception& e) {
           printf("failed to read data (%s)\n", e.what());
@@ -1209,36 +1207,36 @@ static void command_read_stacks(MemwatchShell& sh, const string& args_str) {
       }
     }
 
-    if (sh.watch) {
+    if (this->watch) {
       usleep(1000000); // wait a second, if the read is repeating
     }
-  } while (sh.watch && !s.is_signaled());
+  } while (this->watch && !s.is_signaled());
 }
 
 // pause
-static void command_pause(MemwatchShell& sh, const string& args_str) {
-  sh.adapter->pause();
+void MemwatchShell::command_pause(const string& args_str) {
+  this->adapter->pause();
 }
 
 // resume
-static void command_resume(MemwatchShell& sh, const string& args_str) {
-  sh.adapter->resume();
+void MemwatchShell::command_resume(const string& args_str) {
+  this->adapter->resume();
 }
 
 // signal <signum>
-static void command_signal(MemwatchShell& sh, const string& args_str) {
+void MemwatchShell::command_signal(const string& args_str) {
   int signum = stoi(args_str.c_str());
-  if (kill(sh.pid, signum)) {
+  if (kill(this->pid, signum)) {
     throw runtime_error(string_printf("failed to send signal %d to process", signum));
   }
 }
 
 // attach [name_or_pid]
-static void command_attach(MemwatchShell& sh, const string& args_str) {
+void MemwatchShell::command_attach(const string& args_str) {
 
   // if no command given, use the current process name
   // (i.e. if the program was quit & restarted, its pid will change)
-  const string& name = args_str.empty() ? sh.process_name : args_str;
+  const string& name = args_str.empty() ? this->process_name : args_str;
 
   // try to read new pid
   pid_t new_pid = 0;
@@ -1253,125 +1251,122 @@ static void command_attach(MemwatchShell& sh, const string& args_str) {
   string new_name = name_for_pid(new_pid);
 
   // if we get here, then the process exists - attach to it
-  sh.pid = new_pid;
-  sh.process_name = new_name;
-  sh.adapter->attach(sh.pid);
+  this->pid = new_pid;
+  this->process_name = new_name;
+  this->adapter->attach(this->pid);
 }
 
 // state [<field> <value>]
-static void command_state(MemwatchShell& sh, const string& args_str) {
+void MemwatchShell::command_state(const string& args_str) {
 
   if (args_str.empty()) {
-    printf("use_color = %d\n", sh.use_color);
-    printf("pid = %d\n", sh.pid);
-    printf("process_name = \"%s\"\n", sh.process_name.c_str());
-    printf("pause_target = %d\n", sh.pause_target);
-    printf("max_results = %" PRIu64 "\n", sh.max_results);
-    printf("interactive = %d\n", sh.interactive);
-    printf("run = %d\n", sh.run);
-    printf("num_commands_run = %" PRIu64 "\n", sh.num_commands_run);
-    printf("num_find_results = %zu\n", sh.find_results.size());
+    printf("use_color = %d\n", this->use_color);
+    printf("pid = %d\n", this->pid);
+    printf("process_name = \"%s\"\n", this->process_name.c_str());
+    printf("pause_target = %d\n", this->pause_target);
+    printf("max_results = %" PRIu64 "\n", this->max_results);
+    printf("interactive = %d\n", this->interactive);
+    printf("run = %d\n", this->run);
+    printf("num_commands_run = %" PRIu64 "\n", this->num_commands_run);
+    printf("num_find_results = %zu\n", this->find_results.size());
     return;
   }
 
-  auto args = split_args(args_str, 2, 2);
+  auto args = this->split_args(args_str, 2, 2);
 
   if (args[0] == "use_color") {
-    sh.use_color = stoi(args[1]);
+    this->use_color = stoi(args[1]);
   } else if (args[0] == "process_name") {
-    sh.process_name = args[1];
+    this->process_name = args[1];
   } else if (args[0] == "pause_target") {
-    sh.pause_target = stoi(args[1]);
+    this->pause_target = stoi(args[1]);
   } else if (args[0] == "max_results") {
-    sh.max_results = stoull(args[1]);
+    this->max_results = stoull(args[1]);
   } else if (args[0] == "run") {
-    sh.run = stoi(args[1]);
+    this->run = stoi(args[1]);
   } else {
     throw invalid_argument("unknown or read-only field");
   }
 }
 
 // quit
-static void command_quit(MemwatchShell& sh, const string& args_str) {
-  sh.run = false;
+void MemwatchShell::command_quit(const string& args_str) {
+  this->run = false;
 }
 
 
 
-// list of pointers to functions for each command
-typedef void (*command_handler_t)(MemwatchShell& sh, const string& args_str);
-
-static const unordered_map<string, command_handler_t> command_handlers({
-  {"access",   command_access},
-  {"acc",      command_access},
-  {"a",        command_access},
-  {"attach",   command_attach},
-  {"att",      command_attach},
-  {"at",       command_attach},
-  {"close",    command_close},
-  {"c",        command_close},
-  {"data",     command_data},
-  {"delete",   command_delete},
-  {"del",      command_delete},
-  {"disable",  command_disable},
-  {"dis",      command_disable},
-  {"di",       command_disable},
-  {"d",        command_disable},
-  {"dump",     command_dump},
-  {"dmp",      command_dump},
-  {"enable",   command_enable},
-  {"ena",      command_enable},
-  {"en",       command_enable},
-  {"e",        command_enable},
-  {"find",     command_find},
-  {"fi",       command_find},
-  {"fork",     command_fork},
-  {"fk",       command_fork},
-  {"fo",       command_fork},
-  {"frozen",   command_frozen},
-  {"fzn",      command_frozen},
-  {"freeze",   command_freeze},
-  {"fr",       command_freeze},
-  {"f",        command_freeze},
-  {"help",     command_help},
-  {"h",        command_help},
-  {"list",     command_list},
-  {"l",        command_list},
-  {"open",     command_open},
-  {"o",        command_open},
-  {"pause",    command_pause},
-  {"quit",     command_quit},
-  {"q",        command_quit},
-  {"read",     command_read},
-  {"rd",       command_read},
-  {"regs",     command_read_regs},
-  {"results",  command_results},
-  {"resume",   command_resume},
-  {"res",      command_results},
-  {"r",        command_read},
-  {"search",   command_search},
-  {"s",        command_search},
-  {"set",      command_set},
-  {"signal",   command_signal},
-  {"sig",      command_signal},
-  {"stacks",   command_read_stacks},
-  {"stax",     command_read_stacks},
-  {"stx",      command_read_stacks},
-  {"state",    command_state},
-  {"st",       command_state},
-  {"t",        command_find},
-  {"unfreeze", command_unfreeze},
-  {"u",        command_unfreeze},
-  {"watch",    command_watch},
-  {"wa",       command_watch},
-  {"!",        command_watch},
-  {"wregs",    command_write_regs},
-  {"write",    command_write},
-  {"wr",       command_write},
-  {"w",        command_write},
-  {"x",        command_results},
-  {"-",        command_disable},
-  {"+",        command_enable},
+const unordered_map<string, MemwatchShell::command_handler_t> MemwatchShell::command_handlers({
+  {"access",   &MemwatchShell::command_access},
+  {"acc",      &MemwatchShell::command_access},
+  {"a",        &MemwatchShell::command_access},
+  {"attach",   &MemwatchShell::command_attach},
+  {"att",      &MemwatchShell::command_attach},
+  {"at",       &MemwatchShell::command_attach},
+  {"close",    &MemwatchShell::command_close},
+  {"c",        &MemwatchShell::command_close},
+  {"data",     &MemwatchShell::command_data},
+  {"delete",   &MemwatchShell::command_delete},
+  {"del",      &MemwatchShell::command_delete},
+  {"disable",  &MemwatchShell::command_disable},
+  {"dis",      &MemwatchShell::command_disable},
+  {"di",       &MemwatchShell::command_disable},
+  {"d",        &MemwatchShell::command_disable},
+  {"dump",     &MemwatchShell::command_dump},
+  {"dmp",      &MemwatchShell::command_dump},
+  {"enable",   &MemwatchShell::command_enable},
+  {"ena",      &MemwatchShell::command_enable},
+  {"en",       &MemwatchShell::command_enable},
+  {"e",        &MemwatchShell::command_enable},
+  {"find",     &MemwatchShell::command_find},
+  {"fi",       &MemwatchShell::command_find},
+  {"fork",     &MemwatchShell::command_fork},
+  {"fk",       &MemwatchShell::command_fork},
+  {"fo",       &MemwatchShell::command_fork},
+  {"frozen",   &MemwatchShell::command_frozen},
+  {"fzn",      &MemwatchShell::command_frozen},
+  {"freeze",   &MemwatchShell::command_freeze},
+  {"fr",       &MemwatchShell::command_freeze},
+  {"f",        &MemwatchShell::command_freeze},
+  {"help",     &MemwatchShell::command_help},
+  {"h",        &MemwatchShell::command_help},
+  {"list",     &MemwatchShell::command_list},
+  {"l",        &MemwatchShell::command_list},
+  {"open",     &MemwatchShell::command_open},
+  {"o",        &MemwatchShell::command_open},
+  {"pause",    &MemwatchShell::command_pause},
+  {"quit",     &MemwatchShell::command_quit},
+  {"q",        &MemwatchShell::command_quit},
+  {"read",     &MemwatchShell::command_read},
+  {"rd",       &MemwatchShell::command_read},
+  {"regs",     &MemwatchShell::command_read_regs},
+  {"results",  &MemwatchShell::command_results},
+  {"resume",   &MemwatchShell::command_resume},
+  {"res",      &MemwatchShell::command_results},
+  {"r",        &MemwatchShell::command_read},
+  {"search",   &MemwatchShell::command_search},
+  {"s",        &MemwatchShell::command_search},
+  {"set",      &MemwatchShell::command_set},
+  {"signal",   &MemwatchShell::command_signal},
+  {"sig",      &MemwatchShell::command_signal},
+  {"stacks",   &MemwatchShell::command_read_stacks},
+  {"stax",     &MemwatchShell::command_read_stacks},
+  {"stx",      &MemwatchShell::command_read_stacks},
+  {"state",    &MemwatchShell::command_state},
+  {"st",       &MemwatchShell::command_state},
+  {"t",        &MemwatchShell::command_find},
+  {"unfreeze", &MemwatchShell::command_unfreeze},
+  {"u",        &MemwatchShell::command_unfreeze},
+  {"watch",    &MemwatchShell::command_watch},
+  {"wa",       &MemwatchShell::command_watch},
+  {"!",        &MemwatchShell::command_watch},
+  {"wregs",    &MemwatchShell::command_write_regs},
+  {"write",    &MemwatchShell::command_write},
+  {"wr",       &MemwatchShell::command_write},
+  {"w",        &MemwatchShell::command_write},
+  {"x",        &MemwatchShell::command_results},
+  {"-",        &MemwatchShell::command_disable},
+  {"+",        &MemwatchShell::command_enable},
 });
 
 
@@ -1395,7 +1390,7 @@ void MemwatchShell::dispatch_command(const string& args_str) {
   }
 
   // run the command
-  handler(*this, args_str.substr(args_begin));
+  (this->*handler)(args_str.substr(args_begin));
 }
 
 MemwatchShell::MemwatchShell(pid_t pid, uint64_t max_results, bool pause_target,
