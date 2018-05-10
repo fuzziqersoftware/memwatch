@@ -1,6 +1,6 @@
 OBJECTS=Main.o MemwatchShell.o MemorySearch.o ProcessMemoryAdapter.o RegionFreezer.o Signalable.o
-CXXFLAGS=-O3 -g -Wall -Werror -std=c++14 -I/usr/local/include
-LDFLAGS=-lreadline -L/usr/local/lib -lphosg
+CXXFLAGS=-O3 -g -Wall -Werror -std=c++14 -I/opt/local/include -I/usr/local/include
+LDFLAGS=-lreadline -L/opt/local/lib -L/usr/local/lib -lphosg
 EXECUTABLES=memwatch
 
 all: memwatch tests
