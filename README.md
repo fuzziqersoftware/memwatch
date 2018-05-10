@@ -37,7 +37,7 @@ memwatch's interactive interface implements the following commands for reading, 
 ### Memory search commands
 memwatch's interactive interface implements the following commands for searching a process's memory for variables:
 - `find <data>`: Finds all occurrences of `data` in readable regions of the target's memory. See the Data Format section for more information on how to specify the search string. Searches done with this command do not affect the current saved search results.
-- `open <type> [name]`: Opens a search for a variable of the given type in writable memory regions. `type` may be suffixed with a ! to search all readable memory instead of only writable memory. See the Search Types section for valid search types. If `name` is not given, the search will be unnamed and cannot be resumed after another search is opened.
+- `open <type> [name]`: Opens a search for a variable of the given type in writable memory regions. `type` may be suffixed with a ! to search all readable memory instead of only writable memory. See the Search Types section for valid search types. If `name` is not given, the search will be unnamed and cannot be resumed after another search is opened. If `predicate` is given, perform the initial search immediately.
 - `open [name]`: If `name` is given, reopens a previous search. If `name` is not given, lists all open searches.
 - `close [name]`: If `name` is given, closes the specified search. If `name` is not given, closes the current search.
 - `fork <name> [name2]`: If `name2` is given, makes a copy of the search named `name` as `name2`. Otherwise, makes a copy of the current search as `name`.

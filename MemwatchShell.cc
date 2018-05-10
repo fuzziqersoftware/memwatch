@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#include <readline/history.h>
 #include <readline/readline.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -653,16 +654,21 @@ static void command_frozen(MemwatchShell& sh, const string& args) {
   }
 }
 
+// forward declaration so command_open can call this
+static void command_search(MemwatchShell& sh, const string& args_str);
+
 // open
 // open <name>
 // open <type> [name]
+// open <type> name .
+// open <type> name operator value
 static void command_open(MemwatchShell& sh, const string& args_str) {
 
   if (!sh.interactive) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
-  vector<string> args = split_args(args_str, 0, 2);
+  vector<string> args = split_args(args_str, 0, 4);
 
   if (args.size() == 0) {
     for (const auto& it : sh.name_to_search) {
@@ -700,7 +706,7 @@ static void command_open(MemwatchShell& sh, const string& args_str) {
     throw invalid_argument("no search named " + args[0]);
   }
 
-  string name = (args.size() == 2) ? args[1] : "";
+  string name = (args.size() >= 2) ? args[1] : "";
   bool all_memory = (args[0].find('!') != string::npos);
 
   sh.name_to_search.erase(name);
@@ -715,6 +721,15 @@ static void command_open(MemwatchShell& sh, const string& args_str) {
     printf("opened new %s search (unnamed)\n", MemorySearch::name_for_search_type(type));
   } else {
     printf("opened new %s search named %s\n", MemorySearch::name_for_search_type(type), name.c_str());
+  }
+
+  // if more arguments were given, perform the initial search
+  if (args.size() > 2) {
+    if (args.size() == 3) {
+      command_search(sh, args[2]);
+    } else {
+      command_search(sh, args[2] + " " + args[3]);
+    }
   }
 }
 

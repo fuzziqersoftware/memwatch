@@ -74,8 +74,8 @@ A single command (see the following sections) which will be executed instead of 
 .BI "find " data
 .RI "Finds all occurrences of " data " in readable regions of the target\'s memory. See the DATA FORMAT section for more information on how to specify the search string. Searches done with this command do not affect the current search results."
 .TP
-.BI "open " type " [" name "]"
-.RI "Opens a search for a variable of the given type in writable memory regions. " type " may be suffixed with a ! to search all readable memory instead of only writable memory. See the SEARCH TYPES section for valid search types. If " name " is not given, the search will be unnamed and cannot be resumed after another search is opened."
+.BI "open " type " [" name " [" predicate " [" value "]]]"
+.RI "Opens a search for a variable of the given type in writable memory regions. " type " may be suffixed with a ! to search all readable memory instead of only writable memory. See the SEARCH TYPES section for valid search types. If " name " is not given, the search will be unnamed and cannot be resumed after another search is opened. If " predicate " is given, perform the initial search immediately."
 .TP
 .BI "open [" name "]"
 .RI "If " name " is given, reopens a previous search. If " name " is not given, lists all open searches."
