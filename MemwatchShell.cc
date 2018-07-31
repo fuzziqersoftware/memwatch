@@ -163,18 +163,32 @@ void MemwatchShell::print_regions(FILE* stream,
 
 uint64_t MemwatchShell::get_addr_from_command(const string& args) {
   if (args[0] == 'x' || args[0] == 's') {
-    const auto& s = this->get_search();
+    size_t num_end_pos = 0;
+    uint64_t index = stoull(args.substr(1), &num_end_pos, 0);
+    string search_name;
+    if (num_end_pos + 1 < args.size()) {
+      if (args[num_end_pos + 1] == '@') {
+        search_name = args.substr(num_end_pos + 2);
+      } else {
+        throw invalid_argument("extra characters after result id");
+      }
+    }
 
-    uint64_t index = stoull(args.substr(1));
+    const auto& s = this->get_search(search_name.empty() ? NULL : &search_name);
+
     if (index >= s.get_results().size()) {
       throw invalid_argument("search does not have enough results");
     }
     return s.get_results()[index];
 
   } else if (args[0] == 't') {
-    uint64_t index = stoull(args.substr(1));
+    size_t num_end_pos = 0;
+    uint64_t index = stoull(args.substr(1), &num_end_pos, 0);
+    if (num_end_pos + 1 < args.size()) {
+      throw invalid_argument("extra characters after result id");
+    }
     if (index >= this->find_results.size()) {
-      throw invalid_argument("search does not have enough results");
+      throw invalid_argument("find does not have enough results");
     }
     return this->find_results[index];
   }
@@ -427,6 +441,7 @@ void MemwatchShell::command_freeze(const string& args) {
   }
 
   string name;
+  string addr_arg;
   uint64_t addr = 0;
   uint64_t array_max_entries = 0;
   uint64_t read_size = 0;
@@ -467,7 +482,8 @@ void MemwatchShell::command_freeze(const string& args) {
           data_to_parse += arg;
         }
       } else {
-        addr = this->get_addr_from_command(arg);
+        addr_arg = arg;
+        addr = this->get_addr_from_command(addr_arg);
       }
     }
   }
@@ -476,7 +492,14 @@ void MemwatchShell::command_freeze(const string& args) {
   if (name.empty()) {
     try {
       this->get_search();
-      name = this->current_search_name;
+      // if there's an override search name, use that instead of the current
+      // search name
+      size_t at_pos = addr_arg.find('@');
+      if (at_pos != string::npos) {
+        name = addr_arg.substr(at_pos + 1);
+      } else {
+        name = this->current_search_name;
+      }
     } catch (const out_of_range& e) {
       name = "";
     } catch (const invalid_argument& e) {
