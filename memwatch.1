@@ -66,7 +66,7 @@ A single command (see the following sections) which will be executed instead of 
 .RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " and " size " are specified in hexadecimal. If a filename is given, writes the data to the given file instead of printing to the terminal. " format " is a short string specifying which additional interpretations of the data should be printed. It starts with '+' and includes any of the characters 'a' (text), 'f' (float), 'd' (double), and 'r' (reverse-endian); the default is '+a'. The " read " command may be prepended with " watch " to repeat the read every second until Ctrl+C is pressed."
 .TP
 .BI "write " "address-or-result-id" " " "data"
-.RI "Writes " data " to " address " in the target process\'s memory. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. See the DATA FORMAT section for information on how to specify the data string."
+.RI "Writes " data " to " address " in the target process\'s memory. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. For example, specifying " s0 " refers to the first result address in the current search; " s1 " refers to the second result, etc. Results from other searches may also be used by specifying the search name explicitly, as in " s1@search-name ".  See the DATA FORMAT section for information on how to specify the data string."
 
 .SH "MEMORY SEARCH COMMANDS"
 .BR memwatch "\'s interactive interface implements the following commands for searching a process\'s memory for variables:"
@@ -108,7 +108,7 @@ A single command (see the following sections) which will be executed instead of 
 .BR memwatch " implements a memory freezer, which repeatedly writes values to the target\'s memory at a very short interval, effectively fixing the variable's value in the target process. The following commands allow manipulation of frozen variables:"
 .TP
 .BI "freeze [+n" "name" "] " address-or-result-id " " data " " "[+d]"
-.RI "Sets a freeze on " address " with the given data. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any)."
+.RI "Sets a freeze on " address " with the given data. " address " may refer to a search or find result, using the same syntax as for the " write " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any)."
 .TP
 .BI "freeze [+n" "name" "] " address-or-result-id " +s" size " " "[+d]"
 .RI "Identical to the above command, but uses the data already present in the process's memory. Size is specified in hexadecimal."
