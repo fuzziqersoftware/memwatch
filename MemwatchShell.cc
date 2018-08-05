@@ -169,7 +169,7 @@ uint64_t MemwatchShell::get_addr_from_command(const string& args) {
     if (num_end_pos + 1 < args.size()) {
       if (args[num_end_pos + 1] == '@') {
         search_name = args.substr(num_end_pos + 2);
-      } else {
+      } else if (args[num_end_pos + 1] != ' ') {
         throw invalid_argument("extra characters after result id");
       }
     }
@@ -184,7 +184,7 @@ uint64_t MemwatchShell::get_addr_from_command(const string& args) {
   } else if (args[0] == 't') {
     size_t num_end_pos = 0;
     uint64_t index = stoull(args.substr(1), &num_end_pos, 0);
-    if (num_end_pos + 1 < args.size()) {
+    if ((num_end_pos + 1 < args.size()) && (args[num_end_pos + 1] != ' ')) {
       throw invalid_argument("extra characters after result id");
     }
     if (index >= this->find_results.size()) {
