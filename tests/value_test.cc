@@ -11,6 +11,8 @@ int main(int argc, char* argv[]) {
 
   ptrace(PT_DENY_ATTACH, getpid(), NULL, 0);
 
+  printf("pid: %d\n", getpid());
+
   int8_t s8 = 0, rs8; // rs8 not really necessary but whatevs
   int16_t s16 = 0, rs16;
   int32_t s32 = 0, rs32;

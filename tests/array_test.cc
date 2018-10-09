@@ -11,6 +11,8 @@ int main(int argc, char* argv[]) {
 
   ptrace(PT_DENY_ATTACH, getpid(), NULL, 0);
 
+  printf("pid: %d\n", getpid());
+
   int array_size = 20;
   uint64_t array[array_size];
   memset(array, 0, sizeof(uint64_t) * array_size);
