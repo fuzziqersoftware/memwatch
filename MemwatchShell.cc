@@ -17,15 +17,13 @@
 #include <phosg/Filesystem.hh>
 #include <phosg/Process.hh>
 #include <phosg/Strings.hh>
+#include <phosg/Time.hh>
 
 #include "Signalable.hh"
 
 using namespace std;
 
 #define HISTORY_FILE_LENGTH  1024
-
-
-// TODO: undoing searches
 
 
 
@@ -174,7 +172,7 @@ uint64_t MemwatchShell::get_addr_from_command(const string& args) {
       }
     }
 
-    const auto& s = this->get_search(search_name.empty() ? NULL : &search_name);
+    const auto& s = this->get_latest_search(search_name.empty() ? NULL : &search_name);
 
     if (index >= s.get_results().size()) {
       throw invalid_argument("search does not have enough results");
@@ -491,7 +489,7 @@ void MemwatchShell::command_freeze(const string& args) {
   // generate a name if none was given
   if (name.empty()) {
     try {
-      this->get_search();
+      this->get_latest_search();
       // if there's an override search name, use that instead of the current
       // search name
       size_t at_pos = addr_arg.find('@');
@@ -693,28 +691,45 @@ void MemwatchShell::command_open(const string& args_str) {
   vector<string> args = this->split_args(args_str, 0, 4);
 
   if (args.size() == 0) {
-    for (const auto& it : this->name_to_search) {
-      printf("  %s %s", MemorySearch::name_for_search_type(it.second.get_type()),
-          it.first.c_str());
-      if (!it.second.has_memory()) {
-        printf(" (initial search not done)");
+    for (const auto& map_it : this->name_to_searches) {
+      auto& searches = map_it.second;
+
+      string line;
+      if (searches.empty()) {
+        line = string_printf("(unknown type) %s\n", map_it.first.c_str());
       } else {
-        printf(" (%zu results)", it.second.get_results().size());
+        line = string_printf("%s %s with iterations [",
+            MemorySearch::name_for_search_type(searches[0].get_type()),
+            map_it.first.c_str());
+
+        for (size_t x = 0; x < searches.size(); x++) {
+          if (x > 0) {
+            line += ", (";
+          } else {
+            line += '(';
+          }
+
+          const MemorySearch& search = searches[x];
+          line += this->details_for_iteration(search);
+
+          line += ')';
+        }
+        line += ']';
       }
-      if (it.second.is_all_memory()) {
-        printf(" (all memory)");
-      }
-      printf("\n");
+
+      printf("  %s\n", line.c_str());
     }
-    printf("total searches: %zu\n", this->name_to_search.size());
+    printf("total searches: %zu\n", this->name_to_searches.size());
     return;
   }
 
   // if the first argument is the name of a search, switch to that search
-  if (this->name_to_search.count(args[0]) && (args.size() == 1)) {
+  if (this->name_to_searches.count(args[0]) && (args.size() == 1)) {
     this->current_search_name = args[0];
     if (!this->current_search_name.empty()) {
-      this->name_to_search.erase("");
+      if (this->name_to_searches.erase("")) {
+        printf("closed unnamed search\n");
+      }
     }
     printf("switched to search %s\n", this->current_search_name.c_str());
     return;
@@ -731,12 +746,17 @@ void MemwatchShell::command_open(const string& args_str) {
   string name = (args.size() >= 2) ? args[1] : "";
   bool all_memory = (args[0].find('!') != string::npos);
 
-  this->name_to_search.erase(name);
-  this->name_to_search.emplace(piecewise_construct, make_tuple(name),
-      make_tuple(type, all_memory));
+  this->name_to_searches.erase(name);
+
+  vector<MemorySearch> searches;
+  searches.emplace_back(type, all_memory);
+  this->name_to_searches.emplace(name, move(searches));
+
   this->current_search_name = name;
   if (!this->current_search_name.empty()) {
-    this->name_to_search.erase("");
+    if (this->name_to_searches.erase("")) {
+      printf("closed unnamed search\n");
+    }
   }
 
   if (this->current_search_name.empty()) {
@@ -768,18 +788,18 @@ void MemwatchShell::command_fork(const string& args_str) {
     if (args[0] == this->current_search_name) {
       throw invalid_argument("can\'t fork a search into itself");
     }
-    const MemorySearch& current_search = this->get_search();
+    const vector<MemorySearch>& current_searches = this->get_searches();
 
-    this->name_to_search.erase(args[0]);
-    this->name_to_search.emplace(args[0], current_search);
+    this->name_to_searches.erase(args[0]);
+    this->name_to_searches.emplace(args[0], current_searches);
     printf("forked search %s into %s\n", this->current_search_name.c_str(),
         args[0].c_str());
     this->current_search_name = args[0];
 
   } else {
     try {
-      this->name_to_search.erase(args[1]);
-      this->name_to_search.emplace(args[1], this->name_to_search.at(args[0]));
+      this->name_to_searches.erase(args[1]);
+      this->name_to_searches.emplace(args[1], this->name_to_searches.at(args[0]));
       printf("forked search %s into %s\n", args[0].c_str(), args[1].c_str());
     } catch (const out_of_range& e) {
       throw out_of_range("no search named " + args[0]);
@@ -876,9 +896,9 @@ void MemwatchShell::command_results(const string& args) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
-  MemorySearch& search = this->get_search(args.empty() ? NULL : &args);
+  MemorySearch& search = this->get_latest_search(args.empty() ? NULL : &args);
 
-  if (!search.has_memory()) {
+  if (!search.has_memory_snapshot()) {
     throw invalid_argument("search not found, or no search currently open");
   }
 
@@ -897,7 +917,7 @@ void MemwatchShell::command_delete(const string& args_str) {
     throw invalid_argument("this command can only be used in interactive mode");
   }
 
-  MemorySearch& search = this->get_search();
+  MemorySearch& search = this->get_latest_search();
 
   auto args = this->split_args(args_str, 1);
 
@@ -942,10 +962,14 @@ void MemwatchShell::command_search(const string& args_str) {
   string name = this->current_search_name;
   MemorySearch::Predicate predicate;
   string value;
+  string annotation;
   try {
     predicate = MemorySearch::search_predicate_for_name(args[0].c_str());
     if (args.size() > 1) {
       value = args[1];
+      annotation = args[0] + " " + args[1] + " at ";
+    } else {
+      annotation = args[0] + " previous at ";
     }
 
   } catch (const out_of_range& e) {
@@ -956,32 +980,73 @@ void MemwatchShell::command_search(const string& args_str) {
     predicate = MemorySearch::search_predicate_for_name(args[1].c_str());
     if (args.size() > 2) {
       value = args[2];
+      annotation = args[1] + " " + args[2] + " at ";
+    } else {
+      annotation = args[1] + " previous at ";
     }
   }
 
-  MemorySearch& search = this->get_search(&name);
+  annotation += format_time(now());
+
+  vector<MemorySearch>& searches = this->get_searches(&name);
+  if (searches.empty()) {
+    throw runtime_error("search has no iterations");
+  }
+  MemorySearch& latest_search = searches.back();
 
   // convert the value into something we can search for
   if (!value.empty()) {
-    value = this->read_typed_value(search.get_type(), value);
+    value = this->read_typed_value(latest_search.get_type(), value);
   }
 
-  search.check_can_update(predicate, value);
+  latest_search.check_can_update(predicate, value);
 
   shared_ptr<vector<ProcessMemoryAdapter::Region>> regions(new vector<ProcessMemoryAdapter::Region>());
   {
     PauseGuard g(this->pause_target ? this->adapter : NULL);
-    if (search.has_valid_results()) {
-      *regions = this->adapter->get_target_regions(search.get_results(), true);
+    if (latest_search.has_valid_results()) {
+      *regions = this->adapter->get_target_regions(latest_search.get_results(), true);
     } else {
       *regions = this->adapter->get_all_regions(true);
     }
   }
 
-  search.update(regions, predicate, value, this->max_results, stderr);
-  if (search.get_results().size() <= 20) {
-    this->print_search_results(search);
+  MemorySearch new_search = latest_search;
+  new_search.set_annotation(annotation);
+  new_search.update(regions, predicate, value, this->max_results, stderr);
+  if (new_search.get_results().size() <= 20) {
+    this->print_search_results(new_search);
   }
+
+  searches.emplace_back(move(new_search));
+  while (searches.size() > this->max_search_iterations) {
+    searches.erase(searches.begin());
+  }
+}
+
+// iterations [name]
+void MemwatchShell::command_iterations(const string& args_str) {
+  if (!this->interactive) {
+    throw invalid_argument("this command can only be used in interactive mode");
+  }
+
+  for (const auto& iteration : this->get_searches(args_str.empty() ? NULL : &args_str)) {
+    string s = this->details_for_iteration(iteration);
+    fprintf(stderr, "  %s\n", s.c_str());
+  }
+}
+
+// undo [name]
+void MemwatchShell::command_undo(const string& args_str) {
+  if (!this->interactive) {
+    throw invalid_argument("this command can only be used in interactive mode");
+  }
+
+  vector<MemorySearch>& searches = this->get_searches(args_str.empty() ? NULL : &args_str);
+  if (searches.size() <= 1) {
+    throw invalid_argument("cannot undo initial search");
+  }
+  searches.pop_back();
 }
 
 // set <value>
@@ -1004,8 +1069,8 @@ void MemwatchShell::command_set(const string& args) {
     value_arg = args;
   }
 
-  MemorySearch& search = this->get_search();
-  if (!search.has_memory()) {
+  MemorySearch& search = this->get_latest_search();
+  if (!search.has_memory_snapshot()) {
     throw invalid_argument("no initial search performed");
   }
 
@@ -1046,13 +1111,13 @@ void MemwatchShell::command_close(const string& args) {
   }
 
   if (args.empty()) {
-    if (!this->name_to_search.erase(this->current_search_name)) {
+    if (!this->name_to_searches.erase(this->current_search_name)) {
       throw invalid_argument("no search currently open");
     }
     this->current_search_name.clear();
 
   } else {
-    if (!this->name_to_search.erase(args)) {
+    if (!this->name_to_searches.erase(args)) {
       throw invalid_argument("no open search named " + args);
     }
     if (this->current_search_name == args) {
@@ -1288,6 +1353,7 @@ void MemwatchShell::command_state(const string& args_str) {
     printf("process_name = \"%s\"\n", this->process_name.c_str());
     printf("pause_target = %d\n", this->pause_target);
     printf("max_results = %" PRIu64 "\n", this->max_results);
+    printf("max_search_iterations = %" PRIu64 "\n", this->max_search_iterations);
     printf("interactive = %d\n", this->interactive);
     printf("run = %d\n", this->run);
     printf("num_commands_run = %" PRIu64 "\n", this->num_commands_run);
@@ -1305,6 +1371,8 @@ void MemwatchShell::command_state(const string& args_str) {
     this->pause_target = stoi(args[1]);
   } else if (args[0] == "max_results") {
     this->max_results = stoull(args[1]);
+  } else if (args[0] == "max_search_iterations") {
+    this->max_search_iterations = stoull(args[1]);
   } else if (args[0] == "run") {
     this->run = stoi(args[1]);
   } else {
@@ -1320,76 +1388,83 @@ void MemwatchShell::command_quit(const string& args_str) {
 
 
 const unordered_map<string, MemwatchShell::command_handler_t> MemwatchShell::command_handlers({
-  {"access",   &MemwatchShell::command_access},
-  {"acc",      &MemwatchShell::command_access},
-  {"a",        &MemwatchShell::command_access},
-  {"attach",   &MemwatchShell::command_attach},
-  {"att",      &MemwatchShell::command_attach},
-  {"at",       &MemwatchShell::command_attach},
-  {"close",    &MemwatchShell::command_close},
-  {"c",        &MemwatchShell::command_close},
-  {"data",     &MemwatchShell::command_data},
-  {"delete",   &MemwatchShell::command_delete},
-  {"del",      &MemwatchShell::command_delete},
-  {"disable",  &MemwatchShell::command_disable},
-  {"dis",      &MemwatchShell::command_disable},
-  {"di",       &MemwatchShell::command_disable},
-  {"d",        &MemwatchShell::command_disable},
-  {"dump",     &MemwatchShell::command_dump},
-  {"dmp",      &MemwatchShell::command_dump},
-  {"enable",   &MemwatchShell::command_enable},
-  {"ena",      &MemwatchShell::command_enable},
-  {"en",       &MemwatchShell::command_enable},
-  {"e",        &MemwatchShell::command_enable},
-  {"find",     &MemwatchShell::command_find},
-  {"fi",       &MemwatchShell::command_find},
-  {"fork",     &MemwatchShell::command_fork},
-  {"fk",       &MemwatchShell::command_fork},
-  {"fo",       &MemwatchShell::command_fork},
-  {"frozen",   &MemwatchShell::command_frozen},
-  {"fzn",      &MemwatchShell::command_frozen},
-  {"freeze",   &MemwatchShell::command_freeze},
-  {"fr",       &MemwatchShell::command_freeze},
-  {"f",        &MemwatchShell::command_freeze},
-  {"help",     &MemwatchShell::command_help},
-  {"h",        &MemwatchShell::command_help},
-  {"list",     &MemwatchShell::command_list},
-  {"l",        &MemwatchShell::command_list},
-  {"open",     &MemwatchShell::command_open},
-  {"o",        &MemwatchShell::command_open},
-  {"pause",    &MemwatchShell::command_pause},
-  {"quit",     &MemwatchShell::command_quit},
-  {"q",        &MemwatchShell::command_quit},
-  {"read",     &MemwatchShell::command_read},
-  {"rd",       &MemwatchShell::command_read},
-  {"regs",     &MemwatchShell::command_read_regs},
-  {"results",  &MemwatchShell::command_results},
-  {"resume",   &MemwatchShell::command_resume},
-  {"res",      &MemwatchShell::command_results},
-  {"r",        &MemwatchShell::command_read},
-  {"search",   &MemwatchShell::command_search},
-  {"s",        &MemwatchShell::command_search},
-  {"set",      &MemwatchShell::command_set},
-  {"signal",   &MemwatchShell::command_signal},
-  {"sig",      &MemwatchShell::command_signal},
-  {"stacks",   &MemwatchShell::command_read_stacks},
-  {"stax",     &MemwatchShell::command_read_stacks},
-  {"stx",      &MemwatchShell::command_read_stacks},
-  {"state",    &MemwatchShell::command_state},
-  {"st",       &MemwatchShell::command_state},
-  {"t",        &MemwatchShell::command_find},
-  {"unfreeze", &MemwatchShell::command_unfreeze},
-  {"u",        &MemwatchShell::command_unfreeze},
-  {"watch",    &MemwatchShell::command_watch},
-  {"wa",       &MemwatchShell::command_watch},
-  {"!",        &MemwatchShell::command_watch},
-  {"wregs",    &MemwatchShell::command_write_regs},
-  {"write",    &MemwatchShell::command_write},
-  {"wr",       &MemwatchShell::command_write},
-  {"w",        &MemwatchShell::command_write},
-  {"x",        &MemwatchShell::command_results},
-  {"-",        &MemwatchShell::command_disable},
-  {"+",        &MemwatchShell::command_enable},
+  {"access",     &MemwatchShell::command_access},
+  {"acc",        &MemwatchShell::command_access},
+  {"a",          &MemwatchShell::command_access},
+  {"attach",     &MemwatchShell::command_attach},
+  {"att",        &MemwatchShell::command_attach},
+  {"at",         &MemwatchShell::command_attach},
+  {"close",      &MemwatchShell::command_close},
+  {"c",          &MemwatchShell::command_close},
+  {"cz",         &MemwatchShell::command_undo},
+  {"data",       &MemwatchShell::command_data},
+  {"delete",     &MemwatchShell::command_delete},
+  {"del",        &MemwatchShell::command_delete},
+  {"disable",    &MemwatchShell::command_disable},
+  {"dis",        &MemwatchShell::command_disable},
+  {"di",         &MemwatchShell::command_disable},
+  {"d",          &MemwatchShell::command_disable},
+  {"dump",       &MemwatchShell::command_dump},
+  {"dmp",        &MemwatchShell::command_dump},
+  {"enable",     &MemwatchShell::command_enable},
+  {"ena",        &MemwatchShell::command_enable},
+  {"en",         &MemwatchShell::command_enable},
+  {"e",          &MemwatchShell::command_enable},
+  {"find",       &MemwatchShell::command_find},
+  {"fi",         &MemwatchShell::command_find},
+  {"fork",       &MemwatchShell::command_fork},
+  {"fk",         &MemwatchShell::command_fork},
+  {"fo",         &MemwatchShell::command_fork},
+  {"frozen",     &MemwatchShell::command_frozen},
+  {"fzn",        &MemwatchShell::command_frozen},
+  {"freeze",     &MemwatchShell::command_freeze},
+  {"fr",         &MemwatchShell::command_freeze},
+  {"f",          &MemwatchShell::command_freeze},
+  {"help",       &MemwatchShell::command_help},
+  {"h",          &MemwatchShell::command_help},
+  {"iterations", &MemwatchShell::command_iterations},
+  {"iters",      &MemwatchShell::command_iterations},
+  {"its",        &MemwatchShell::command_iterations},
+  {"it",         &MemwatchShell::command_iterations},
+  {"i",          &MemwatchShell::command_iterations},
+  {"list",       &MemwatchShell::command_list},
+  {"l",          &MemwatchShell::command_list},
+  {"open",       &MemwatchShell::command_open},
+  {"o",          &MemwatchShell::command_open},
+  {"pause",      &MemwatchShell::command_pause},
+  {"quit",       &MemwatchShell::command_quit},
+  {"q",          &MemwatchShell::command_quit},
+  {"read",       &MemwatchShell::command_read},
+  {"rd",         &MemwatchShell::command_read},
+  {"regs",       &MemwatchShell::command_read_regs},
+  {"results",    &MemwatchShell::command_results},
+  {"resume",     &MemwatchShell::command_resume},
+  {"res",        &MemwatchShell::command_results},
+  {"r",          &MemwatchShell::command_read},
+  {"search",     &MemwatchShell::command_search},
+  {"s",          &MemwatchShell::command_search},
+  {"set",        &MemwatchShell::command_set},
+  {"signal",     &MemwatchShell::command_signal},
+  {"sig",        &MemwatchShell::command_signal},
+  {"stacks",     &MemwatchShell::command_read_stacks},
+  {"stax",       &MemwatchShell::command_read_stacks},
+  {"stx",        &MemwatchShell::command_read_stacks},
+  {"state",      &MemwatchShell::command_state},
+  {"st",         &MemwatchShell::command_state},
+  {"t",          &MemwatchShell::command_find},
+  {"undo",       &MemwatchShell::command_undo},
+  {"unfreeze",   &MemwatchShell::command_unfreeze},
+  {"u",          &MemwatchShell::command_unfreeze},
+  {"watch",      &MemwatchShell::command_watch},
+  {"wa",         &MemwatchShell::command_watch},
+  {"!",          &MemwatchShell::command_watch},
+  {"wregs",      &MemwatchShell::command_write_regs},
+  {"write",      &MemwatchShell::command_write},
+  {"wr",         &MemwatchShell::command_write},
+  {"w",          &MemwatchShell::command_write},
+  {"x",          &MemwatchShell::command_results},
+  {"-",          &MemwatchShell::command_disable},
+  {"+",          &MemwatchShell::command_enable},
 });
 
 
@@ -1416,12 +1491,14 @@ void MemwatchShell::dispatch_command(const string& args_str) {
   (this->*handler)(args_str.substr(args_begin));
 }
 
-MemwatchShell::MemwatchShell(pid_t pid, uint64_t max_results, bool pause_target,
-    bool interactive, bool use_color) : adapter(new ProcessMemoryAdapter(pid)),
+MemwatchShell::MemwatchShell(pid_t pid, uint64_t max_results,
+    uint64_t max_search_iterations, bool pause_target, bool interactive,
+    bool use_color) : adapter(new ProcessMemoryAdapter(pid)),
     freezer(new RegionFreezer(this->adapter)), pid(pid),
     process_name(name_for_pid(this->pid)), pause_target(pause_target),
     watch(false), interactive(interactive), run(true), use_color(use_color),
-    num_commands_run(0), max_results(max_results), name_to_search(),
+    num_commands_run(0), max_results(max_results),
+    max_search_iterations(max_search_iterations), name_to_searches(),
     current_search_name("") { }
 
 int MemwatchShell::execute_command(const string& args) {
@@ -1451,22 +1528,22 @@ int MemwatchShell::execute_commands() {
     // or memwatch:<pid>/<process_name> <num_search>/<num_frozen> #
     string prompt;
     try {
-      MemorySearch& s = this->get_search();
+      MemorySearch& s = this->get_latest_search();
       const char* search_name = this->current_search_name.empty() ? "(unnamed search)" : this->current_search_name.c_str();
-      if (!s.has_memory()) {
+      if (!s.has_memory_snapshot()) {
         prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s # ", this->pid,
-            this->process_name.c_str(), this->name_to_search.size(),
+            this->process_name.c_str(), this->name_to_searches.size(),
             this->freezer->frozen_count(), search_name,
             MemorySearch::short_name_for_search_type(s.get_type()));
       } else if (!s.has_valid_results()) {
         prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s(+) # ", this->pid,
-            this->process_name.c_str(), this->name_to_search.size(),
+            this->process_name.c_str(), this->name_to_searches.size(),
             this->freezer->frozen_count(), search_name,
             MemorySearch::short_name_for_search_type(s.get_type()),
             s.get_results().size());
       } else {
         prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s(%llu) # ", this->pid,
-            this->process_name.c_str(), this->name_to_search.size(),
+            this->process_name.c_str(), this->name_to_searches.size(),
             this->freezer->frozen_count(), search_name,
             MemorySearch::short_name_for_search_type(s.get_type()),
             s.get_results().size());
@@ -1474,7 +1551,7 @@ int MemwatchShell::execute_commands() {
 
     } catch (const invalid_argument& e) {
       prompt = string_printf("memwatch:%u/%s %zus/%zuf # ", this->pid,
-          this->process_name.c_str(), this->name_to_search.size(),
+          this->process_name.c_str(), this->name_to_searches.size(),
           this->freezer->frozen_count());
     }
 
@@ -1506,13 +1583,44 @@ int MemwatchShell::execute_commands() {
   return 0;
 }
 
-MemorySearch& MemwatchShell::get_search(const string* name) {
+MemorySearch& MemwatchShell::get_latest_search(const string* name) {
+  try {
+    auto& searches = this->get_searches(name);
+    return searches.at(searches.size() - 1);
+  } catch (const out_of_range& e) {
+    throw invalid_argument("search does not contain any iterations");
+  }
+}
+
+vector<MemorySearch>& MemwatchShell::get_searches(const string* name) {
   if (!name) {
     name = &this->current_search_name;
   }
   try {
-    return this->name_to_search.at(*name);
+    return this->name_to_searches.at(*name);
   } catch (const out_of_range& e) {
     throw invalid_argument("search not found, or no search is open");
   }
+}
+
+string MemwatchShell::details_for_iteration(const MemorySearch& s) {
+  string ret;
+
+  const string& annotation = s.get_annotation();
+  if (!annotation.empty()) {
+    ret += annotation;
+    ret += "; ";
+  }
+
+  if (!s.has_memory_snapshot()) {
+    ret += "initial";
+  } else {
+    ret += string_printf("%zu results", s.get_results().size());
+  }
+
+  if (s.is_all_memory()) {
+    ret += "; all memory";
+  }
+
+  return ret;
 }

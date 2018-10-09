@@ -98,6 +98,12 @@ A single command (see the following sections) which will be executed instead of 
 .BI "delete " spec " [" "spec ..." "]"
 .RI "Deletes specific search results. " spec " may be the address of a specific result to delete, or a range of addresses to delete, which is inclusive on both ends. Ranges are specified as a pair of addresses separated by a dash with no spaces. Result references like " s1 " are acceptable for this command as well."
 .TP
+.BI "iterations [" "search_name" "]"
+.RI "Displays the list of stored iterations for the current search, or the named search if a name is given."
+.TP
+.BI "undo [" "search_name" "]"
+.RI "Undoes the latest iteration of the current search, or the named search if a name is given."
+.TP
 .BI "set " value
 .RI "Writes " value " to all addresses in the current result set."
 .TP
@@ -155,10 +161,10 @@ A single command (see the following sections) which will be executed instead of 
 .BR s, str, string
 Search for any string. Values are specified in immediate data format (see the DATA FORMAT section for more information).
 .TP
-.BR f, flt, float
+.B f, flt, float
 Search for a 32-bit floating-point value.
 .TP
-.BR d, dbl, double
+.B d, dbl, double
 Search for a 64-bit floating-point value.
 .TP
 .B u8, u16, u32, u64

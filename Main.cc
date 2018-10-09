@@ -57,6 +57,7 @@ int main(int argc, char* argv[]) {
   bool pause_target = false;
   bool allow_parent = false;
   uint64_t max_results = 1024 * 1024 * 1024; // approx. 1 billion
+  uint64_t max_search_iterations = 5;
   size_t num_bad_arguments = 0;
   string current_command;
   vector<string> commands;
@@ -83,6 +84,12 @@ int main(int argc, char* argv[]) {
         max_results = strtoull(&argv[x][2], NULL, 0);
       } else if (!strncmp(argv[x], "--max-results=", 14)) {
         max_results = strtoull(&argv[x][14], NULL, 0);
+
+      // -i, --max-search-iterations: set number of historical searches
+      } else if (!strncmp(argv[x], "-i", 2)) {
+        max_search_iterations = strtoull(&argv[x][2], NULL, 0);
+      } else if (!strncmp(argv[x], "--max-search-iterations=", 14)) {
+        max_search_iterations = strtoull(&argv[x][24], NULL, 0);
 
       // complain if an unknown arg was given
       } else {
@@ -190,7 +197,8 @@ int main(int argc, char* argv[]) {
 
   // if commands were given on the cli, run them individually
   if (!commands.empty()) {
-    MemwatchShell sh(pid, max_results, pause_target, false, use_color);
+    MemwatchShell sh(pid, max_results, max_search_iterations, pause_target,
+        false, use_color);
     for (const string& command : commands) {
       int ret = sh.execute_command(command);
       if (ret) {
@@ -202,7 +210,8 @@ int main(int argc, char* argv[]) {
 
   // else, use the interactive interface
   try {
-    MemwatchShell sh(pid, max_results, pause_target, true, use_color);
+    MemwatchShell sh(pid, max_results, max_search_iterations, pause_target,
+        true, use_color);
     return sh.execute_commands();
   } catch (const exception& e) {
     fprintf(stderr, "error: %s\n", e.what());

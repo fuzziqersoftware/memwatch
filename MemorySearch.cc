@@ -197,13 +197,21 @@ static const vector<SearchTypeConfig> search_type_configs({
 
 MemorySearch::MemorySearch(MemorySearch::Type type, bool all_memory) :
     type(type), results_valid(false), all_memory(all_memory), memory(),
-    prev_size(0), results() { }
+    prev_size(0), results(), annotation() { }
+
+const std::string& MemorySearch::get_annotation() const {
+  return this->annotation;
+}
+
+void MemorySearch::set_annotation(const std::string& annotation) {
+  this->annotation = annotation;
+}
 
 MemorySearch::Type MemorySearch::get_type() const {
   return this->type;
 }
 
-bool MemorySearch::has_memory() const {
+bool MemorySearch::has_memory_snapshot() const {
   return (bool)this->memory;
 }
 

@@ -15,8 +15,8 @@
 
 class MemwatchShell {
 public:
-  MemwatchShell(pid_t pid, uint64_t max_results, bool pause_target = true,
-      bool interactive = true, bool use_color = true);
+  MemwatchShell(pid_t pid, uint64_t max_results, uint64_t max_search_iterations,
+      bool pause_target = true, bool interactive = true, bool use_color = true);
   ~MemwatchShell() = default;
 
   int execute_commands();
@@ -37,7 +37,8 @@ private:
   uint64_t num_commands_run;
 
   uint64_t max_results;
-  std::map<std::string, MemorySearch> name_to_search;
+  uint64_t max_search_iterations;
+  std::map<std::string, std::vector<MemorySearch>> name_to_searches;
   std::string current_search_name;
 
   std::vector<uint64_t> find_results;
@@ -46,7 +47,8 @@ private:
 
   void dispatch_command(const std::string&);
 
-  MemorySearch& get_search(const std::string* name = NULL);
+  MemorySearch& get_latest_search(const std::string* name = NULL);
+  std::vector<MemorySearch>& get_searches(const std::string* name = NULL);
 
   static std::vector<std::string> split_args(const std::string& args_str,
       size_t min_args = 0, size_t max_args = 0);
@@ -59,6 +61,7 @@ private:
   void print_thread_regs(int tid,
       const ProcessMemoryAdapter::ThreadState& state,
       const ProcessMemoryAdapter::ThreadState* prev);
+  std::string details_for_iteration(const MemorySearch& s);
 
   void command_help(const std::string& args);
   void command_list(const std::string& args);
@@ -80,6 +83,8 @@ private:
   void command_results(const std::string& args);
   void command_delete(const std::string& args_str);
   void command_search(const std::string& args_str);
+  void command_iterations(const std::string& args_str);
+  void command_undo(const std::string& args_str);
   void command_set(const std::string& args);
   void command_close(const std::string& args);
   void command_read_regs(const std::string& args_str);

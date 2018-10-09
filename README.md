@@ -46,6 +46,8 @@ memwatch's interactive interface implements the following commands for searching
 - `search [search_name] .`: Begins a search for a variable with an unknown initial value. Once this is done, future searches can be done using the above operators.
 - `results [search_name]`: Displays the current list of results. If `search_name` is given, displays the results for that search. The command may be prepended with `watch` to read new values every second.
 - `delete <spec> [spec ...]`: Deletes specific search results. `<spec>` may be the address of a specific result to delete, or a range of addresses to delete, which is inclusive on both ends. Ranges are specified as a pair of addresses separated by a dash with no spaces. Result references like `s1` are acceptable for this command as well.
+- `iterations [search_name]`: Displays the list of stored iterations for the current search, or the named search if a name is given.
+- `undo [search_name]`: Undoes the latest iteration of the current search, or the named search if a name is given.
 - `set <value>`: Writes `value` to all addresses in the current result set.
 - `set <result-id> <value>`: Writes `value` to one address in the current result set. `result-id` should be of the form `s0`, `s1`, etc. (as for the `write` command).
 

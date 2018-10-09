@@ -51,10 +51,16 @@ public:
 
   MemorySearch(Type type, bool all_memory = false);
   MemorySearch(const MemorySearch& other) = default;
+  MemorySearch(MemorySearch&& other) = default;
+  MemorySearch& operator=(const MemorySearch& other) = default;
+  MemorySearch& operator=(MemorySearch&& other) = default;
   ~MemorySearch() = default;
 
+  const std::string& get_annotation() const;
+  void set_annotation(const std::string& annotation);
+
   Type get_type() const;
-  bool has_memory() const;
+  bool has_memory_snapshot() const;
   bool has_valid_results() const;
   bool is_all_memory() const;
   const std::vector<uint64_t>& get_results() const;
@@ -82,4 +88,5 @@ private:
   std::shared_ptr<std::vector<ProcessMemoryAdapter::Region>> memory;
   uint64_t prev_size;
   std::vector<uint64_t> results;
+  std::string annotation;
 };
