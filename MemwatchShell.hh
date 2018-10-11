@@ -84,6 +84,7 @@ private:
   void command_delete(const std::string& args_str);
   void command_search(const std::string& args_str);
   void command_iterations(const std::string& args_str);
+  void command_truncate(const std::string& args_str);
   void command_undo(const std::string& args_str);
   void command_set(const std::string& args);
   void command_close(const std::string& args);

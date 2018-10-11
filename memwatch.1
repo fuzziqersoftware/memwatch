@@ -3,7 +3,7 @@
 memwatch \- find and modify variables in other processes
 .SH SYNOPSIS
 .B memwatch
-[-c] [-p] [-P] [-nX]
+[-c] [-p] [-P] [-nX] [-iX]
 .I pid_or_name
 [command [\\; command ...]]
 .SH DESCRIPTION
@@ -25,6 +25,9 @@ By default, memwatch will skip its own pid and the parent's pid when searching p
 .TP
 .B \-nX, --max-results=X
 By default, memwatch limits the number of results in iterative searches to 1073741824 (that's 2^30). This option overrides this limit. Setting the limit to zero allows an unlimited number of results, but this can be dangerous - for example, when performing a search that yields lots of results, memwatch's memory usage may increase to several times that of the target process.
+.TP
+.B \-iX, --max-search-iterations=X
+By default, memwatch limits the number of historical iterations per search to 5. This option overrides this limit. A higher limit means more memory usage, because each search iteration may contain an entire snapshot of the target process' memory. Setting this limit to zero disables the limit entirely; do this at your own risk.
 .TP
 .B pid_or_name
 The process ID or partial name (case-insensitive) of a process to target. In the case of a partial name, memwatch first searches the list of running processes. If no matching process is found, it then searches the list of processes with arguments. This list is the same as is given by the command \'ps auxwww\'. The value \'KERNEL\' (all caps) specifies that memwatch should operate on the kernel. Operating on the kernel is disabled by default on newer versions of Mac OS X; a kernel patch may be required to re-enable this functionality.
@@ -100,6 +103,9 @@ A single command (see the following sections) which will be executed instead of 
 .TP
 .BI "iterations [" "search_name" "]"
 .RI "Displays the list of stored iterations for the current search, or the named search if a name is given."
+.TP
+.BI "truncate [" "search_name" "] " count
+.RI "Deletes all iterations except the " count " most recent from the current search, or the named search if a name is given."
 .TP
 .BI "undo [" "search_name" "]"
 .RI "Undoes the latest iteration of the current search, or the named search if a name is given."

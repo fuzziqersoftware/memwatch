@@ -1019,8 +1019,10 @@ void MemwatchShell::command_search(const string& args_str) {
   }
 
   searches.emplace_back(move(new_search));
-  while (searches.size() > this->max_search_iterations) {
-    searches.erase(searches.begin());
+
+  ssize_t num_to_delete = searches.size() - this->max_search_iterations;
+  if (num_to_delete > 0) {
+    searches.erase(searches.begin(), searches.begin() + num_to_delete);
   }
 }
 
@@ -1033,6 +1035,39 @@ void MemwatchShell::command_iterations(const string& args_str) {
   for (const auto& iteration : this->get_searches(args_str.empty() ? NULL : &args_str)) {
     string s = this->details_for_iteration(iteration);
     fprintf(stderr, "  %s\n", s.c_str());
+  }
+}
+
+// truncate [name] <count-to-retain>
+void MemwatchShell::command_truncate(const string& args_str) {
+  if (!this->interactive) {
+    throw invalid_argument("this command can only be used in interactive mode");
+  }
+
+  auto args = this->split_args(args_str, 1, 2);
+
+  vector<MemorySearch>* searches = NULL;
+  ssize_t count_to_retain = 0;
+  if (args.size() == 2) {
+    searches = &this->get_searches(&args[0]);
+    count_to_retain = stoll(args[1]);
+  } else {
+    searches = &this->get_searches();
+    count_to_retain = stoll(args[0]);
+  }
+
+  if (count_to_retain <= 0) {
+    throw invalid_argument("retained iteration count must be positive");
+  }
+
+  // count_to_retain is a positive number, so we can't possibly delete all items
+  // in searches here
+  ssize_t num_to_delete = searches->size() - count_to_retain;
+  if (num_to_delete > 0) {
+    searches->erase(searches->begin(), searches->begin() + num_to_delete);
+    fprintf(stderr, "deleted %zd iterations\n", num_to_delete);
+  } else {
+    fprintf(stderr, "deleted 0 iterations\n");
   }
 }
 
@@ -1428,6 +1463,7 @@ const unordered_map<string, MemwatchShell::command_handler_t> MemwatchShell::com
   {"it",         &MemwatchShell::command_iterations},
   {"i",          &MemwatchShell::command_iterations},
   {"list",       &MemwatchShell::command_list},
+  {"ls",         &MemwatchShell::command_list},
   {"l",          &MemwatchShell::command_list},
   {"open",       &MemwatchShell::command_open},
   {"o",          &MemwatchShell::command_open},
@@ -1451,6 +1487,9 @@ const unordered_map<string, MemwatchShell::command_handler_t> MemwatchShell::com
   {"stx",        &MemwatchShell::command_read_stacks},
   {"state",      &MemwatchShell::command_state},
   {"st",         &MemwatchShell::command_state},
+  {"truncate",   &MemwatchShell::command_truncate},
+  {"trunc",      &MemwatchShell::command_truncate},
+  {"tr",         &MemwatchShell::command_truncate},
   {"t",          &MemwatchShell::command_find},
   {"undo",       &MemwatchShell::command_undo},
   {"unfreeze",   &MemwatchShell::command_unfreeze},
