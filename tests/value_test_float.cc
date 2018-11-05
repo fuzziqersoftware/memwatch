@@ -9,8 +9,6 @@
 
 int main(int argc, char* argv[]) {
 
-  ptrace(PT_DENY_ATTACH, getpid(), NULL, 0);
-
   printf("pid: %d\n", getpid());
 
   float f = 0, rf;
