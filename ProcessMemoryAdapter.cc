@@ -220,9 +220,14 @@ void ProcessMemoryAdapter::read(std::vector<Region>& regions) {
 }
 
 void ProcessMemoryAdapter::write(mach_vm_address_t addr, const string& data) {
-  kern_return_t ret = mach_vm_write(this->task, addr, (vm_offset_t)data.data(), data.size());
+  this->write(addr, data.data(), data.size());
+}
+
+void ProcessMemoryAdapter::write(mach_vm_address_t addr, const void* data,
+    size_t size) {
+  kern_return_t ret = mach_vm_write(this->task, addr, (vm_offset_t)data, size);
   if (ret != KERN_SUCCESS) {
-    throw runtime_error(string_printf("can\'t write to process %d at %016" PRIX64 ":%016" PRIX64 " (%d)", this->pid, addr, data.size(), ret));
+    throw runtime_error(string_printf("can\'t write to process %d at %016" PRIX64 ":%016" PRIX64 " (%d)", this->pid, addr, size, ret));
   }
 }
 
@@ -558,6 +563,41 @@ void ProcessMemoryAdapter::set_threads_registers(
     try {
       this->set_thread_registers(port, st.at(port));
     } catch (const out_of_range& e) { }
+  }
+}
+
+mach_port_t ProcessMemoryAdapter::create_thread(mach_vm_address_t ip,
+    mach_vm_address_t sp) {
+  mach_port_t thread_port;
+  kern_return_t ret = thread_create(this->task, &thread_port);
+  if (ret != KERN_SUCCESS) {
+    throw runtime_error(string_printf("can\'t create thread (%d)", ret));
+  }
+
+  ThreadState st = this->get_thread_registers(thread_port);
+
+  if (st.is64) {
+    st.st64.__rip = ip;
+    st.st64.__rsp = sp;
+  } else {
+    st.st32.__eip = ip;
+    st.st32.__esp = sp;
+  }
+
+  this->set_thread_registers(thread_port, st);
+
+  ret = thread_resume(thread_port);
+  if (ret != KERN_SUCCESS) {
+    throw runtime_error(string_printf("can\'t resume thread (%d)", ret));
+  }
+
+  return thread_port;
+}
+
+void ProcessMemoryAdapter::terminate_thread(mach_port_t thread_port) {
+  kern_return_t ret = thread_terminate(thread_port);
+  if (ret != KERN_SUCCESS) {
+    throw runtime_error(string_printf("can\'t terminate thread (%d)", ret));
   }
 }
 

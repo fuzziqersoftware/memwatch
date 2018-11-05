@@ -91,6 +91,7 @@ private:
   void command_read_regs(const std::string& args_str);
   void command_write_regs(const std::string& args_str);
   void command_read_stacks(const std::string& args_str);
+  void command_run(const std::string& args_str);
   void command_pause(const std::string& args_str);
   void command_resume(const std::string& args_str);
   void command_signal(const std::string& args_str);

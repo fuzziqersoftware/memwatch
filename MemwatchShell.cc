@@ -9,6 +9,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <sys/syslimits.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 #include <map>
@@ -20,6 +21,8 @@
 #include <phosg/Time.hh>
 
 #include "Signalable.hh"
+#include "Assembler/AMD64Assembler.hh"
+#include "Assembler/FileAssembler.hh"
 
 using namespace std;
 
@@ -1232,7 +1235,7 @@ void MemwatchShell::print_thread_regs(int tid,
     print_reg_value("  r12: %016" PRIX64,         state, prev, st64.__r12);
     print_reg_value("  r13: %016" PRIX64,         state, prev, st64.__r13);
     print_reg_value("  r14: %016" PRIX64 "\n",    state, prev, st64.__r14);
-    print_reg_value("  r15: %016" PRIX64 "  ",    state, prev, st64.__r15);
+    print_reg_value("  r15: %016" PRIX64,         state, prev, st64.__r15);
     print_reg_value("  rflags: %016" PRIX64 "\n", state, prev, st64.__rflags);
     // TODO: print floating state
     print_reg_value("  cs:  %016" PRIX64,         state, prev, st64.__cs);
@@ -1334,6 +1337,145 @@ void MemwatchShell::command_read_stacks(const string& args_str) {
       usleep(1000000); // wait a second, if the read is repeating
     }
   } while (this->watch && !s.is_signaled());
+}
+
+// run <assembly-file>
+void MemwatchShell::command_run(const string& args_str) {
+  string filename;
+  size_t stack_size = 0x1000;
+  bool wait_for_termination = true;
+  bool print_regs = false;
+  string start_label_name = "start";
+  for (string arg : this->split_args(args_str, 1, 0)) {
+    if (arg[0] == '+') {
+      switch (arg[1]) {
+        case 's':
+          stack_size = stoull(arg.substr(2), NULL, 16);
+          break;
+        case 'l':
+          start_label_name = &arg[2];
+          break;
+        case 'n':
+          wait_for_termination = false;
+          break;
+        case 'r':
+          print_regs = true;
+          break;
+        default:
+          throw invalid_argument("unknown option: " + arg);
+      }
+
+    } else {
+      if (!filename.empty()) {
+        throw invalid_argument("too many positional arguments given");
+      }
+      filename = arg;
+    }
+  }
+  stack_size = (stack_size + 0xFFF) & (~0xFFF);
+
+  string text = load_file(filename);
+
+  auto af = assemble_file(text);
+  if (!af.errors.empty()) {
+    fprintf(stdout, "cannot assemble %s:\n", filename.c_str());
+    for (const string& e : af.errors) {
+      printf("  %s\n", e.c_str());
+    }
+    return;
+  }
+
+  // find the start label
+  ssize_t start_label_offset = -1;
+  for (auto label_it : af.label_offsets) {
+    if (label_it.second == start_label_name) {
+      start_label_offset = label_it.first;
+    }
+  }
+  if (start_label_offset < 0) {
+    throw invalid_argument(string_printf("%s label missing", start_label_name.c_str()));
+  }
+
+  // assemble the return segment (which just calls SYS_exit)
+  string exit_code;
+  {
+    AMD64Assembler as;
+    as.write_label("again");
+    as.write_jmp("again");
+
+    unordered_set<size_t> patch_offsets;
+    exit_code = as.assemble(patch_offsets);
+    if (!patch_offsets.empty()) {
+      throw runtime_error("exit code segment has patches");
+    }
+  }
+  af.code += exit_code;
+
+  // round the size up to a page boundary and allocate the code region
+  size_t code_size = (af.code.size() + 0xFFF) & (~0xFFF);
+  auto code_addr = this->adapter->allocate(0, code_size);
+  uint64_t exit_code_addr = code_addr + af.code.size() - exit_code.size();
+
+  // make code read-write (for now)
+  this->adapter->set_protection(code_addr, code_size,
+      Protection::READABLE | Protection::WRITABLE, Protection::ALL_ACCESS);
+
+  // apply patches to the code
+  char* code_ptr = const_cast<char*>(af.code.data());
+  int64_t delta = static_cast<int64_t>(code_addr);
+  for (size_t patch_offset : af.patch_offsets) {
+    *reinterpret_cast<int64_t*>(code_ptr + patch_offset) += delta;
+  }
+
+  // write the code into the process' memory
+  this->adapter->write(code_addr, af.code);
+
+  // make code non-writable
+  this->adapter->set_protection(code_addr, code_size,
+      Protection::READABLE | Protection::EXECUTABLE, Protection::ALL_ACCESS);
+
+  // allocate the stack region
+  auto stack_addr = this->adapter->allocate(0, stack_size);
+
+  // make stack non-executable
+  this->adapter->set_protection(stack_addr, stack_size,
+      Protection::READABLE | Protection::WRITABLE, Protection::ALL_ACCESS);
+
+  // write the return address for the exit code to the stack region
+  uint64_t rsp = stack_addr + stack_size - 8;
+  this->adapter->write(rsp, &exit_code_addr, 8);
+
+  // start the thread
+  auto thread = this->adapter->create_thread(code_addr + start_label_offset, rsp);
+  printf("started thread at ip=%016" PRIX64 " running 0x%zX bytes of code\n",
+      code_addr, af.code.size());
+
+  if (wait_for_termination) {
+    // wait for the thread to reach the completed location
+    ProcessMemoryAdapter::ThreadState regs;
+    Signalable s;
+    while (!s.is_signaled()) {
+      sched_yield();
+      regs = this->adapter->get_thread_registers(thread);
+      uint64_t ip = regs.is64 ? regs.st64.__rip : regs.st32.__eip;
+      if (ip == exit_code_addr) {
+        break;
+      }
+    }
+
+    // print the thread regs if requested
+    if (print_regs) {
+      this->print_thread_regs(thread, regs, NULL);
+    }
+
+    // terminate the thread
+    this->adapter->terminate_thread(thread);
+    printf("thread has terminated\n");
+
+    // free the code and stack space
+    this->adapter->deallocate(code_addr, code_size);
+    this->adapter->deallocate(stack_addr, stack_size);
+  }
 }
 
 // pause
@@ -1476,6 +1618,7 @@ const unordered_map<string, MemwatchShell::command_handler_t> MemwatchShell::com
   {"results",    &MemwatchShell::command_results},
   {"resume",     &MemwatchShell::command_resume},
   {"res",        &MemwatchShell::command_results},
+  {"run",        &MemwatchShell::command_run},
   {"r",          &MemwatchShell::command_read},
   {"search",     &MemwatchShell::command_search},
   {"s",          &MemwatchShell::command_search},

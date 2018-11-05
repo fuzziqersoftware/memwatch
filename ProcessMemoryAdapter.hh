@@ -82,20 +82,23 @@ public:
   void read(Region& region);
   void read(std::vector<Region>& regions);
   void write(mach_vm_address_t addr, const std::string& data);
+  void write(mach_vm_address_t addr, const void* data, size_t size);
 
   void pause();
   void resume();
   void terminate();
 
+  ThreadState get_thread_registers(mach_port_t thread_port);
+  void set_thread_registers(mach_port_t thread_port, const ThreadState& st);
   std::unordered_map<mach_port_t, ThreadState> get_threads_registers();
   void set_threads_registers(const std::unordered_map<mach_port_t, ThreadState>& ts);
+
+  mach_port_t create_thread(mach_vm_address_t ip, mach_vm_address_t sp);
+  void terminate_thread(mach_port_t thread);
 
 private:
   std::pair<std::unique_ptr<thread_act_t, std::function<void(thread_act_port_array_t x)>>, mach_msg_type_number_t>
     get_thread_ports();
-
-  ThreadState get_thread_registers(mach_port_t thread_port);
-  void set_thread_registers(mach_port_t thread_port, const ThreadState& st);
 
   pid_t pid;
   vm_map_t task;
