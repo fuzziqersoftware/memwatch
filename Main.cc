@@ -113,7 +113,9 @@ int main(int argc, char* argv[]) {
         if (commands.empty()) {
           commands.emplace_back();
         }
-        commands.back() += ' ';
+        if (!commands.back().empty()) {
+          commands.back() += ' ';
+        }
         commands.back() += argv[x];
       }
     }
