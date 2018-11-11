@@ -42,7 +42,7 @@ void print_usage() {
 }
 
 // entry point
-int main(int argc, char* argv[]) {
+int main(int argc, char** argv) {
 
   // hello there
   fprintf(stderr, "fuzziqer software memwatch\n\n");
@@ -59,17 +59,21 @@ int main(int argc, char* argv[]) {
   uint64_t max_results = 1024 * 1024 * 1024; // approx. 1 billion
   uint64_t max_search_iterations = 5;
   size_t num_bad_arguments = 0;
-  string current_command;
   vector<string> commands;
+  bool parsing_terminated = false;
 
   // parse command line args
   int x;
   for (x = 1; x < argc; x++) {
 
-    if (argv[x][0] == '-') {
+    if (!parsing_terminated && (argv[x][0] == '-')) {
+
+      // --: end the argument list; all following arguments are commands
+      if (!strcmp(argv[x], "--")) {
+        parsing_terminated = true;
 
       // -c, --no-color: don't use colors in terminal output
-      if (!strcmp(argv[x], "-c") || !strcmp(argv[x], "--no-color")) {
+      } else if (!strcmp(argv[x], "-c") || !strcmp(argv[x], "--no-color")) {
         use_color = false;
 
       // -f, --no-freeze: don't freeze target while operating on it
@@ -98,7 +102,7 @@ int main(int argc, char* argv[]) {
       }
 
     // first non-dash param: a process name or pid
-    } else if (!pid && !process_name[0]) {
+    } else if (!parsing_terminated && !pid && !process_name[0]) {
       char* result;
       pid = strtoul(argv[x], &result, 0);
       if (*result) {
