@@ -1037,7 +1037,7 @@ void MemwatchShell::command_iterations(const string& args_str) {
 
   for (const auto& iteration : this->get_searches(args_str.empty() ? NULL : &args_str)) {
     string s = this->details_for_iteration(iteration);
-    fprintf(stderr, "  %s\n", s.c_str());
+    printf("  %s\n", s.c_str());
   }
 }
 
@@ -1068,9 +1068,9 @@ void MemwatchShell::command_truncate(const string& args_str) {
   ssize_t num_to_delete = searches->size() - count_to_retain;
   if (num_to_delete > 0) {
     searches->erase(searches->begin(), searches->begin() + num_to_delete);
-    fprintf(stderr, "deleted %zd iterations\n", num_to_delete);
+    printf("deleted %zd iterations\n", num_to_delete);
   } else {
-    fprintf(stderr, "deleted 0 iterations\n");
+    printf("deleted 0 iterations\n");
   }
 }
 
@@ -1378,11 +1378,11 @@ void MemwatchShell::command_run(const string& args_str) {
 
   auto af = assemble_file(text);
   if (!af.errors.empty()) {
-    fprintf(stdout, "cannot assemble %s:\n", filename.c_str());
+    printf("errors in file %s:\n", filename.c_str());
     for (const string& e : af.errors) {
       printf("  %s\n", e.c_str());
     }
-    return;
+    throw invalid_argument("code could not be assembled");
   }
 
   // find the start label
@@ -1396,7 +1396,7 @@ void MemwatchShell::command_run(const string& args_str) {
     throw invalid_argument(string_printf("%s label missing", start_label_name.c_str()));
   }
 
-  // assemble the return segment (which just calls SYS_exit)
+  // assemble the return segment (which just loops forever)
   string exit_code;
   {
     AMD64Assembler as;
@@ -1688,7 +1688,7 @@ int MemwatchShell::execute_command(const string& args) {
     this->dispatch_command(args);
     return 0;
   } catch (const exception& e) {
-    fprintf(stderr, "error: %s\n", e.what());
+    printf("error: %s\n", e.what());
     return 1;
   }
 }
@@ -1741,7 +1741,7 @@ int MemwatchShell::execute_commands() {
     // command can be NULL if ctrl+d was pressed - just exit in that case
     char* command = readline(prompt.c_str());
     if (!command) {
-      printf(" -- exit\n");
+      fprintf(stderr, " -- exit\n");
       break;
     }
 

@@ -21,7 +21,7 @@ uint64_t recent_cancel_count = 0;
 void sigint_handler(int signum) {
   if (recent_cancel_time == time(NULL)) {
     if (recent_cancel_count > 1) {
-      printf(" -- no operation to cancel - terminating\n");
+      fprintf(stderr, " -- no operation to cancel - terminating\n");
       exit(0);
     } else {
       recent_cancel_count++;
@@ -32,20 +32,20 @@ void sigint_handler(int signum) {
   }
 
   if (Signalable::signal_all()) {
-    printf(" -- canceling operation\n");
+    fprintf(stderr, " -- canceling operation\n");
   }
 }
 
 void print_usage() {
-  printf("usage: memwatch [options] pid_or_name [command ...]\n");
-  printf("see `man memwatch` for more information\n");
+  fprintf(stderr, "usage: memwatch [options] pid_or_name [command ...]\n");
+  fprintf(stderr, "see `man memwatch` for more information\n");
 }
 
 // entry point
 int main(int argc, char* argv[]) {
 
   // hello there
-  printf("fuzziqer software memwatch\n\n");
+  fprintf(stderr, "fuzziqer software memwatch\n\n");
 
   // install our ctrl+c handler
   signal(SIGINT, sigint_handler);
@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
 
       // complain if an unknown arg was given
       } else {
-        printf("unknown command-line argument: %s\n", argv[x]);
+        fprintf(stderr, "unknown command-line argument: %s\n", argv[x]);
         num_bad_arguments++;
       }
 
@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
     pid = 0;
     operate_on_kernel = true;
     if (pause_target) {
-      printf("warning: operating on the kernel; -f may not be used\n");
+      fprintf(stderr, "warning: operating on the kernel; -f may not be used\n");
       pause_target = false;
     }
   }
@@ -149,26 +149,26 @@ int main(int argc, char* argv[]) {
     sort(pids.begin(), pids.end());
 
     if (pids.size() == 0) {
-      printf("error: no processes found\n");
+      fprintf(stderr, "error: no processes found\n");
       return 2;
     }
 
     if (pids.size() > 1) {
-      printf("choose a process:\n");
+      fprintf(stderr, "choose a process:\n");
       int index = 0;
       for (const auto& proc : pids) {
-        printf("  (%d) %6d - %s\n", index, proc, processes[proc].c_str());
+        fprintf(stderr, "  (%d) %6d - %s\n", index, proc, processes[proc].c_str());
         index++;
       }
 
-      printf("> ");
+      fprintf(stderr, "> ");
       fflush(stdout);
 
       char choice[10];
       fgets(choice, sizeof(choice), stdin);
       int choice_index = atoi(choice);
       if (choice_index < 0 || choice_index >= pids.size()) {
-        printf("invalid choice\n");
+        fprintf(stderr, "invalid choice\n");
         return 2;
       }
 
@@ -181,20 +181,20 @@ int main(int argc, char* argv[]) {
 
   // pid missing?
   if (!pid && !operate_on_kernel) {
-    printf("error: no process id or process name given\n");
+    fprintf(stderr, "error: no process id or process name given\n");
     print_usage();
     return 1;
   }
 
   // fail if pid is memwatch itself
   if (pid == getpid()) {
-    printf("error: memwatch cannot operate on itself\n");
+    fprintf(stderr, "error: memwatch cannot operate on itself\n");
     return 2;
   }
 
   // warn user if not running as root
   if (geteuid()) {
-    printf("warning: memwatch likely will not work if not run as root\n");
+    fprintf(stderr, "warning: memwatch likely will not work if not run as root\n");
   }
 
   // if commands were given on the cli, run them individually
