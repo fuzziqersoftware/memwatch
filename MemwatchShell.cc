@@ -1374,7 +1374,7 @@ void MemwatchShell::command_run(const string& args_str) {
   }
   stack_size = (stack_size + 0xFFF) & (~0xFFF);
 
-  string text = load_file(filename);
+  string text = (filename == "-") ? read_all(stdin) : load_file(filename);
 
   auto af = assemble_file(text);
   if (!af.errors.empty()) {
