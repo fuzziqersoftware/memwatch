@@ -120,7 +120,7 @@ A single command (see the following sections) which will be executed instead of 
 .BR memwatch " implements a memory freezer, which repeatedly writes values to the target\'s memory at a very short interval, effectively fixing the variable's value in the target process. The following commands allow manipulation of frozen variables:"
 .TP
 .BI "freeze [+n" "name" "] " address-or-result-id " " data " " "[+d]"
-.RI "Sets a freeze on " address " with the given data. " address " may refer to a search or find result, using the same syntax as for the " write " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any)."
+.RI "Sets a freeze on " address " with the given data. " address " may refer to a search or find result, using the same syntax as for the " write " command. The given data is written in the background approximately every 10 milliseconds. Sets the freeze name to " name " if given; otherwise, sets the freeze name to the current search name (if any). If " +d " is given, the freeze is initially disabled and won't take effect until enabled with the " enable " command."
 .TP
 .BI "freeze [+n" "name" "] " address-or-result-id " +s" size " " "[+d]"
 .RI "Identical to the above command, but uses the data already present in the process's memory. Size is specified in hexadecimal."
