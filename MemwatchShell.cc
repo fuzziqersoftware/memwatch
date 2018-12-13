@@ -66,7 +66,7 @@ string MemwatchShell::read_typed_value(MemorySearch::Type type,
   string data_buffer(sizeof(PrimitiveValue), 0);
   PrimitiveValue* value = (PrimitiveValue*)data_buffer.data();
   if (MemorySearch::is_integer_search_type(type)) {
-    value->u64 = stoull(s);
+    value->u64 = stoull(s, NULL, 0);
   } else if (type == MemorySearch::Type::FLOAT || type == MemorySearch::Type::FLOAT_RE) {
     value->f = stof(s);
   } else if (type == MemorySearch::Type::DOUBLE || type == MemorySearch::Type::DOUBLE_RE) {
