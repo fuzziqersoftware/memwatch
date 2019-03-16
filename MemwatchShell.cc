@@ -1704,7 +1704,7 @@ int MemwatchShell::execute_commands() {
   // while we have stuff to do...
   while (this->run) {
 
-    // decide what to prompt the user with (include the seearch name if a search
+    // decide what to prompt the user with (include the search name if a search
     // is currently open)
     // prompt is memwatch:<pid>/<process_name> <num_search>/<num_frozen> <searchname> #
     // or memwatch:<pid>/<process_name> <num_search>/<num_frozen> #
