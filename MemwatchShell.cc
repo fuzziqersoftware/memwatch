@@ -19,10 +19,10 @@
 #include <phosg/Process.hh>
 #include <phosg/Strings.hh>
 #include <phosg/Time.hh>
+#include <libamd64/AMD64Assembler.hh>
+#include <libamd64/FileAssembler.hh>
 
 #include "Signalable.hh"
-#include "Assembler/AMD64Assembler.hh"
-#include "Assembler/FileAssembler.hh"
 
 using namespace std;
 
@@ -1404,7 +1404,7 @@ void MemwatchShell::command_run(const string& args_str) {
     as.write_jmp("again");
 
     unordered_set<size_t> patch_offsets;
-    exit_code = as.assemble(patch_offsets);
+    exit_code = as.assemble(&patch_offsets);
     if (!patch_offsets.empty()) {
       throw runtime_error("exit code segment has patches");
     }

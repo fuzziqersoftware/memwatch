@@ -1,6 +1,6 @@
-OBJECTS=Main.o MemwatchShell.o MemorySearch.o ProcessMemoryAdapter.o RegionFreezer.o Signalable.o Assembler/AMD64Assembler.o Assembler/FileAssembler.o
+OBJECTS=Main.o MemwatchShell.o MemorySearch.o ProcessMemoryAdapter.o RegionFreezer.o Signalable.o
 CXXFLAGS=-O3 -g -Wall -Werror -std=c++14 -I/opt/local/include -I/usr/local/include
-LDFLAGS=-lreadline -L/opt/local/lib -L/usr/local/lib -lphosg
+LDFLAGS=-lreadline -L/opt/local/lib -L/usr/local/lib -lphosg -lamd64
 EXECUTABLES=memwatch
 
 all: memwatch tests
@@ -16,7 +16,7 @@ tests:
 	cd tests/ && make && cd ..
 
 clean:
-	-rm -f *.o Assembler/*.o $(EXECUTABLES)
+	-rm -f *.o $(EXECUTABLES)
 	cd tests/ && make clean && cd ..
 
 .PHONY: clean tests

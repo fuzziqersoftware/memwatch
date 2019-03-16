@@ -6,6 +6,7 @@ I often use memwatch to cheat in games, but have also used it in debugging to co
 ## Building
 
 - Build and install phosg (https://github.com/fuzziqersoftware/phosg)
+- Build and install libamd64 (https://github.com/fuzziqersoftware/libamd64)
 - `make`
 - `sudo make install`
 
