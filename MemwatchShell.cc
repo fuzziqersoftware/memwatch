@@ -245,7 +245,7 @@ void MemwatchShell::command_dump(const string& args) {
     for (const auto& region : regions) {
       if (!region.data.empty()) {
         string filename = string_printf("%s.%016" PRIX64 ".%016" PRIX64 ".bin",
-            args.c_str(), region.addr);
+            args.c_str(), region.addr, region.addr + region.size);
         save_file(filename, region.data);
       }
     }
