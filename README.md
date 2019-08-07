@@ -20,36 +20,41 @@ Upon running memwatch, you'll see a debugger-like prompt like `memwatch:48536/Vi
 
 ## Commands
 
+Most commands can be abbreviated intuitively (e.g. `read`, `rd`, and `r` are all the same command). There are a few unintuitive abbreviations, which are noted below.
+
 ### General commands
+
 - `help`: Displays the memwatch manual page.
 - `attach [pid_or_name]`: Attaches to a new process by PID or by name. If no argument is given, attaches to a process with the same name as the currently-attached process.
 - `data <data_string>`: Parses the data string and displays the raw values returned from the parser. You can use this to test complex data strings before writing them to be sure the correct data will be written.
 - `state [field_name value]`:  With no arguments, displays simple variables from memwatch's internal state. This includes variables from command-line options, like use_color and pause_target. With arguments, sets the internal variable `field_name` to `value`.
-- `quit`: Exits memwatch.
+- `watch <command> [args...]` or `! <command> [args...]`: Repeat the given command every second until Ctrl+C is pressed. Not all commands may be repeated; if the command doesn't support watching, it will execute only once.
+- `quit` or `exit`: Exits memwatch.
 
 ### Memory access commands
+
 memwatch's interactive interface implements the following commands for reading, writing, and otherwise manipulating virtual memory:
 - `access <address> <mode>`: Changes the virtual memory protection mode on the region containing `address`. The access mode is a string consisting of the r, w, or x characters, or some combination thereof. To remove all access to a memory region, use - for the access mode.
 - `list`: Lists memory regions allocated in the target process's address space.
 - `dump [filename_prefix]`: If a prefix is given, dumps all readable memory in the target process to files named `<prefix>.address1.address2.bin`, along with an index file. If no prefix is given, only determines which regions are readable.
-- `read <address> <size> [filename] [+format]`: Reads a block of `size` bytes from `address` in the target process's memory. `address` and `size` are specified in hexadecimal. If a filename is given, writes the data to the given file instead of printing to the terminal. `format` is a short string specifying which additional interpretations of the data should be printed. It starts with '+' and includes any of the characters 'a' (text), 'f' (float), 'd' (double), and 'r' (reverse-endian); the default is '+a'. The `read` command may be prepended with `watch` to repeat the read every second until Ctrl+C is pressed.
+- `read <address> <size> [filename] [+format]`: Reads a block of `size` bytes from `address` in the target process's memory. `address` and `size` are specified in hexadecimal. If a filename is given, writes the data to the given file instead of printing to the terminal. `format` is a short string specifying which additional interpretations of the data should be printed. It starts with '+' and includes any of the characters 'a' (text), 'f' (float), 'd' (double), and 'r' (reverse-endian); the default is '+a'. 
 - `write <address-or-result-id> <data>`: Writes `data` to `address` in the target process's memory. `address` may be preceded by `s` to read the address from the current search result set, or by `t` to read the address from the results of the previous invocation of the `find` command. For example, specifying `s0` refers to the first result address in the current search; `s1` refers to the second result, etc. Results from other searches may also be used by specifying the search name explicitly, as in `s1@search-name`.  See the Data Format section for information on how to specify the data string.
 
-
 ### Memory search commands
+
 memwatch's interactive interface implements the following commands for searching a process's memory for variables:
-- `find <data>`: Finds all occurrences of `data` in readable regions of the target's memory. See the Data Format section for more information on how to specify the search string. Searches done with this command do not affect the current saved search results.
+- `find <data>` or `t <data>`: Finds all occurrences of `data` in readable regions of the target's memory. See the Data Format section for more information on how to specify the search string. Searches done with this command do not affect the current saved search results.
 - `open <type> [name]`: Opens a search for a variable of the given type in writable memory regions. `type` may be suffixed with a ! to search all readable memory instead of only writable memory. See the Search Types section for valid search types. If `name` is not given, the search will be unnamed and cannot be resumed after another search is opened. If `predicate` is given, perform the initial search immediately.
 - `open [name]`: If `name` is given, reopens a previous search. If `name` is not given, lists all open searches.
 - `close [name]`: If `name` is given, closes the specified search. If `name` is not given, closes the current search.
 - `fork <name> [name2]`: If `name2` is given, makes a copy of the search named `name` as `name2`. Otherwise, makes a copy of the current search as `name`.
 - `search [search_name] <operator> [value]`: Reads the values of variables in the current list of results (or the named search's results, if a name is given), and filters out the results for which `new_value operator prev_value` is false. If `value` is not given, uses the value of the variable during the previous search. Valid operators are `<` (less than), `>` (greater than), `<=` (less-or-equal), `>=` (greater-or-equal), `=` (equal), `!=` (not equal), and `$` (flag search - true if the two arguments differ in only one bit). The `$` operator cannot be used in a search for a floating-point variable.
 - `search [search_name] .`: Begins a search for a variable with an unknown initial value. Once this is done, future searches can be done using the above operators.
-- `results [search_name]`: Displays the current list of results. If `search_name` is given, displays the results for that search. The command may be prepended with `watch` to read new values every second.
+- `results [search_name]` or `x`: Displays the current list of results. If `search_name` is given, displays the results for that search.
 - `delete <spec> [spec ...]`: Deletes specific search results. `spec` may be the address of a specific result to delete, or a range of addresses to delete, which is inclusive on both ends. Ranges are specified as a pair of addresses separated by a dash with no spaces. Result references like `s1` are acceptable for this command as well.
 - `iterations [search_name]`: Displays the list of stored iterations for the current search, or the named search if a name is given.
 - `truncate [search_name] <count>`: Deletes all iterations except the `count` most recent from the current search, or the named search if a name is given.
-- `undo [search_name]`: Undoes the latest iteration of the current search, or the named search if a name is given.
+- `undo [search_name]` or `cz`: Undoes the latest iteration of the current search, or the named search if a name is given.
 - `set <value>`: Writes `value` to all addresses in the current result set.
 - `set <result-id> <value>`: Writes `value` to one address in the current result set. `result-id` should be of the form `s0`, `s1`, etc. (as for the `write` command).
 
@@ -60,19 +65,20 @@ memwatch implements a memory freezer, which repeatedly writes values to the targ
 - `freeze [+n<name>] <address-or-result-id> +s<size> [+d]`: Identical to the above command, but uses the data already present in the process's memory. Size is specified in hexadecimal.
 - `freeze [+n<name>] <address-or-result-id> +m<max-entries> <data> [+N<null-data>] [+d]`: Sets a freeze on an array of `max-entries` items starting at `address` with the given data. If `data` is not present in the array, the first null entry in the array is overwritten with `data`. Null entries are those whose contents are entirely zeroes, or whose contents match `null-data` if `null-data` is given. The size of each array element is assumed to be the size of `data`. `data` and `null-data` must have equal sizes.
 - `unfreeze [id]`: If `id` is not given, displays the list of currently-frozen regions. Otherwise, `id` may be the index, address, or name of the region to unfreeze. If a name is given and multiple regions have the same name, unfreezes all of them. If `*` is given, unfreezes all regions.
-- `enable <id>`: Enables the given frozen regions, so their values will be written. Values for `id` are specified in the same way as for the `unfreeze` command.
-- `disable <id>`: Disables the given frozen regions, so their values will not be written. Values for `id` are specified in the same way as for the `unfreeze` command.
+- `enable <id>` or `+ <id>`: Enables the given frozen regions, so their values will be written. Values for `id` are specified in the same way as for the `unfreeze` command.
+- `disable <id>` or `- <id>`: Disables the given frozen regions, so their values will not be written. Values for `id` are specified in the same way as for the `unfreeze` command.
 - `frozen [data | commands]`: Displays the list of currently-frozen regions. If run as `frozen data`, displays the data associated with each region as well. If run as `frozen commands`, displays for each frozen region a command to freeze that region (this is generally a more concise way to view frozen regions with their data).
 
 ### Execution state management commands
+
 memwatch implements experimental support for viewing and modifying execution state in the target process, implemented by the following commands:
 - `pause`: Pauses the target process.
-- `resume`: Unpauses the target process.
+- `unpause` or `resume`: Unpauses the target process.
 - `signal <signum>`: Sends the Unix signal `signum` to the target process. See the signal(3) manual page for a list of signals.
 - `regs`: Reads the register state for all threads in the target process. If the process is not paused, thread registers might not represent an actual overall state of the process at any point in time.
 - `wregs <thread_id> <value> <reg>`: Writes `value` to `reg` in one thread of the target process. `thread_id` should match one of the thread IDs shown by the regs command.
-- `stacks [size]`: Reads `size` bytes from the stack of each thread. If not given, `size` defaults to 0x100 (256 bytes).
-- `run <filename> [+l<start_label_name>] [+s<stack_size>] [+r] [+n]`: Assembles the given assembly code (from the file) and runs it in a new thread in the target process. The file must be written in Intel syntax, and only common opcodes are supported. If `+l` is given, execution will start at the given label; otherwise it will start at the label `start`. If `+s` is given, the value will be rounded up to a page boundary, and that much memory will be allocated for the thread's stack; if `+s` is not given, the default stack size is 4KB. If `[+r]` is given, memwatch will print the thread's register values when it terminates. If `+n` is given, memwatch will not wait for the thread to terminate, and will not deallocate its code and stack space. Without this option, memwatch will wait until the thread terminates or until memwatch receives a SIGINT (Ctrl+C), in which case it will terminate the thread and free its memory.
+- `stacks [size]`: Reads `size` bytes from the stack of each thread. If not given, `size` defaults to 0x100 (256 bytes). This won't provide a consistent snapshot of the process' state unless it's paused.
+- `run <filename> [+l<start_label_name>] [+s<stack_size>] [+r] [+n]`: Assembles the given assembly code (from the file) and runs it in a new thread in the target process. The file must be written in Intel syntax, and only common opcodes are supported. If `+l` is given, execution will start at the given label; otherwise it will start at the label `start`. If `+s` is given, the value will be rounded up to a page boundary, and that much memory will be allocated for the thread's stack; if `+s` is not given, the default stack size is 4KB. If `+r` is given, memwatch will print the thread's register values when it terminates. If `+n` is given, memwatch will not wait for the thread to terminate, and will not deallocate its code and stack space. Without this option, memwatch will wait until the thread terminates or until memwatch receives a SIGINT (Ctrl+C), in which case it will terminate the thread and free its memory.
 
 ## Search types
 memwatch supports searching for the following types of variables. Any type except 'str' may be prefixed by the letter 'r' to perform reverse-endian searches (that is, to search for big-endian values on a little-endian architecture, or vice versa).

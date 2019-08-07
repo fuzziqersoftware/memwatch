@@ -36,7 +36,9 @@ The process ID or partial name (case-insensitive) of a process to target. In the
 A single command (see the following sections) which will be executed instead of entering the interactive interface. Freeze and search commands (except for "find") are not supported in this interface.
 
 .SH "GENERAL COMMANDS"
-.BR memwatch "\'s interactive interface implements the following general commands:"
+.BR "" "Most commands can be abbreviated intuitively (e.g. " read ", " rd ", and " r " are all the same command). There are a few unintuitive abbreviations, which are noted below."
+
+memwatch\'s interactive interface implements the following general commands:
 .TP
 .BI "help"
 .RI "Displays this manual page."
@@ -49,6 +51,9 @@ A single command (see the following sections) which will be executed instead of 
 .TP
 .BI "state [" "field_name value" "]"
 .RI "With no arguments, displays simple variables from memwatch's internal state. This includes variables from command-line options, like use_color and pause_target. With arguments, sets the internal variable " field_name " to " value "."
+.TP
+.BI "watch " command " [" args... "]"
+.RI "Repeat the given command every second until Ctrl+C is pressed. Not all commands may be repeated; if the command doesn't support watching, it will execute only once."
 .TP
 .BI "quit"
 .RI "Exits memwatch."
@@ -66,7 +71,7 @@ A single command (see the following sections) which will be executed instead of 
 .RI "If " filename_prefix " is given, dumps all readable memory in the target process to files named " filename_prefix ".address1.address2.bin, along with an index file. If " filename_prefix " is not given, only determines which regions are readable."
 .TP
 .BI "read " "address" " " "size" " [" "filename" "] [" "+format" "]"
-.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " and " size " are specified in hexadecimal. If a filename is given, writes the data to the given file instead of printing to the terminal. " format " is a short string specifying which additional interpretations of the data should be printed. It starts with '+' and includes any of the characters 'a' (text), 'f' (float), 'd' (double), and 'r' (reverse-endian); the default is '+a'. The " read " command may be prepended with " watch " to repeat the read every second until Ctrl+C is pressed."
+.RI "Reads a block of " size " bytes from " address " in the target process\'s memory. " address " and " size " are specified in hexadecimal. If a filename is given, writes the data to the given file instead of printing to the terminal. " format " is a short string specifying which additional interpretations of the data should be printed. It starts with '+' and includes any of the characters 'a' (text), 'f' (float), 'd' (double), and 'r' (reverse-endian); the default is '+a'."
 .TP
 .BI "write " "address-or-result-id" " " "data"
 .RI "Writes " data " to " address " in the target process\'s memory. " address " may be preceded by " s " to read the address from the current search result set, or by " t " to read the address from the results of the previous invocation of the " find " command. For example, specifying " s0 " refers to the first result address in the current search; " s1 " refers to the second result, etc. Results from other searches may also be used by specifying the search name explicitly, as in " s1@search-name ".  See the DATA FORMAT section for information on how to specify the data string."
@@ -96,7 +101,7 @@ A single command (see the following sections) which will be executed instead of 
 .RI "Begins a search for a variable with an unknown initial value. Once this is done, future searches can be done using the above operators."
 .TP
 .BI "results [" search_name "]"
-.RI "Displays the current list of results. If search_name is given, displays the results for that search. The command may be prepended with " watch " to read new values every second."
+.RI "Displays the current list of results. If search_name is given, displays the results for that search."
 .TP
 .BI "delete " spec " [" "spec ..." "]"
 .RI "Deletes specific search results. " spec " may be the address of a specific result to delete, or a range of addresses to delete, which is inclusive on both ends. Ranges are specified as a pair of addresses separated by a dash with no spaces. Result references like " s1 " are acceptable for this command as well."
@@ -159,7 +164,7 @@ A single command (see the following sections) which will be executed instead of 
 .RI "Writes " value " to " reg " in one thread of the target process. " thread_id " should match one of the thread IDs shown by the regs command."
 .TP
 .BI "stacks [" size "]"
-.RI "Reads " size " bytes from the stack of each thread. If not given, " size " defaults to 0x100 (256 bytes)."
+.RI "Reads " size " bytes from the stack of each thread. If not given, " size " defaults to 0x100 (256 bytes). This won't provide a consistent snapshot of the process' state unless it's paused."
 .TP
 .BI "run " filename " [+l" start_label_name "] [+s" stack_size "] [+r] [+n]"
 .RI "Assembles the given assembly code (from the file) and runs it in a new thread in the target process. The file must be written in Intel syntax, and only common opcodes are supported. If +l is given, execution will start at the given label; otherwise it will start at the label " start ". If +s is given, the value will be rounded up to a page boundary, and that much memory will be allocated for the thread's stack; if +s is not given, the default stack size is 4KB. If +r is given, memwatch will print the thread's register values when it terminates. If +n is given, memwatch will not wait for the thread to terminate, and will not deallocate its code and stack space. Without this option, memwatch will wait until the thread terminates or until memwatch receives a SIGINT (Ctrl+C), in which case it will terminate the thread and free its memory."
