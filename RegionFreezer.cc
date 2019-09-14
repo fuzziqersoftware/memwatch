@@ -225,9 +225,14 @@ RegionFreezer::Region::Region(const std::string& name, uint64_t index,
     index(index), addr(addr), data(data), error(), enable(enable) { }
 
 void RegionFreezer::Region::print(FILE* stream, bool with_data) const {
-  fprintf(stream, "%4" PRIu64 ": %016" PRIX64 ":%016zX [%s] %s%s\n",
-      this->index, this->addr, this->data.size(), this->error.c_str(),
-      this->name.c_str(), this->enable ? "" : " (disabled)");
+  fprintf(stream, "%4" PRIu64 ": %016" PRIX64 ":%016zX %s%s",
+      this->index, this->addr, this->data.size(), this->name.c_str(),
+      this->enable ? "" : " (disabled)");
+  if (!this->error.empty()) {
+    fprintf(stream, " (error: %s)\n", this->error.c_str());
+  } else {
+    fputc('\n', stream);
+  }
   if (with_data) {
     fprintf(stream, "data:\n");
     print_data(stream, this->data.data(), this->data.size(), this->addr);
@@ -264,10 +269,14 @@ RegionFreezer::ArrayRegion::ArrayRegion(const std::string& name, uint64_t index,
 }
 
 void RegionFreezer::ArrayRegion::print(FILE* stream, bool with_data) const {
-  fprintf(stream, "%4" PRIu64 ": %016" PRIX64 ":%016zX [array:%zu] [%s] %s%s\n",
+  fprintf(stream, "%4" PRIu64 ": %016" PRIX64 ":%016zX [array:%zu] %s%s",
       this->index, this->addr, this->data.size(), this->num_items,
-      this->error.c_str(), this->name.c_str(),
-      this->enable ? "" : " (disabled)");
+      this->name.c_str(), this->enable ? "" : " (disabled)");
+  if (!this->error.empty()) {
+    fprintf(stream, " (error: %s)\n", this->error.c_str());
+  } else {
+    fputc('\n', stream);
+  }
   if (with_data) {
     fprintf(stream, "data:\n");
     print_data(stream, this->data.data(), this->data.size());
