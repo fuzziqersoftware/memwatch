@@ -1345,6 +1345,7 @@ void MemwatchShell::command_run(const string& args_str) {
   size_t stack_size = 0x1000;
   bool wait_for_termination = true;
   bool print_regs = false;
+  bool writable_code = false;
   string start_label_name = "start";
   for (string arg : this->split_args(args_str, 1, 0)) {
     if (arg[0] == '+') {
@@ -1357,6 +1358,9 @@ void MemwatchShell::command_run(const string& args_str) {
           break;
         case 'n':
           wait_for_termination = false;
+          break;
+        case 'w':
+          writable_code = true;
           break;
         case 'r':
           print_regs = true;
@@ -1432,7 +1436,8 @@ void MemwatchShell::command_run(const string& args_str) {
 
   // make code non-writable
   this->adapter->set_protection(code_addr, code_size,
-      Protection::READABLE | Protection::EXECUTABLE, Protection::ALL_ACCESS);
+      Protection::READABLE | Protection::EXECUTABLE | (writable_code ? Protection::WRITABLE : 0),
+      Protection::ALL_ACCESS);
 
   // allocate the stack region
   auto stack_addr = this->adapter->allocate(0, stack_size);
