@@ -271,7 +271,11 @@ void MemwatchShell::command_find(const string& args) {
 
   this->find_results.clear();
 
+  Signalable s;
   for (const auto& region : regions) {
+    if (s.is_signaled()) {
+      break;
+    }
     if (region.data.empty()) {
       continue;
     }
