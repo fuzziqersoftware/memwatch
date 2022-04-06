@@ -4,10 +4,9 @@
 #include <sys/types.h>
 
 #include <map>
+#include <shared_mutex>
 #include <string>
 #include <thread>
-
-#include <phosg/Concurrency.hh>
 
 #include "ProcessMemoryAdapter.hh"
 
@@ -86,7 +85,7 @@ private:
   std::map<size_t, std::shared_ptr<Region>> regions_by_index;
   std::atomic<size_t> next_index;
 
-  mutable rw_lock lock;
+  mutable std::shared_mutex lock;
   std::atomic<bool> should_exit;
   std::thread thread;
 

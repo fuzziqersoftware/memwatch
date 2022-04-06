@@ -1,8 +1,9 @@
 #pragma once
 
 #include <unordered_set>
+#include <shared_mutex>
 
-#include <phosg/Concurrency.hh>
+
 
 class Signalable {
 public:
@@ -15,6 +16,6 @@ public:
 private:
   bool signaled;
 
-  static rw_lock lock;
+  static std::shared_mutex lock;
   static std::unordered_set<Signalable*> all_signalables;
 };

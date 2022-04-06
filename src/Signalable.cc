@@ -2,18 +2,16 @@
 
 #include <unordered_set>
 
-#include <phosg/Concurrency.hh>
-
 using namespace std;
 
 
 Signalable::Signalable() : signaled(false) {
-  rw_guard g(Signalable::lock, true);
+  unique_lock g(Signalable::lock);
   Signalable::all_signalables.emplace(this);
 }
 
 Signalable::~Signalable() {
-  rw_guard g(Signalable::lock, true);
+  unique_lock g(Signalable::lock);
   Signalable::all_signalables.erase(this);
 }
 
@@ -22,12 +20,12 @@ bool Signalable::is_signaled() const {
 }
 
 bool Signalable::signal_all() {
-  rw_guard g(Signalable::lock, false);
+  shared_lock g(Signalable::lock);
   for (auto& s : all_signalables) {
     s->signaled = true;
   }
   return !all_signalables.empty();
 }
 
-rw_lock Signalable::lock;
+shared_mutex Signalable::lock;
 unordered_set<Signalable*> Signalable::all_signalables;

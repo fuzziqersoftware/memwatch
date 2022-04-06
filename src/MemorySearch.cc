@@ -20,20 +20,20 @@ using namespace std;
 // this section declares comparator functions, one for each pair of (operation,
 // datatype), as well as the null predicate (which is always true).
 
-static bool null_pred(void* a, void* b, size_t size) {
+static bool null_pred(void*, void*, size_t) {
   return true;
 }
 
 #define DECLARE_OP_FUNCTION(type, op, name) \
-  static bool name(const type* a, const type* b, size_t size) { \
+  static bool name(const type* a, const type* b, size_t) { \
     return *a op *b; \
   }
 #define DECLARE_INT_OP_FUNCTION_RE(type, op, width, name) \
-  static bool name(const type* a, const type* b, size_t size) { \
+  static bool name(const type* a, const type* b, size_t) { \
     return bswap##width(*a) op bswap##width(*b); \
   }
 #define DECLARE_FLOAT_OP_FUNCTION_RE(type, op, width, name) \
-  static bool name(const type* a, const type* b, size_t size) { \
+  static bool name(const type* a, const type* b, size_t) { \
     type ar, br; \
     *(uint##width##_t*)&ar = bswap##width(*(uint##width##_t*)a); \
     *(uint##width##_t*)&br = bswap##width(*(uint##width##_t*)b); \
@@ -88,7 +88,7 @@ DECLARE_FLOAT_OP_FUNCTIONS_FOR_TYPE(float, 32)
 DECLARE_FLOAT_OP_FUNCTIONS_FOR_TYPE(double, 64)
 
 #define DECLARE_FLAG_OP_FUNCTION(type) \
-  static bool type##_flag(type* a, type* b, size_t size) { \
+  static bool type##_flag(type* a, type* b, size_t) { \
     return (*a ^ *b) && !((*a ^ *b) & ((*a ^ *b) - 1)); \
   }
 

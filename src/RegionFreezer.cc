@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <phosg/Concurrency.hh>
 #include <phosg/Strings.hh>
 
 using namespace std;
@@ -76,7 +75,7 @@ static void erase_by_value(unordered_multimap<K, V>& m, K& k, V& v) {
 size_t RegionFreezer::unfreeze_name(const string& name) {
   size_t num_deleted = 0;
 
-  rw_guard g(this->lock, true);
+  unique_lock g(this->lock);
   auto its = this->regions_by_name.equal_range(name);
   for (auto it = its.first; it != its.second; it++) {
     erase_by_value(this->regions_by_addr, it->second->addr, it->second);
@@ -91,7 +90,7 @@ size_t RegionFreezer::unfreeze_name(const string& name) {
 size_t RegionFreezer::unfreeze_addr(mach_vm_address_t addr) {
   size_t num_deleted = 0;
 
-  rw_guard g(this->lock, true);
+  unique_lock g(this->lock);
   auto its = this->regions_by_addr.equal_range(addr);
   for (auto it = its.first; it != its.second; it++) {
     erase_by_value(this->regions_by_name, it->second->name, it->second);
@@ -104,7 +103,7 @@ size_t RegionFreezer::unfreeze_addr(mach_vm_address_t addr) {
 }
 
 bool RegionFreezer::unfreeze_index(size_t index) {
-  rw_guard g(this->lock, true);
+  unique_lock g(this->lock);
   auto it = this->regions_by_index.find(index);
   if (it == this->regions_by_index.end()) {
     return false;
@@ -117,7 +116,7 @@ bool RegionFreezer::unfreeze_index(size_t index) {
 }
 
 size_t RegionFreezer::unfreeze_all() {
-  rw_guard g(this->lock, true);
+  unique_lock g(this->lock);
   size_t num_regions = this->regions_by_index.size();
   this->regions_by_name.clear();
   this->regions_by_name.clear();
@@ -128,7 +127,7 @@ size_t RegionFreezer::unfreeze_all() {
 size_t RegionFreezer::enable_name(const string& name, bool enable) {
   size_t num_changed = 0;
 
-  rw_guard g(this->lock, true);
+  unique_lock g(this->lock);
   auto its = this->regions_by_name.equal_range(name);
   for (auto it = its.first; it != its.second; it++) {
     if (it->second->enable == enable) {
@@ -144,7 +143,7 @@ size_t RegionFreezer::enable_name(const string& name, bool enable) {
 size_t RegionFreezer::enable_addr(mach_vm_address_t addr, bool enable) {
   size_t num_changed = 0;
 
-  rw_guard g(this->lock, true);
+  unique_lock g(this->lock);
   auto its = this->regions_by_addr.equal_range(addr);
   for (auto it = its.first; it != its.second; it++) {
     if (it->second->enable == enable) {
@@ -159,7 +158,7 @@ size_t RegionFreezer::enable_addr(mach_vm_address_t addr, bool enable) {
 
 bool RegionFreezer::enable_index(size_t index, bool enable) {
   try {
-    rw_guard g(this->lock, true);
+    unique_lock g(this->lock);
     auto rgn = this->regions_by_index.at(index);
     if (rgn->enable == enable) {
       return false;
@@ -174,7 +173,7 @@ bool RegionFreezer::enable_index(size_t index, bool enable) {
 size_t RegionFreezer::enable_all(bool enable) {
   size_t num_changed = 0;
 
-  rw_guard g(this->lock, true);
+  unique_lock g(this->lock);
   for (auto& it : this->regions_by_index) {
     if (it.second->enable == enable) {
       continue;
@@ -191,7 +190,7 @@ size_t RegionFreezer::frozen_count() const {
 }
 
 void RegionFreezer::print_regions(FILE* stream, bool with_data) const {
-  rw_guard g(this->lock, false);
+  shared_lock g(this->lock);
 
   if (this->regions_by_index.empty()) {
     fprintf(stream, "no regions frozen\n");
@@ -205,7 +204,7 @@ void RegionFreezer::print_regions(FILE* stream, bool with_data) const {
 }
 
 void RegionFreezer::print_regions_commands(FILE* stream) const {
-  rw_guard g(this->lock, false);
+  shared_lock g(this->lock);
 
   if (this->regions_by_index.empty()) {
     fprintf(stream, "no regions frozen\n");
@@ -356,7 +355,7 @@ void RegionFreezer::ArrayRegion::write(shared_ptr<ProcessMemoryAdapter> adapter)
 }
 
 void RegionFreezer::add_region(shared_ptr<Region> rgn) {
-  rw_guard g(this->lock, true);
+  unique_lock g(this->lock);
   this->regions_by_name.emplace(rgn->name, rgn);
   this->regions_by_addr.emplace(rgn->addr, rgn);
   this->regions_by_index.emplace(rgn->index, rgn);
@@ -365,7 +364,7 @@ void RegionFreezer::add_region(shared_ptr<Region> rgn) {
 void RegionFreezer::run_write_thread() {
   while (!this->should_exit) {
     {
-      rw_guard g(this->lock, true);
+      unique_lock g(this->lock);
       for (auto& it : this->regions_by_index) {
         if (it.second->enable) {
           it.second->write(this->adapter);

@@ -24,7 +24,6 @@ Most commands can be abbreviated intuitively (e.g. `read`, `rd`, and `r` are all
 
 ### General commands
 
-- `help`: Displays the memwatch manual page.
 - `attach [pid_or_name]`: Attaches to a new process by PID or by name. If no argument is given, attaches to a process with the same name as the currently-attached process.
 - `data <data_string>`: Parses the data string and displays the raw values returned from the parser. You can use this to test complex data strings before writing them to be sure the correct data will be written.
 - `state [field_name value]`:  With no arguments, displays simple variables from memwatch's internal state. This includes variables from command-line options, like use_color and pause_target. With arguments, sets the internal variable `field_name` to `value`.
@@ -75,10 +74,6 @@ memwatch implements experimental support for viewing and modifying execution sta
 - `pause`: Pauses the target process.
 - `unpause` or `resume`: Unpauses the target process.
 - `signal <signum>`: Sends the Unix signal `signum` to the target process. See the signal(3) manual page for a list of signals.
-- `regs`: Reads the register state for all threads in the target process. If the process is not paused, thread registers might not represent an actual overall state of the process at any point in time.
-- `wregs <thread_id> <value> <reg>`: Writes `value` to `reg` in one thread of the target process. `thread_id` should match one of the thread IDs shown by the regs command.
-- `stacks [size]`: Reads `size` bytes from the stack of each thread. If not given, `size` defaults to 0x100 (256 bytes). This won't provide a consistent snapshot of the process' state unless it's paused.
-- `run <filename> [+l<start_label_name>] [+s<stack_size>] [+w] [+r] [+n]`: Assembles the given assembly code (from the file) and runs it in a new thread in the target process. The file must be written in Intel syntax, and only common opcodes are supported. If `+l` is given, execution will start at the given label; otherwise it will start at the label `start`. If `+s` is given, the value will be rounded up to a page boundary, and that much memory will be allocated for the thread's stack; if `+s` is not given, the default stack size is 4KB. If `+w` is given, the memory used for the executable code will also be writable. If `+r` is given, memwatch will print the thread's register values when it terminates. If `+n` is given, memwatch will not wait for the thread to terminate, and will not deallocate its code and stack space. Without this option, memwatch will wait until the thread terminates or until memwatch receives a SIGINT (Ctrl+C), in which case it will terminate the thread and free its memory.
 
 ## Search types
 memwatch supports searching for the following types of variables. Any type except 'str' may be prefixed by the letter 'r' to perform reverse-endian searches (that is, to search for big-endian values on a little-endian architecture, or vice versa).

@@ -1,2 +1,9 @@
-*.o
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+
+array_test
+value_test
+value_test_float
 memwatch

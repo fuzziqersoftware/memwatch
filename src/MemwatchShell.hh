@@ -58,12 +58,8 @@ private:
       const std::vector<ProcessMemoryAdapter::Region>& regions);
   uint64_t get_addr_from_command(const std::string& args);
   void print_search_results(const MemorySearch& search);
-  void print_thread_regs(int tid,
-      const ProcessMemoryAdapter::ThreadState& state,
-      const ProcessMemoryAdapter::ThreadState* prev);
   std::string details_for_iteration(const MemorySearch& s);
 
-  void command_help(const std::string& args);
   void command_list(const std::string& args);
   void command_watch(const std::string& args);
   void command_dump(const std::string& args);

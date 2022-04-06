@@ -19,8 +19,6 @@
 #include <phosg/Process.hh>
 #include <phosg/Strings.hh>
 #include <phosg/Time.hh>
-#include <libamd64/AMD64Assembler.hh>
-#include <libamd64/FileAssembler.hh>
 
 #include "Signalable.hh"
 
@@ -106,7 +104,7 @@ void MemwatchShell::print_regions(FILE* stream,
 
   fprintf(stream, "# addr size access/max_access\n");
   for (const auto& region : regions) {
-    fprintf(stream, "%016" PRIX64 " %016" PRIX64 " %c%c%c/%c%c%c%s\n",
+    fprintf(stream, "%016" PRIX64 " %016zX %c%c%c/%c%c%c%s\n",
         region.addr,
         region.size,
         (region.protection & Protection::READABLE) ? 'r' : '-',
@@ -201,18 +199,8 @@ uint64_t MemwatchShell::get_addr_from_command(const string& args) {
 ////////////////////////////////////////////////////////////////////////////////
 // command handlers
 
-// help (no arguments)
-void MemwatchShell::command_help(const string& args) {
-  // this is cheating but it means I don't have to maintain two very similar
-  // sets of documentation
-  int retcode = system("man memwatch");
-  if (retcode) {
-    throw runtime_error("failed to open the man page - memwatch may not be installed properly on your system");
-  }
-}
-
 // list (no arguments)
-void MemwatchShell::command_list(const string& args) {
+void MemwatchShell::command_list(const string&) {
   vector<ProcessMemoryAdapter::Region> regions;
   {
     PauseGuard g(this->pause_target ? this->adapter : NULL);
@@ -281,7 +269,7 @@ void MemwatchShell::command_find(const string& args) {
     }
 
     // search through this region's data for the string
-    int y, z;
+    size_t y, z;
     for (y = 0; y <= region.size - data.size(); y++) {
       for (z = 0; z < data.size(); z++) {
         if (mask[z] && (region.data[y + z] != data[z])) {
@@ -332,7 +320,7 @@ void MemwatchShell::command_read(const string& args_str) {
   uint64_t size = stoull(args[1], NULL, 16);
 
   const string* filename = NULL;
-  uint64_t print_flags = PrintDataFlags::PrintAscii | PrintDataFlags::UseColor;
+  uint64_t print_flags = PrintDataFlags::PRINT_ASCII | PrintDataFlags::USE_COLOR;
   for (size_t x = 2; x < args.size(); x++) {
     if (args[x].empty()) {
       continue;
@@ -343,13 +331,13 @@ void MemwatchShell::command_read(const string& args_str) {
         if (ch == '+') {
           continue;
         } else if (ch == 'a') {
-          print_flags |= PrintDataFlags::PrintAscii;
+          print_flags |= PrintDataFlags::PRINT_ASCII;
         } else if (ch == 'f') {
-          print_flags |= PrintDataFlags::PrintFloat;
+          print_flags |= PrintDataFlags::PRINT_FLOAT;
         } else if (ch == 'd') {
-          print_flags |= PrintDataFlags::PrintDouble;
+          print_flags |= PrintDataFlags::PRINT_DOUBLE;
         } else if (ch == 'r') {
-          print_flags |= PrintDataFlags::ReverseEndian;
+          print_flags |= PrintDataFlags::REVERSE_ENDIAN;
         }
       }
     } else {
@@ -1168,332 +1156,13 @@ void MemwatchShell::command_close(const string& args) {
   }
 }
 
-#define print_reg_value(str, state, prev, regname) \
-  do { \
-    int diff = ((prev) && ((state).regname != (prev)->regname)); \
-    if (this->use_color && diff) { \
-      print_color_escape(stdout, TerminalFormat::BOLD, TerminalFormat::FG_RED, \
-          TerminalFormat::END); \
-    } \
-    printf((str), (state).regname); \
-    if (this->use_color && diff) { \
-      print_color_escape(stdout, TerminalFormat::NORMAL, TerminalFormat::END); \
-    } \
-  } while (0);
-
-// prints the register contents in a thread state
-void MemwatchShell::print_thread_regs(int tid,
-    const ProcessMemoryAdapter::ThreadState& state,
-    const ProcessMemoryAdapter::ThreadState* prev) {
-
-  if (prev && (state.is64 != prev->is64)) {
-    printf("warning: previous thread state does not match architecture of current state\n");
-    prev = NULL;
-  }
-
-  if (!state.is64) {
-    printf("[%d: thread 32-bit @ ", tid);
-    print_reg_value("eip:%08" PRIX32, state, prev, st32.__eip);
-    printf("]\n");
-    print_reg_value("  eax: %08" PRIX32,         state, prev, st32.__eax);
-    print_reg_value("  ecx: %08" PRIX32,         state, prev, st32.__ecx);
-    print_reg_value("  edx: %08" PRIX32,         state, prev, st32.__edx);
-    print_reg_value("  ebx: %08" PRIX32 "\n",    state, prev, st32.__ebx);
-    print_reg_value("  ebp: %08" PRIX32,         state, prev, st32.__ebp);
-    print_reg_value("  esp: %08" PRIX32,         state, prev, st32.__esp);
-    print_reg_value("  esi: %08" PRIX32,         state, prev, st32.__esi);
-    print_reg_value("  edi: %08" PRIX32 "\n",    state, prev, st32.__edi);
-    print_reg_value("  eflags: %08" PRIX32 "\n", state, prev, st32.__eflags);
-    print_reg_value("  cs:  %08" PRIX32,         state, prev, st32.__cs);
-    print_reg_value("  ds:  %08" PRIX32,         state, prev, st32.__ds);
-    print_reg_value("  es:  %08" PRIX32,         state, prev, st32.__es);
-    print_reg_value("  fs:  %08" PRIX32 "\n",    state, prev, st32.__fs);
-    print_reg_value("  gs:  %08" PRIX32,         state, prev, st32.__gs);
-    print_reg_value("  ss:  %08" PRIX32 "\n",    state, prev, st32.__ss);
-    // TODO: print floating state
-    print_reg_value("  dr0: %08" PRIX32,         state, prev, db32.__dr0);
-    print_reg_value("  dr1: %08" PRIX32,         state, prev, db32.__dr1);
-    print_reg_value("  dr2: %08" PRIX32,         state, prev, db32.__dr2);
-    print_reg_value("  dr3: %08" PRIX32 "\n",    state, prev, db32.__dr3);
-    print_reg_value("  dr4: %08" PRIX32,         state, prev, db32.__dr4);
-    print_reg_value("  dr5: %08" PRIX32,         state, prev, db32.__dr5);
-    print_reg_value("  dr6: %08" PRIX32,         state, prev, db32.__dr6);
-    print_reg_value("  dr7: %08" PRIX32 "\n",    state, prev, db32.__dr7);
-
-  } else {
-    printf("[%d: thread 64-bit @ ", tid);
-    print_reg_value("rip:%016" PRIX64, state, prev, st64.__rip);
-    printf("]\n");
-    print_reg_value("  rax: %016" PRIX64,         state, prev, st64.__rax);
-    print_reg_value("  rcx: %016" PRIX64,         state, prev, st64.__rcx);
-    print_reg_value("  rdx: %016" PRIX64 "\n",    state, prev, st64.__rdx);
-    print_reg_value("  rbx: %016" PRIX64,         state, prev, st64.__rbx);
-    print_reg_value("  rbp: %016" PRIX64,         state, prev, st64.__rbp);
-    print_reg_value("  rsp: %016" PRIX64 "\n",    state, prev, st64.__rsp);
-    print_reg_value("  rsi: %016" PRIX64,         state, prev, st64.__rsi);
-    print_reg_value("  rdi: %016" PRIX64,         state, prev, st64.__rdi);
-    print_reg_value("  r8:  %016" PRIX64 "\n",    state, prev, st64.__r8);
-    print_reg_value("  r9:  %016" PRIX64,         state, prev, st64.__r9);
-    print_reg_value("  r10: %016" PRIX64,         state, prev, st64.__r10);
-    print_reg_value("  r11: %016" PRIX64 "\n",    state, prev, st64.__r11);
-    print_reg_value("  r12: %016" PRIX64,         state, prev, st64.__r12);
-    print_reg_value("  r13: %016" PRIX64,         state, prev, st64.__r13);
-    print_reg_value("  r14: %016" PRIX64 "\n",    state, prev, st64.__r14);
-    print_reg_value("  r15: %016" PRIX64,         state, prev, st64.__r15);
-    print_reg_value("  rflags: %016" PRIX64 "\n", state, prev, st64.__rflags);
-    // TODO: print floating state
-    print_reg_value("  cs:  %016" PRIX64,         state, prev, st64.__cs);
-    print_reg_value("  fs:  %016" PRIX64,         state, prev, st64.__fs);
-    print_reg_value("  gs:  %016" PRIX64 "\n",    state, prev, st64.__gs);
-    print_reg_value("  dr0: %016" PRIX64,         state, prev, db64.__dr0);
-    print_reg_value("  dr1: %016" PRIX64,         state, prev, db64.__dr1);
-    print_reg_value("  dr2: %016" PRIX64 "\n",    state, prev, db64.__dr2);
-    print_reg_value("  dr3: %016" PRIX64,         state, prev, db64.__dr3);
-    print_reg_value("  dr4: %016" PRIX64,         state, prev, db64.__dr4);
-    print_reg_value("  dr5: %016" PRIX64 "\n",    state, prev, db64.__dr5);
-    print_reg_value("  dr6: %016" PRIX64,         state, prev, db64.__dr6);
-    print_reg_value("  dr7: %016" PRIX64 "\n",    state, prev, db64.__dr7);
-  }
-}
-
-// regs
-void MemwatchShell::command_read_regs(const string& args_str) {
-
-  Signalable s;
-  do {
-    unordered_map<mach_port_t, ProcessMemoryAdapter::ThreadState> state;
-    unordered_map<mach_port_t, ProcessMemoryAdapter::ThreadState> prev;
-    {
-      PauseGuard g(this->pause_target ? this->adapter : NULL);
-      state = this->adapter->get_threads_registers();
-    }
-
-    string time_str = format_time();
-    printf("%s [%zu threads] // %s\n", this->process_name.c_str(), state.size(),
-        time_str.c_str());
-
-    for (const auto& it : state) {
-      try {
-        this->print_thread_regs(it.first, it.second, &prev.at(it.first));
-      } catch (const out_of_range& e) {
-        this->print_thread_regs(it.first, it.second, NULL);
-      }
-    }
-
-    state.swap(prev);
-    state.clear();
-
-    if (this->watch) {
-      usleep(1000000); // wait a second, if the read is repeating
-    }
-  } while (this->watch && !s.is_signaled());
-}
-
-// wregs <tid> <reg> <value>
-void MemwatchShell::command_write_regs(const string& args_str) {
-  if (!this->interactive) {
-    throw invalid_argument("this command can only be used in interactive mode");
-  }
-
-  auto args = this->split_args(args_str, 3, 3);
-
-  int tid = stoi(args[0]);
-  auto& regname = args[1];
-  uint64_t value = stoull(args[2]);
-
-  {
-    PauseGuard g(this->pause_target ? this->adapter : NULL);
-    auto data = this->adapter->get_threads_registers();
-    try {
-      data.at(tid).set_register_by_name(regname.c_str(), value);
-    } catch (const out_of_range& e) {
-      throw out_of_range("no such thread/register");
-    }
-    this->adapter->set_threads_registers(data);
-  }
-}
-
-// stacks [size]
-void MemwatchShell::command_read_stacks(const string& args_str) {
-
-  uint64_t size = args_str.empty() ? 0x100 : stoull(args_str, NULL, 16);
-
-  Signalable s;
-  do {
-    {
-      PauseGuard g(this->pause_target ? this->adapter : NULL);
-      string time_str = format_time();
-      auto regs = this->adapter->get_threads_registers();
-      for (const auto& it : regs) {
-        uint64_t addr = it.second.is64 ? it.second.st64.__rsp : it.second.st32.__esp;
-        printf("%s [Thread %d] @ %016" PRIX64 ":%016" PRIX64 " // %s\n",
-            this->process_name.c_str(), it.first, addr, size, time_str.c_str());
-        try {
-          string data = this->adapter->read(addr, size);
-          print_data(stdout, data.data(), data.size(), addr);
-        } catch (const exception& e) {
-          printf("failed to read data (%s)\n", e.what());
-        }
-      }
-    }
-
-    if (this->watch) {
-      usleep(1000000); // wait a second, if the read is repeating
-    }
-  } while (this->watch && !s.is_signaled());
-}
-
-// run <assembly-file>
-void MemwatchShell::command_run(const string& args_str) {
-  string filename;
-  size_t stack_size = 0x1000;
-  bool wait_for_termination = true;
-  bool print_regs = false;
-  bool writable_code = false;
-  string start_label_name = "start";
-  for (string arg : this->split_args(args_str, 1, 0)) {
-    if (arg[0] == '+') {
-      switch (arg[1]) {
-        case 's':
-          stack_size = stoull(arg.substr(2), NULL, 16);
-          break;
-        case 'l':
-          start_label_name = &arg[2];
-          break;
-        case 'n':
-          wait_for_termination = false;
-          break;
-        case 'w':
-          writable_code = true;
-          break;
-        case 'r':
-          print_regs = true;
-          break;
-        default:
-          throw invalid_argument("unknown option: " + arg);
-      }
-
-    } else {
-      if (!filename.empty()) {
-        throw invalid_argument("too many positional arguments given");
-      }
-      filename = arg;
-    }
-  }
-  stack_size = (stack_size + 0xFFF) & (~0xFFF);
-
-  string text = (filename == "-") ? read_all(stdin) : load_file(filename);
-
-  auto af = assemble_file(text);
-  if (!af.errors.empty()) {
-    printf("errors in file %s:\n", filename.c_str());
-    for (const string& e : af.errors) {
-      printf("  %s\n", e.c_str());
-    }
-    throw invalid_argument("code could not be assembled");
-  }
-
-  // find the start label
-  ssize_t start_label_offset = -1;
-  for (auto label_it : af.label_offsets) {
-    if (label_it.second == start_label_name) {
-      start_label_offset = label_it.first;
-    }
-  }
-  if (start_label_offset < 0) {
-    throw invalid_argument(string_printf("%s label missing", start_label_name.c_str()));
-  }
-
-  // assemble the return segment (which just loops forever)
-  string exit_code;
-  {
-    AMD64Assembler as;
-    as.write_label("again");
-    as.write_jmp("again");
-
-    unordered_set<size_t> patch_offsets;
-    exit_code = as.assemble(&patch_offsets);
-    if (!patch_offsets.empty()) {
-      throw runtime_error("exit code segment has patches");
-    }
-  }
-  af.code += exit_code;
-
-  // round the size up to a page boundary and allocate the code region
-  size_t code_size = (af.code.size() + 0xFFF) & (~0xFFF);
-  auto code_addr = this->adapter->allocate(0, code_size);
-  uint64_t exit_code_addr = code_addr + af.code.size() - exit_code.size();
-
-  // make code read-write (for now)
-  this->adapter->set_protection(code_addr, code_size,
-      Protection::READABLE | Protection::WRITABLE, Protection::ALL_ACCESS);
-
-  // apply patches to the code
-  char* code_ptr = const_cast<char*>(af.code.data());
-  int64_t delta = static_cast<int64_t>(code_addr);
-  for (size_t patch_offset : af.patch_offsets) {
-    *reinterpret_cast<int64_t*>(code_ptr + patch_offset) += delta;
-  }
-
-  // write the code into the process' memory
-  this->adapter->write(code_addr, af.code);
-
-  // make code non-writable
-  this->adapter->set_protection(code_addr, code_size,
-      Protection::READABLE | Protection::EXECUTABLE | (writable_code ? Protection::WRITABLE : 0),
-      Protection::ALL_ACCESS);
-
-  // allocate the stack region
-  auto stack_addr = this->adapter->allocate(0, stack_size);
-
-  // make stack non-executable
-  this->adapter->set_protection(stack_addr, stack_size,
-      Protection::READABLE | Protection::WRITABLE, Protection::ALL_ACCESS);
-
-  // write the return address for the exit code to the stack region
-  uint64_t rsp = stack_addr + stack_size - 8;
-  this->adapter->write(rsp, &exit_code_addr, 8);
-
-  // start the thread
-  auto thread = this->adapter->create_thread(code_addr + start_label_offset, rsp);
-  printf("started thread at ip=%016" PRIX64 " running 0x%zX bytes of code\n",
-      code_addr, af.code.size());
-
-  if (wait_for_termination) {
-    // wait for the thread to reach the completed location
-    ProcessMemoryAdapter::ThreadState regs;
-    Signalable s;
-    while (!s.is_signaled()) {
-      sched_yield();
-      regs = this->adapter->get_thread_registers(thread);
-      uint64_t ip = regs.is64 ? regs.st64.__rip : regs.st32.__eip;
-      if (ip == exit_code_addr) {
-        break;
-      }
-    }
-
-    // print the thread regs if requested
-    if (print_regs) {
-      this->print_thread_regs(thread, regs, NULL);
-    }
-
-    // terminate the thread
-    this->adapter->terminate_thread(thread);
-    printf("thread has terminated\n");
-
-    // free the code and stack space
-    this->adapter->deallocate(code_addr, code_size);
-    this->adapter->deallocate(stack_addr, stack_size);
-  }
-}
-
 // pause
-void MemwatchShell::command_pause(const string& args_str) {
+void MemwatchShell::command_pause(const string&) {
   this->adapter->pause();
 }
 
 // resume
-void MemwatchShell::command_resume(const string& args_str) {
+void MemwatchShell::command_resume(const string&) {
   this->adapter->resume();
 }
 
@@ -1567,7 +1236,7 @@ void MemwatchShell::command_state(const string& args_str) {
 }
 
 // quit
-void MemwatchShell::command_quit(const string& args_str) {
+void MemwatchShell::command_quit(const string&) {
   this->run = false;
 }
 
@@ -1609,9 +1278,6 @@ const unordered_map<string, MemwatchShell::command_handler_t> MemwatchShell::com
   {"freeze",     &MemwatchShell::command_freeze},
   {"fr",         &MemwatchShell::command_freeze},
   {"f",          &MemwatchShell::command_freeze},
-  {"help",       &MemwatchShell::command_help},
-  {"hlp",        &MemwatchShell::command_help},
-  {"h",          &MemwatchShell::command_help},
   {"iterations", &MemwatchShell::command_iterations},
   {"iters",      &MemwatchShell::command_iterations},
   {"its",        &MemwatchShell::command_iterations},
@@ -1627,20 +1293,15 @@ const unordered_map<string, MemwatchShell::command_handler_t> MemwatchShell::com
   {"q",          &MemwatchShell::command_quit},
   {"read",       &MemwatchShell::command_read},
   {"rd",         &MemwatchShell::command_read},
-  {"regs",       &MemwatchShell::command_read_regs},
   {"results",    &MemwatchShell::command_results},
   {"resume",     &MemwatchShell::command_resume},
   {"res",        &MemwatchShell::command_results},
-  {"run",        &MemwatchShell::command_run},
   {"r",          &MemwatchShell::command_read},
   {"search",     &MemwatchShell::command_search},
   {"s",          &MemwatchShell::command_search},
   {"set",        &MemwatchShell::command_set},
   {"signal",     &MemwatchShell::command_signal},
   {"sig",        &MemwatchShell::command_signal},
-  {"stacks",     &MemwatchShell::command_read_stacks},
-  {"stax",       &MemwatchShell::command_read_stacks},
-  {"stx",        &MemwatchShell::command_read_stacks},
   {"state",      &MemwatchShell::command_state},
   {"st",         &MemwatchShell::command_state},
   {"truncate",   &MemwatchShell::command_truncate},
@@ -1654,7 +1315,6 @@ const unordered_map<string, MemwatchShell::command_handler_t> MemwatchShell::com
   {"watch",      &MemwatchShell::command_watch},
   {"wa",         &MemwatchShell::command_watch},
   {"!",          &MemwatchShell::command_watch},
-  {"wregs",      &MemwatchShell::command_write_regs},
   {"write",      &MemwatchShell::command_write},
   {"wr",         &MemwatchShell::command_write},
   {"w",          &MemwatchShell::command_write},
@@ -1680,7 +1340,7 @@ void MemwatchShell::dispatch_command(const string& args_str) {
   try {
     handler = command_handlers.at(args_str.substr(0, command_end));
   } catch (const out_of_range& e) {
-    throw out_of_range("unknown command - try \'help\'");
+    throw out_of_range("unknown command");
   }
 
   // run the command
@@ -1735,10 +1395,9 @@ int MemwatchShell::execute_commands() {
         prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s(+) # ", this->pid,
             this->process_name.c_str(), this->name_to_searches.size(),
             this->freezer->frozen_count(), search_name,
-            MemorySearch::short_name_for_search_type(s.get_type()),
-            s.get_results().size());
+            MemorySearch::short_name_for_search_type(s.get_type()));
       } else {
-        prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s(%llu) # ", this->pid,
+        prompt = string_printf("memwatch:%u/%s %zus/%zuf %s:%s(%zu) # ", this->pid,
             this->process_name.c_str(), this->name_to_searches.size(),
             this->freezer->frozen_count(), search_name,
             MemorySearch::short_name_for_search_type(s.get_type()),

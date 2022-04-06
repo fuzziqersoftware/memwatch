@@ -1,5 +1,4 @@
 #include <sys/types.h>
-#include <sys/ptrace.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +6,7 @@
 #include <unistd.h>
 
 
-int main(int argc, char* argv[]) {
+int main(int, char**) {
 
   printf("pid: %d\n", getpid());
 

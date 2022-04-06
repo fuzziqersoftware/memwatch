@@ -15,10 +15,10 @@ using namespace std;
 // signal handler for ctrl+c: cancel operations first; if there are none to
 // cancel, then quit
 
-uint64_t recent_cancel_time = 0;
+time_t recent_cancel_time = 0;
 uint64_t recent_cancel_count = 0;
 
-void sigint_handler(int signum) {
+void sigint_handler(int) {
   if (recent_cancel_time == time(NULL)) {
     if (recent_cancel_count > 1) {
       fprintf(stderr, " -- no operation to cancel - terminating\n");
@@ -170,7 +170,7 @@ int main(int argc, char** argv) {
 
       char choice[10];
       fgets(choice, sizeof(choice), stdin);
-      int choice_index = atoi(choice);
+      size_t choice_index = strtoull(choice, nullptr, 0);
       if (choice_index < 0 || choice_index >= pids.size()) {
         fprintf(stderr, "invalid choice\n");
         return 2;
