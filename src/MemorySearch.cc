@@ -288,6 +288,9 @@ void MemorySearch::update(shared_ptr<vector<ProcessMemoryAdapter::Region>> new_m
     if (progress_file) {
       size_t total_bytes = 0;
       for (const auto& region : *new_memory) {
+        if (region.data.empty()) {
+          continue;
+        }
         total_bytes += region.size;
       }
       total_size_str = format_size(total_bytes);
