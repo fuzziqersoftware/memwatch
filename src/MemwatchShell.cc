@@ -245,25 +245,22 @@ void MemwatchShell::command_dump(const string& args) {
 
 // find <data>
 void MemwatchShell::command_find(const string& args) {
-  vector<ProcessMemoryAdapter::Region> regions;
-  {
-    PauseGuard g(this->pause_target ? this->adapter : NULL);
-    regions = this->adapter->get_all_regions(true);
-  }
-
   string mask;
   string data = parse_data_string(args, &mask);
   if (data.empty()) {
     throw invalid_argument("no data was specified");
   }
 
+  vector<ProcessMemoryAdapter::Region> regions;
+  {
+    PauseGuard g(this->pause_target ? this->adapter : NULL);
+    regions = this->adapter->get_all_regions(true);
+  }
+
   this->find_results.clear();
 
   Signalable s;
   for (const auto& region : regions) {
-    if (s.is_signaled()) {
-      break;
-    }
     if (region.data.empty()) {
       continue;
     }
@@ -271,6 +268,13 @@ void MemwatchShell::command_find(const string& args) {
     // search through this region's data for the string
     size_t y, z;
     for (y = 0; y <= region.size - data.size(); y++) {
+      if ((y & 0x0000000000000FFF) == 0) {
+        if (s.is_signaled()) {
+          break;
+        }
+        fprintf(stderr, "... %016" PRIX64 "\r", region.addr + y);
+      }
+
       for (z = 0; z < data.size(); z++) {
         if (mask[z] && (region.data[y + z] != data[z])) {
           break;
@@ -285,6 +289,10 @@ void MemwatchShell::command_find(const string& args) {
             (region.protection & Protection::EXECUTABLE) ? 'x' : '-');
         this->find_results.emplace_back(region.addr + y);
       }
+    }
+
+    if ((y & 0x0000000000000FFF) == 0) {
+      fprintf(stderr, "%zu total results found\n", this->find_results.size());
     }
   }
 }
