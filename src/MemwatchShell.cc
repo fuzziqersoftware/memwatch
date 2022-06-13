@@ -290,11 +290,9 @@ void MemwatchShell::command_find(const string& args) {
         this->find_results.emplace_back(region.addr + y);
       }
     }
-
-    if ((y & 0x0000000000000FFF) == 0) {
-      fprintf(stderr, "%zu total results found\n", this->find_results.size());
-    }
   }
+
+  fprintf(stderr, "%zu total results found\n", this->find_results.size());
 }
 
 // access <addr> [mode]
