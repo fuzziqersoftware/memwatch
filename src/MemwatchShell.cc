@@ -257,39 +257,93 @@ void MemwatchShell::command_find(const string& args) {
     regions = this->adapter->get_all_regions(true);
   }
 
-  this->find_results.clear();
+  // Sort the regions by size, for best thread loadbalancing
+  sort(regions.begin(), regions.end(), +[](const ProcessMemoryAdapter::Region& a, const ProcessMemoryAdapter::Region& b) -> bool {
+    return a.data.size() > b.data.size();
+  });
+  vector<atomic<bool>> regions_claimed(regions.size());
+  for (auto& z : regions_claimed) {
+    z.store(false);
+  }
 
-  Signalable s;
+  atomic<size_t> searched_size = 0;
+  size_t total_size = 0;
   for (const auto& region : regions) {
     if (region.data.empty()) {
       continue;
     }
+    total_size += region.data.size();
+  }
 
-    // search through this region's data for the string
-    size_t y, z;
-    for (y = 0; y <= region.size - data.size(); y++) {
-      if ((y & 0x0000000000000FFF) == 0) {
-        if (s.is_signaled()) {
-          break;
-        }
-        fprintf(stderr, "... %016" PRIX64 "\r", region.addr + y);
+  this->find_results.clear();
+
+  auto search_thread_fn = [&](std::vector<pair<uint64_t, uint8_t>>& thread_results) {
+    Signalable s;
+    for (size_t x = 0; x < regions_claimed.size(); x++) {
+      if (regions_claimed[x].exchange(true)) {
+        continue; // Another thread already claimed this region
       }
 
-      for (z = 0; z < data.size(); z++) {
-        if (mask[z] && (region.data[y + z] != data[z])) {
-          break;
-        }
+      const auto& region = regions.at(x);
+      if (region.data.empty()) {
+        continue;
       }
 
-      if (z == data.size()) {
-        printf("(%zu) %016" PRIX64 " (%c%c%c)\n", this->find_results.size(),
-            region.addr + y,
-            (region.protection & Protection::READABLE) ? 'r' : '-',
-            (region.protection & Protection::WRITABLE) ? 'w' : '-',
-            (region.protection & Protection::EXECUTABLE) ? 'x' : '-');
-        this->find_results.emplace_back(region.addr + y);
+      size_t y, z;
+      for (y = 0; y <= region.size - data.size(); y++) {
+        if ((y & 0x0000000000000FFF) == 0) {
+          if (s.is_signaled()) {
+            break;
+          }
+          searched_size += 0x1000;
+        }
+
+        for (z = 0; z < data.size(); z++) {
+          if (mask[z] && (region.data[y + z] != data[z])) {
+            break;
+          }
+        }
+
+        if (z == data.size()) {
+          thread_results.emplace_back(region.addr + y, region.protection);
+        }
       }
     }
+  };
+
+  size_t num_threads = thread::hardware_concurrency();
+  vector<thread> threads;
+  vector<vector<pair<uint64_t, uint8_t>>> all_thread_results(num_threads);
+  while (threads.size() < num_threads) {
+    threads.emplace_back(search_thread_fn, std::ref(all_thread_results[threads.size()]));
+  }
+  while (searched_size < total_size) {
+    usleep(1000000);
+    size_t progress = searched_size.load();
+    string searched_str = format_size(progress);
+    string total_str = format_size(total_size);
+    fprintf(stderr, "%s/%s (%zu%%)\r", searched_str.c_str(), total_str.c_str(),
+        (progress * 100) / total_size);
+  }
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  vector<pair<uint64_t, uint8_t>> results;
+  for (const auto& thread_results : all_thread_results) {
+    results.insert(results.end(), thread_results.begin(), thread_results.end());
+  }
+  sort(results.begin(), results.end());
+
+  this->find_results.clear();
+  for (const auto& result : results) {
+    uint64_t addr = result.first;
+    uint8_t protection = result.second;
+    printf("(%zu) %016" PRIX64 " (%c%c%c)\n", this->find_results.size(), addr,
+        (protection & Protection::READABLE) ? 'r' : '-',
+        (protection & Protection::WRITABLE) ? 'w' : '-',
+        (protection & Protection::EXECUTABLE) ? 'x' : '-');
+    this->find_results.emplace_back(addr);
   }
 
   fprintf(stderr, "%zu total results found\n", this->find_results.size());
